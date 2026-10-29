@@ -1,0 +1,28 @@
+/* Team spaces */
+.teams .page-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.teams .page-heading p{color:#78796e;font-size:13px;margin-top:4px}
+.team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:16px}
+.team-card{display:flex;flex-direction:column;gap:6px;align-items:flex-start;text-align:left}
+.team-card small{color:#78796e;font-size:12px}
+.team-card.new input{width:100%;border:1px solid #dde4ed;border-radius:8px;padding:8px 10px}
+.members{display:flex;gap:6px;flex-wrap:wrap}
+.members span{font-size:12px;background:#f2f4ee;border-radius:99px;padding:2px 10px}
+.members span.me{background:#303b33;color:#fff}
+.invite-line{font-size:12px;margin:10px 0;word-break:break-all}
+.invite-line code{background:#f5f7fb;border-radius:6px;padding:2px 6px}
+.add-original{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.add-original input,.add-original textarea{border:1px solid #dde4ed;border-radius:8px;padding:8px 10px;font-size:14px}
+.team-original{margin-top:14px;display:flex;flex-direction:column;gap:10px}
+.team-original header{display:flex;justify-content:space-between;align-items:baseline}
+.team-original h2{font-size:16px}
+.team-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.team-actions select{border:1px solid #dde4ed;border-radius:8px;padding:6px 8px;max-width:260px}
+.team-compare{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.team-compare p{font-size:14px;margin:0}
+.marks{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.mark{font-size:11px;border-radius:99px;padding:1px 8px;background:#eef0f4;color:#5f6158}
+.mark.kept{background:#e3f1e8;color:#2f6b45}.mark.shifted{background:#fdf0d8;color:#8a5a12}.mark.missed{background:#f6e3e0;color:#8f4a39}
+.team-added h3{font-size:13px;margin-bottom:4px}
+.team-added ul{margin:0;padding-left:18px;font-size:13px}
+.teams .muted{color:#9a9b90;font-size:12px}
+.mark-row{display:inline-flex;align-items:center;gap:4px;font-size:11px;background:#f7f8fa;border-radius:99px;padding:1px 8px 1px 2px}

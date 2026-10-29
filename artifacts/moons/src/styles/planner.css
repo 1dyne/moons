@@ -1,0 +1,77 @@
+/* Planner: daily tasks with timers, projects, confidence */
+.planner .page-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.planner .page-heading p{color:#78796e;font-size:13px;margin-top:4px}
+.day-nav{display:flex;align-items:center;gap:4px}
+.day-nav input{border:1px solid #dde4ed;border-radius:8px;padding:6px 8px}
+.planner-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;align-items:start;margin-top:16px}
+@media (max-width:860px){.planner-grid{grid-template-columns:1fr}}
+.day-summary{display:flex;gap:14px;font-size:12px;color:#5f6158;margin-bottom:12px;align-items:center;flex-wrap:wrap}
+.day-summary span{background:#f2f4ee;border-radius:99px;padding:4px 10px}
+.running-bar{display:flex;align-items:center;gap:10px;background:#303b33;color:#fff;border-radius:12px;padding:10px 14px;margin-top:12px;font-size:13px}
+.running-bar .secondary{margin-left:auto}
+.pulse{width:9px;height:9px;border-radius:50%;background:#7fe0a4;animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.pulse{animation:none}}
+.add-task{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.add-task input,.add-task select{border:1px solid #dde4ed;border-radius:8px;padding:7px 9px;font-size:13px;background:#fff}
+.add-task input[aria-label]{flex:1;min-width:160px}
+.add-task .est,.add-task input[type=time]{flex:0 0 auto;width:96px;min-width:0}
+.task-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.task-row{display:flex;align-items:center;gap:10px;border:1px solid #e9edf3;border-radius:10px;padding:8px 10px}
+.task-row.done .task-main b{text-decoration:line-through;color:#9a9b90}
+.task-row.dropped{opacity:.5}
+.task-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.task-main b{font-size:14px;font-weight:600}
+.task-main small{font-size:11px;color:#78796e}
+.chip-link{font-size:11px;color:#3b66be;padding:0}
+.task-time{font-size:12px;color:#5f6158;white-space:nowrap}
+.task-time.over{color:#a24b35}
+.timer{border:1px solid #dde4ed}.timer.on{background:#303b33;color:#fff}
+.empty-note{font-size:13px;color:#9a9b90;padding:10px 0}
+.suggestions{margin-top:18px;border-top:1px solid #eef0f4;padding-top:14px}
+.suggestions h2{font-size:14px;display:flex;gap:6px;align-items:center}
+.suggestions p{font-size:12px;color:#78796e;margin:4px 0 10px}
+.suggestion{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:6px 0}
+.suggestion small{color:#9a9b90}
+.project-side .side-head h2,.confidence h2{font-size:14px;display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.project-link{display:flex;flex-direction:column;align-items:flex-start;width:100%;text-align:left;border:1px solid #e9edf3;border-radius:10px;padding:9px 11px;margin-bottom:6px}
+.project-link small{font-size:11px;color:#78796e}
+.new-project{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.new-project input{border:1px solid #dde4ed;border-radius:8px;padding:8px 10px}
+.new-project .label{font-size:12px;color:#5f6158}
+.step-board{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;counter-reset:step}
+.step-board>li{border-left:3px solid #c9d7f2;padding-left:12px}
+.step-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.step-head b::before{counter-increment:step;content:counter(step) '. ';color:#7ba4f8}
+.step-head small{font-size:11px;color:#9a9b90}
+.planner .sub{font-size:14px;margin:18px 0 8px}
+.confidence p{font-size:12px;color:#78796e;margin-bottom:8px}
+.confidence .scale-row{display:flex;gap:4px;flex-wrap:wrap}
+.confidence .scale-row button{width:30px;height:30px;border-radius:50%;border:1px solid #dde4ed;background:#fff;font-size:12px}
+.confidence .scale-row button.selected{background:#303b33;color:#fff;border-color:#303b33}
+.confidence .note{width:100%;border:1px solid #dde4ed;border-radius:8px;padding:7px 9px;margin:8px 0;font-size:12px}
+.spiral{width:180px;height:180px;display:block;margin:4px auto}
+.spiral .ring{fill:none;stroke:#eef0f4}
+.spiral .path{fill:none;stroke:#7ba4f8;stroke-width:1.5}
+.spiral .dot{fill:#7ba4f8}.spiral .dot.last{fill:#303b33}
+.evidence-line{font-size:12px;color:#5f6158}
+.observation{font-size:12px;color:#5b4a1f;background:#fbf3dc;border-radius:8px;padding:8px 10px}
+.project-page .form-label{margin-top:14px}
+.running-bar .secondary,.task-time{white-space:nowrap}
+.running-bar>span:nth-child(2){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* keep the stop button clear of the floating MOONS button on phones */
+@media (max-width:600px){.running-bar{margin-right:58px}.add-task .est,.add-task input[type=time]{width:84px}}
+/* Wishes: the bonus stage */
+.day-summary .rate{background:#303b33;color:#fff}
+.wish-toggle{display:inline-flex;align-items:center;gap:4px;font-size:12px;border:1px solid #dde4ed;border-radius:8px;padding:6px 9px;cursor:pointer;color:#5f6158}
+.wish-toggle input{display:none}
+.wish-toggle.on{background:#fff6d6;border-color:#e3b21a;color:#7a5a08}
+.wish-star{color:#e3b21a;fill:#e3b21a;margin-right:4px;vertical-align:-1px}
+.bonus{margin-top:16px;border:1px dashed #e3cf8a;border-radius:12px;padding:12px;background:#fffdf5;opacity:.7}
+.bonus.open{opacity:1;border-style:solid;border-color:#e3b21a;background:#fff9e6}
+.bonus h2{font-size:14px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.bonus h2 small{font-weight:400;font-size:11px;color:#8a7a4a;width:100%}
+.reward-ask{width:100%;display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding-left:28px}
+.reward-ask small{font-size:11px;color:#78796e}
+.chip-mini{font-size:11px;border:1px solid #e3cf8a;border-radius:99px;padding:2px 9px;background:#fff}
+.task-row{flex-wrap:wrap}

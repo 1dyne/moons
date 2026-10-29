@@ -1,0 +1,14 @@
+/* Operator AI settings: model per step, usage */
+.ai-models{border-collapse:collapse;width:100%;margin:6px 0 12px}
+.ai-models th{text-align:left;font-weight:500;font-size:13px;padding:6px 10px 6px 0;white-space:nowrap;vertical-align:top}
+.ai-models td{padding:4px 0;display:flex;flex-direction:column;gap:6px}
+.ai-models select,.ai-models input{font:inherit;font-size:16px;max-width:100%;border:1px solid #d9decd;border-radius:8px;padding:5px 8px;background:#fff}
+.ai-usage-scope{display:inline-flex;border:1px solid #d9decd;border-radius:99px;overflow:hidden;margin:4px 0}
+.ai-usage-scope button{padding:3px 12px;font-size:12.5px}
+.ai-usage-scope button[aria-pressed="true"]{background:#252720;color:#fff}
+.ai-usage-total{font-size:13px;color:#78796e}
+.ai-usage-wrap{overflow-x:auto}
+.ai-usage{border-collapse:collapse;width:100%;font-size:12.5px;font-variant-numeric:tabular-nums}
+.ai-usage th,.ai-usage td{text-align:left;padding:4px 8px;border-bottom:1px solid #eef0ea;white-space:nowrap}
+.ai-usage th{color:#78796e;font-weight:500}
+.settings-card .ai-models+button+h3,.settings-card h3{margin-top:16px}

@@ -1,0 +1,110 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+paths:
+  /workspace:
+    get:
+      operationId: getWorkspace
+      summary: Load or create the cookie-owned guest workspace
+      responses:
+        "200":
+          description: Guest workspace
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+    put:
+      operationId: saveWorkspace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceInput"
+      responses:
+        "200":
+          description: Saved workspace
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+  /workspace/actions:
+    post:
+      operationId: workspaceAction
+      summary: Owner-scoped analyze, chat, material, compare, check, import and notification actions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceActionInput"
+      responses:
+        "200":
+          description: Updated workspace and action result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+components:
+  schemas:
+    Workspace:
+      type: object
+      required: [guestId, revision, store]
+      properties:
+        guestId: {type: string}
+        revision: {type: integer}
+        store:
+          type: object
+          additionalProperties: true
+        result:
+          type: object
+          additionalProperties: true
+    WorkspaceInput:
+      type: object
+      required: [revision, store]
+      properties:
+        revision: {type: integer, minimum: 0}
+        store:
+          type: object
+          additionalProperties: true
+    WorkspaceActionInput:
+      type: object
+      required: [kind, revision, payload]
+      properties:
+        revision: {type: integer, minimum: 0}
+        kind:
+          type: string
+          enum: [import, analyze, chat, material, compare, check, notifications, refresh_notifications, concepts, question_ai, chat_note, explore_map]
+        payload:
+          type: object
+          additionalProperties: true
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+

@@ -1,0 +1,28 @@
+/* Outline structure: the user's sections, each a diagram, table or lines */
+.outline{display:flex;flex-direction:column;gap:18px;max-width:900px}
+.ol-section{border:1px solid #e3e8f0;border-radius:14px;background:#fff;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.ol-section header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ol-section h3{font-size:17px}
+.ol-no-title{font-size:13px!important;font-weight:500;color:#9a9b90;border:1px dashed #cfd6e2;border-radius:8px;padding:3px 10px}
+.ol-forms{display:flex;gap:2px;background:#f2f4ee;border-radius:99px;padding:2px}
+.ol-forms button{display:flex;align-items:center;gap:4px;font-size:12px;padding:4px 10px;border-radius:99px;color:#78796e}
+.ol-forms button.selected{background:#fff;color:#252720;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.ol-node{display:inline-flex;align-items:baseline;gap:6px;text-align:left;font-size:14px;line-height:1.5;padding:6px 10px;border:1px solid #e3e8f0;border-radius:10px;background:#fff;overflow-wrap:anywhere;max-width:100%}
+.ol-node:hover{border-color:#7ba4f8}
+.ol-node.chosen{border-color:#3b66be;box-shadow:0 0 0 2px #cddcfa}
+.ol-node.unsure{border-style:dashed;color:#6b6c62;background:#fafaf7}
+.ol-node.check{border-color:#e6a6a0}
+.ol-node small{font-size:10px;color:#a37b2c;background:#fbf1d9;border-radius:99px;padding:0 6px;white-space:nowrap}
+.ol-node.empty{border:1px dashed #cfd6e2;background:transparent}
+.ol-blank,.ol-blank-text{color:#a3a49a;font-size:12px;font-style:italic}
+.ol-blank{display:inline-block;border:1px dashed #dde2ea;border-radius:8px;padding:4px 8px}
+.ol-lines{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.ol-tree,.ol-tree ul{list-style:none;margin:0;padding:0}
+.ol-tree ul{margin-left:18px;padding-left:12px;border-left:2px solid #e3e8f0}
+.ol-tree li{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin:6px 0}
+.ol-rel{font-size:11px;color:#3b66be;background:#eef3fd;border-radius:99px;padding:0 8px}
+.ol-table-wrap{overflow-x:auto;max-width:100%}
+.ol-table{border-collapse:collapse;min-width:100%}
+.ol-table th,.ol-table td{border:1px solid #e3e8f0;padding:6px;vertical-align:top;text-align:left}
+.ol-table thead th{font-size:12px;color:#78796e;background:#f7f8f4;font-weight:600}
+@media (max-width:600px){.ol-section{padding:12px}.ol-tree ul{margin-left:8px;padding-left:8px}}

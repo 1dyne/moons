@@ -1,0 +1,45 @@
+/* Printable notes (PDF via the browser) and public share pages */
+.print-doc,.share-page{max-width:820px;margin:0 auto;padding:24px 20px 60px;color:#252720}
+.print-toolbar{display:flex;justify-content:space-between;align-items:center;background:#f2f4ee;border-radius:12px;padding:10px 14px;margin-bottom:20px;font-size:13px}
+.print-page{padding:28px 0;border-bottom:1px solid #eceee6}
+.print-page h1{font-size:24px;line-height:1.35}
+.print-page header p{color:#78796e;font-size:12px;margin-top:4px}
+.print-page h2{font-size:14px;margin:22px 0 8px;color:#3b4936}
+.print-page h2 small{font-weight:400;color:#78796e}
+.print-page .body p{font-size:15px;line-height:1.85;margin:0 0 6px}
+.print-page blockquote{margin:6px 0;padding:6px 12px;border-left:3px solid #7ba4f8;color:#3e4a5e;font-size:14px}
+.print-page ul{margin:0;padding-left:18px;font-size:14px;line-height:1.7}
+.print-page .cmp{list-style:none;padding:0}
+.print-page .cmp li{display:flex;flex-direction:column;gap:2px;padding:6px 0;border-bottom:1px dashed #eceee6}
+.print-page .cmp b{font-size:12px;color:#3b66be}
+.print-page .cmp q{font-size:13px}
+.print-page .cmp span{font-size:13px;color:#5f6158}
+.cover{min-height:60vh;display:flex;flex-direction:column;justify-content:center}
+.cover h1{font-size:34px}.cover p{color:#78796e}
+.toc{margin-top:28px;font-size:14px;line-height:2}
+.toc li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dotted #d8dbd0}
+.toc small{color:#9a9b90}
+.share-head{display:flex;gap:14px;align-items:center;padding-bottom:12px;border-bottom:1px solid #eceee6}
+.share-head h1{font-size:20px}.share-head p{font-size:12px;color:#78796e}
+.share-page>.spin{display:block;margin:30vh auto}
+.export-dialog{display:flex;flex-direction:column;gap:10px}
+.export-dialog .label{font-size:12px;color:#5f6158}
+.export-actions{display:flex;flex-wrap:wrap;gap:8px}
+.export-dialog .hint{font-size:11px;color:#9a9b90}
+.share-list{display:flex;flex-direction:column;gap:6px;border-top:1px solid #eef0f4;padding-top:10px}
+.share-row{display:flex;align-items:center;gap:6px;font-size:12px}
+.share-row code{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#f5f7fb;border-radius:6px;padding:4px 8px}
+@media print{
+  @page{margin:18mm 16mm}
+  body{background:#fff!important}
+  .no-print,.site-header,.nav,.agent-launch,.notice-banner,.toast,[class*="floating"]{display:none!important}
+  .print-doc{max-width:none;padding:0}
+  .print-page{border:0;break-after:page;padding:0}
+  .print-page:last-child{break-after:auto}
+  .print-page h2,.print-page blockquote,.print-page li{break-inside:avoid}
+}
+.google-button{width:100%;justify-content:center}
+.auth-or{text-align:center;font-size:12px;color:#9a9b90;margin:8px 0}
+.feedback-form{display:flex;flex-direction:column;gap:10px}
+.feedback-form textarea{border:1px solid #dde4ed;border-radius:10px;padding:10px;font-size:14px}
+.settings-card .hint{font-size:11px;color:#9a9b90;margin:6px 0}

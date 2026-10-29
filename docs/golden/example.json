@@ -1,0 +1,15 @@
+{
+  "id": "example",
+  "kind": "material",
+  "title": "시뮬레이션 에셋 만들기 (형식 예시)",
+  "text": "시뮬레이션 에셋 만들기\n제작과 평가\n먼저 3D 모양을 만들고, 그다음 시뮬레이션에서 평가한다. 제작은 점, 면, 격자 표현으로 나뉜다.\n평가는 재구성과 생성으로 나뉜다.\ncollider의 역할\ncollider는 물체끼리 부딪히는지 계산하는 데 쓴다. 문제는 오목한 물체다. 그래서 convex decomposition으로 근사한다.\nconvex hull은 물체 전체를 하나로 감싸지만, convex decomposition은 여러 볼록 조각으로 나눈다.",
+  "claims": [
+    {"subj": "3D 모양", "rel": "sequence", "obj": "시뮬레이션", "sentences": [2]},
+    {"subj": "제작", "rel": "part", "obj": "점, 면, 격자 표현", "sentences": [3]},
+    {"subj": "평가", "rel": "part", "obj": "재구성", "sentences": [4]},
+    {"subj": "오목한 물체", "rel": "solution", "obj": "convex decomposition", "sentences": [7, 8]},
+    {"subj": "convex hull", "rel": "contrast", "obj": "convex decomposition", "sentences": [9]}
+  ],
+  "frames": [{"heading": 1, "frame": "sequence"}, {"heading": 5, "frame": "problem"}],
+  "concepts": ["collider", "convex decomposition", "convex hull", "오목한 물체"]
+}

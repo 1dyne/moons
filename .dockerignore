@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.data
+.git
+.config
+.local
+.cache
+.migration-backup
+generated-artifacts
+attached_assets
+artifacts/api-server/.test-output
+artifacts/moons/public/mediapipe/wasm

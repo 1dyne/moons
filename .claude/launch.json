@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "moons-prod-local",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--enable-source-maps",
+        "artifacts/api-server/dist/index.mjs"
+      ],
+      "env": {
+        "PORT": "8080",
+        "WEB_DIST_DIR": "artifacts/moons/dist/public",
+        "PGLITE_DIR": ".data/pglite",
+        "STORAGE_DIR": ".data/files",
+        "SESSION_SECRET": "local-dev-only-session-secret-0000000000"
+      },
+      "port": 8080
+    }
+  ]
+}

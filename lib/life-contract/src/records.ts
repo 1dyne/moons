@@ -25,7 +25,8 @@ export const ProjectBody = z.object({
   status: z.enum(['active', 'done', 'paused', 'dropped']).default('active'),
   goalIds: z.array(z.string()).max(20).default([]),
 });
-export const Result = z.enum(['done', 'partial', 'in_progress', 'postponed', 'cancelled', 'unknown']);
+// missed: the user reported not doing it. Different from unknown (no report) and cancelled (no longer planned).
+export const Result = z.enum(['done', 'partial', 'in_progress', 'missed', 'postponed', 'cancelled', 'unknown']);
 export const TaskBody = z.object({
   title: text(200).min(1),
   category: z.enum(['must', 'want', 'leisure']).nullable().default(null),

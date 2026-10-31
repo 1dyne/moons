@@ -15,10 +15,11 @@ export function matchModules(text: string): ModuleType[] {
   return CATALOG.filter(c => c.triggers.some(w => t.includes(w.toLowerCase()))).map(c => c.module);
 }
 
-export function propose(text: string): Proposal {
+/** templateId: the user picked a template chip instead of (or along with) describing their day. */
+export function propose(text: string, templateId?: string): Proposal {
   const requested = matchModules(text);
   const score = (tpl: Template) => tpl.spec.modules.filter(m => requested.includes(m.type)).length * 2 - tpl.spec.modules.length * .1 + (requested[0] && tpl.spec.modules[0]!.type === requested[0] ? 1 : 0);
-  const template = [...TEMPLATES].sort((a, b) => score(b) - score(a))[0]!;
+  const template = TEMPLATES.find(t => t.id === templateId) ?? [...TEMPLATES].sort((a, b) => score(b) - score(a))[0]!;
   const base = new Set<ModuleType>([...template.spec.modules.map(m => m.type), ...requested]);
   const suggested: Proposal['suggested'] = [];
   for (const m of requested.length ? requested : template.spec.modules.map(m => m.type))

@@ -91,7 +91,7 @@ export function buildNow(all: AnyRecord[], settings: Settings, at: Date, opts: {
         };
       }),
       counts: has('life.read.outcome')
-        ? {planned: today.length, committed: today.filter(t => t.body.plan.state === 'committed').length, done: count('done'), partial: count('partial'), postponed: count('postponed'), cancelled: count('cancelled'), unknown: count('unknown')}
+        ? {planned: today.length, committed: today.filter(t => t.body.plan.state === 'committed').length, done: count('done'), partial: count('partial'), missed: count('missed'), postponed: count('postponed'), cancelled: count('cancelled'), unknown: count('unknown')}
         : {planned: today.length, committed: today.filter(t => t.body.plan.state === 'committed').length},
       routineRate: has('life.read.outcome') ? routineRate(records, day) : null,
     } : {state: 'not_shared' as const},

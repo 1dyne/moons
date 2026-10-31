@@ -1,0 +1,11 @@
+{
+  "name": "Planner · MOONS",
+  "short_name": "Planner",
+  "description": "대화로 만드는 나만의 플래너",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [{"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]
+}

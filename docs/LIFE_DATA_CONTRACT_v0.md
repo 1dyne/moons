@@ -103,7 +103,7 @@ type TaskBody = {
     target: {amount: number; unit: string} | null;   // 30 '분', 3 '세트', 20 '문제'
   };
   outcome: {
-    result: 'done' | 'partial' | 'in_progress' | 'postponed' | 'cancelled' | 'unknown';
+    result: 'done' | 'partial' | 'in_progress' | 'missed' | 'postponed' | 'cancelled' | 'unknown';  // missed = 사용자가 '못 했다'고 보고
     actualStart: string | null; actualEnd: string | null; completedAt: string | null;
     amount: number | null; unit: string | null;
     reason: string | null;                          // 사용자가 쓴 사유
@@ -114,6 +114,8 @@ type TaskBody = {
 };
 ```
 - `outcome.result='unknown'`이 기본이다. 하루가 지나도 자동으로 미수행이 되지 않는다.
+- `missed`는 사용자가 직접 "못 했다"고 남긴 경우만. `cancelled`(계획 취소)·`unknown`(보고 없음)과 다르다.
+- 소비자에게 `life.read.outcome` 범위가 없으면 `outcome`은 `null`로 온다("모름"이 아니라 "공유 안 됨").
 - 연기는 원래 task에 `postponed`+`postponedTo`, 새 날짜에 새 task가 생긴다(이력 보존).
 
 ### routine — 반복 정의
@@ -146,7 +148,7 @@ type ReviewBody = {horizon: 'day' | 'week' | 'month'; period: string; text: stri
 
 ## 5. 조회 API
 
-기본 주소 `https://<MOONS API>/life/v1`. 모든 응답에 `contractVersion: "0"`과 `asOf`(서버 시각).
+기본 주소 `https://<플래너 또는 MOONS 주소>/api/life/v1`. (현재 구현: 플래너 자신의 세션으로만 읽고 쓴다. 소비자 OAuth 범위는 P3.) 모든 응답에 `contractVersion: "0"`과 `asOf`(서버 시각).
 
 | 메서드·경로 | 용도 |
 | --- | --- |
@@ -177,7 +179,7 @@ type ReviewBody = {horizon: 'day' | 'week' | 'month'; period: string; text: stri
       {"id": "01J…", "title": "운동", "category": "want", "plan": "committed", "target": "30 분",
        "result": "unknown", "goalIds": []}
     ],
-    "counts": {"committed": 5, "done": 3, "partial": 0, "postponed": 1, "unknown": 1},
+    "counts": {"planned": 6, "committed": 5, "done": 3, "partial": 0, "missed": 0, "postponed": 1, "cancelled": 0, "unknown": 1},
     "routineRate": {"basis": "committed_today", "done": 2, "of": 3}
   },
   "goals": [
@@ -216,11 +218,11 @@ type ReviewBody = {horizon: 'day' | 'week' | 'month'; period: string; text: stri
 
 ## 8. 합성 예시
 
-P0 산출물로 `lib/life-contract/fixtures/`에 넣는다(실제 개인 데이터 없음):
-- `week-basic.json` — 7일 데일리, 월간 목표 1·연간 1, `pick_daily` 루틴, 연기 1건, 정정 1건, 삭제 1건, 미입력일 1일.
-- `condition-unset.json` — 수면·컨디션 모듈 미사용 계정.
-- `changes-out-of-order.json` — 순서가 뒤바뀐 revision·중복 수신.
-- 같은 내용을 노션 DB로 옮긴 형태(모의 우주의 노션 변환기와 비교용).
+`lib/life-contract/fixtures/week-basic.json`(생성: `lib/life-contract/src/fixtures.ts`, 실제 개인 데이터 없음). 파일에는 `records`(최신 상태), `history`(모든 revision), `nowExample`(마지막 날 `now` 응답)이 들어 있다. 아래 중 첫 항목은 완료, 나머지는 다음 단계:
+- [x] `week-basic.json` — 7일 데일리, 월간 목표 1·연간 1, `pick_daily` 루틴(못 함·미보고 포함), 연기 1건, 정정 1건, 삭제 1건, 미입력일 1일, 사적 회고 1건, 수면·컨디션 미사용.
+- [ ] `condition-unset.json` — 수면·컨디션 모듈 미사용 계정.
+- [ ] `changes-out-of-order.json` — 순서가 뒤바뀐 revision·중복 수신.
+- [ ] 같은 내용을 노션 DB로 옮긴 형태(모의 우주의 노션 변환기와 비교용).
 
 ## 9. 확정할 것 (모의 우주 담당과)
 

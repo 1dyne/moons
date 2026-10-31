@@ -1,0 +1,2055 @@
+{
+ "settings": {
+  "tz": "Asia/Seoul",
+  "dayBoundary": "04:00"
+ },
+ "modules": {
+  "sleep": false,
+  "condition": false
+ },
+ "records": [
+  {
+   "id": "01FIXTURE00000000000000001",
+   "kind": "goal",
+   "revision": 1,
+   "createdAt": "2026-10-26T00:00:00.000Z",
+   "updatedAt": "2026-10-26T00:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": null,
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "영어로 일하기",
+    "horizon": "year",
+    "period": "2026",
+    "parentGoalId": null,
+    "projectId": null,
+    "criterion": null,
+    "target": null,
+    "status": "active"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000002",
+   "kind": "goal",
+   "revision": 2,
+   "createdAt": "2026-10-26T00:01:00.000Z",
+   "updatedAt": "2026-10-26T00:01:00.000Z",
+   "deletedAt": null,
+   "logicalDay": null,
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 600개",
+    "horizon": "month",
+    "period": "2026-10",
+    "parentGoalId": "01FIXTURE00000000000000001",
+    "projectId": null,
+    "criterion": null,
+    "target": {
+     "amount": 600,
+     "unit": "단어",
+     "aggregation": "sum"
+    },
+    "status": "active"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000003",
+   "kind": "routine",
+   "revision": 3,
+   "createdAt": "2026-10-26T00:02:00.000Z",
+   "updatedAt": "2026-10-26T00:02:00.000Z",
+   "deletedAt": null,
+   "logicalDay": null,
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "recurrence": {
+     "freq": "daily"
+    },
+    "mode": "pick_daily",
+    "target": null,
+    "goalIds": [],
+    "active": true
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000004",
+   "kind": "routine",
+   "revision": 4,
+   "createdAt": "2026-10-26T00:03:00.000Z",
+   "updatedAt": "2026-10-26T00:03:00.000Z",
+   "deletedAt": null,
+   "logicalDay": null,
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "물 2L",
+    "recurrence": {
+     "freq": "daily"
+    },
+    "mode": "pick_daily",
+    "target": null,
+    "goalIds": [],
+    "active": true
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000005",
+   "kind": "task",
+   "revision": 5,
+   "createdAt": "2026-10-25T23:30:00.000Z",
+   "updatedAt": "2026-10-25T23:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-26",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 40개",
+    "category": "must",
+    "priority": null,
+    "goalIds": [
+     "01FIXTURE00000000000000002"
+    ],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "단어"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-26T21:00:00+09:00",
+     "amount": 40,
+     "unit": "단어",
+     "reason": null,
+     "reportedAt": "2026-10-26T21:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000006",
+   "kind": "task",
+   "revision": 6,
+   "createdAt": "2026-10-25T22:30:00.000Z",
+   "updatedAt": "2026-10-25T22:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-26",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000003",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-26T07:40:00+09:00",
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000007",
+   "kind": "task",
+   "revision": 7,
+   "createdAt": "2026-10-25T22:31:00.000Z",
+   "updatedAt": "2026-10-25T22:31:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-26",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "물 2L",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000004",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "unknown",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000008",
+   "kind": "task",
+   "revision": 8,
+   "createdAt": "2026-10-26T23:30:00.000Z",
+   "updatedAt": "2026-10-26T23:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-27",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 40개",
+    "category": "must",
+    "priority": null,
+    "goalIds": [
+     "01FIXTURE00000000000000002"
+    ],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "단어"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-27T21:00:00+09:00",
+     "amount": 40,
+     "unit": "단어",
+     "reason": null,
+     "reportedAt": "2026-10-27T21:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000009",
+   "kind": "task",
+   "revision": 9,
+   "createdAt": "2026-10-26T22:30:00.000Z",
+   "updatedAt": "2026-10-26T22:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-27",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000003",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "missed",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": "늦잠",
+     "reportedAt": "2026-10-27T22:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000010",
+   "kind": "task",
+   "revision": 10,
+   "createdAt": "2026-10-26T22:31:00.000Z",
+   "updatedAt": "2026-10-26T22:31:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-27",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "물 2L",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000004",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "unknown",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000011",
+   "kind": "task",
+   "revision": 11,
+   "createdAt": "2026-10-27T23:30:00.000Z",
+   "updatedAt": "2026-10-27T23:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-28",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 40개",
+    "category": "must",
+    "priority": null,
+    "goalIds": [
+     "01FIXTURE00000000000000002"
+    ],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "단어"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-28T21:00:00+09:00",
+     "amount": 40,
+     "unit": "단어",
+     "reason": null,
+     "reportedAt": "2026-10-28T21:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000012",
+   "kind": "task",
+   "revision": 12,
+   "createdAt": "2026-10-27T22:30:00.000Z",
+   "updatedAt": "2026-10-27T22:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-28",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000003",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-28T07:40:00+09:00",
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000013",
+   "kind": "task",
+   "revision": 13,
+   "createdAt": "2026-10-29T23:30:00.000Z",
+   "updatedAt": "2026-10-29T23:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-30",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 40개",
+    "category": "must",
+    "priority": null,
+    "goalIds": [
+     "01FIXTURE00000000000000002"
+    ],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "단어"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-30T21:00:00+09:00",
+     "amount": 40,
+     "unit": "단어",
+     "reason": null,
+     "reportedAt": "2026-10-30T21:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000014",
+   "kind": "task",
+   "revision": 14,
+   "createdAt": "2026-10-29T22:30:00.000Z",
+   "updatedAt": "2026-10-29T22:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-30",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000003",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-30T07:40:00+09:00",
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000015",
+   "kind": "task",
+   "revision": 15,
+   "createdAt": "2026-10-30T23:30:00.000Z",
+   "updatedAt": "2026-10-30T23:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-31",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 40개",
+    "category": "must",
+    "priority": null,
+    "goalIds": [
+     "01FIXTURE00000000000000002"
+    ],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "단어"
+     }
+    },
+    "outcome": {
+     "result": "partial",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": 15,
+     "unit": "단어",
+     "reason": "야근",
+     "reportedAt": "2026-10-31T23:10:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000016",
+   "kind": "task",
+   "revision": 16,
+   "createdAt": "2026-10-30T22:30:00.000Z",
+   "updatedAt": "2026-10-30T22:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-31",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000003",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "missed",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": "늦잠",
+     "reportedAt": "2026-10-31T22:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000017",
+   "kind": "task",
+   "revision": 17,
+   "createdAt": "2026-10-31T23:30:00.000Z",
+   "updatedAt": "2026-10-31T23:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 40개",
+    "category": "must",
+    "priority": null,
+    "goalIds": [
+     "01FIXTURE00000000000000002"
+    ],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "단어"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-11-01T21:00:00+09:00",
+     "amount": 40,
+     "unit": "단어",
+     "reason": null,
+     "reportedAt": "2026-11-01T21:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000018",
+   "kind": "task",
+   "revision": 18,
+   "createdAt": "2026-10-31T22:30:00.000Z",
+   "updatedAt": "2026-10-31T22:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000003",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-11-01T07:40:00+09:00",
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000020",
+   "kind": "task",
+   "revision": 20,
+   "createdAt": "2026-10-27T13:00:00.000Z",
+   "updatedAt": "2026-10-27T13:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-28",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "보고서 초안",
+    "category": "must",
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 2,
+      "unit": "시간"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-28T17:00:00+09:00",
+     "amount": 2,
+     "unit": "시간",
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000019",
+   "kind": "task",
+   "revision": 21,
+   "createdAt": "2026-10-27T00:00:00.000Z",
+   "updatedAt": "2026-10-27T13:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-27",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "보고서 초안",
+    "category": "must",
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 2,
+      "unit": "시간"
+     }
+    },
+    "outcome": {
+     "result": "postponed",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": "2026-10-27T22:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": "01FIXTURE00000000000000020"
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000021",
+   "kind": "task",
+   "revision": 23,
+   "createdAt": "2026-10-30T11:00:00.000Z",
+   "updatedAt": "2026-10-30T23:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-30",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "헬스 40분",
+    "category": "want",
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "분"
+     }
+    },
+    "outcome": {
+     "result": "partial",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": 20,
+     "unit": "분",
+     "reason": "시간 부족",
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000022",
+   "kind": "task",
+   "revision": 25,
+   "createdAt": "2026-11-01T01:00:00.000Z",
+   "updatedAt": "2026-11-01T01:05:00.000Z",
+   "deletedAt": "2026-11-01T01:05:00.000Z",
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "잘못 넣은 일",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "planned",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "unknown",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000023",
+   "kind": "review",
+   "revision": 26,
+   "createdAt": "2026-11-01T14:00:00.000Z",
+   "updatedAt": "2026-11-01T14:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "horizon": "day",
+    "period": "2026-11-01",
+    "text": "주말엔 루틴이 무너진다. 다음 주엔 스트레칭만 고르기."
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000024",
+   "kind": "review",
+   "revision": 27,
+   "createdAt": "2026-10-31T14:30:00.000Z",
+   "updatedAt": "2026-10-31T14:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-31",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "horizon": "day",
+    "period": "2026-10-31",
+    "text": "개인적인 메모"
+   },
+   "privateFields": [
+    "text"
+   ]
+  }
+ ],
+ "history": [
+  {
+   "id": "01FIXTURE00000000000000001",
+   "kind": "goal",
+   "revision": 1,
+   "createdAt": "2026-10-26T00:00:00.000Z",
+   "updatedAt": "2026-10-26T00:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": null,
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "영어로 일하기",
+    "horizon": "year",
+    "period": "2026",
+    "parentGoalId": null,
+    "projectId": null,
+    "criterion": null,
+    "target": null,
+    "status": "active"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000002",
+   "kind": "goal",
+   "revision": 2,
+   "createdAt": "2026-10-26T00:01:00.000Z",
+   "updatedAt": "2026-10-26T00:01:00.000Z",
+   "deletedAt": null,
+   "logicalDay": null,
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 600개",
+    "horizon": "month",
+    "period": "2026-10",
+    "parentGoalId": "01FIXTURE00000000000000001",
+    "projectId": null,
+    "criterion": null,
+    "target": {
+     "amount": 600,
+     "unit": "단어",
+     "aggregation": "sum"
+    },
+    "status": "active"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000003",
+   "kind": "routine",
+   "revision": 3,
+   "createdAt": "2026-10-26T00:02:00.000Z",
+   "updatedAt": "2026-10-26T00:02:00.000Z",
+   "deletedAt": null,
+   "logicalDay": null,
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "recurrence": {
+     "freq": "daily"
+    },
+    "mode": "pick_daily",
+    "target": null,
+    "goalIds": [],
+    "active": true
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000004",
+   "kind": "routine",
+   "revision": 4,
+   "createdAt": "2026-10-26T00:03:00.000Z",
+   "updatedAt": "2026-10-26T00:03:00.000Z",
+   "deletedAt": null,
+   "logicalDay": null,
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "물 2L",
+    "recurrence": {
+     "freq": "daily"
+    },
+    "mode": "pick_daily",
+    "target": null,
+    "goalIds": [],
+    "active": true
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000005",
+   "kind": "task",
+   "revision": 5,
+   "createdAt": "2026-10-25T23:30:00.000Z",
+   "updatedAt": "2026-10-25T23:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-26",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 40개",
+    "category": "must",
+    "priority": null,
+    "goalIds": [
+     "01FIXTURE00000000000000002"
+    ],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "단어"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-26T21:00:00+09:00",
+     "amount": 40,
+     "unit": "단어",
+     "reason": null,
+     "reportedAt": "2026-10-26T21:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000006",
+   "kind": "task",
+   "revision": 6,
+   "createdAt": "2026-10-25T22:30:00.000Z",
+   "updatedAt": "2026-10-25T22:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-26",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000003",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-26T07:40:00+09:00",
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000007",
+   "kind": "task",
+   "revision": 7,
+   "createdAt": "2026-10-25T22:31:00.000Z",
+   "updatedAt": "2026-10-25T22:31:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-26",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "물 2L",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000004",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "unknown",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000008",
+   "kind": "task",
+   "revision": 8,
+   "createdAt": "2026-10-26T23:30:00.000Z",
+   "updatedAt": "2026-10-26T23:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-27",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 40개",
+    "category": "must",
+    "priority": null,
+    "goalIds": [
+     "01FIXTURE00000000000000002"
+    ],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "단어"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-27T21:00:00+09:00",
+     "amount": 40,
+     "unit": "단어",
+     "reason": null,
+     "reportedAt": "2026-10-27T21:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000009",
+   "kind": "task",
+   "revision": 9,
+   "createdAt": "2026-10-26T22:30:00.000Z",
+   "updatedAt": "2026-10-26T22:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-27",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000003",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "missed",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": "늦잠",
+     "reportedAt": "2026-10-27T22:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000010",
+   "kind": "task",
+   "revision": 10,
+   "createdAt": "2026-10-26T22:31:00.000Z",
+   "updatedAt": "2026-10-26T22:31:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-27",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "물 2L",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000004",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "unknown",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000011",
+   "kind": "task",
+   "revision": 11,
+   "createdAt": "2026-10-27T23:30:00.000Z",
+   "updatedAt": "2026-10-27T23:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-28",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 40개",
+    "category": "must",
+    "priority": null,
+    "goalIds": [
+     "01FIXTURE00000000000000002"
+    ],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "단어"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-28T21:00:00+09:00",
+     "amount": 40,
+     "unit": "단어",
+     "reason": null,
+     "reportedAt": "2026-10-28T21:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000012",
+   "kind": "task",
+   "revision": 12,
+   "createdAt": "2026-10-27T22:30:00.000Z",
+   "updatedAt": "2026-10-27T22:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-28",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000003",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-28T07:40:00+09:00",
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000013",
+   "kind": "task",
+   "revision": 13,
+   "createdAt": "2026-10-29T23:30:00.000Z",
+   "updatedAt": "2026-10-29T23:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-30",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 40개",
+    "category": "must",
+    "priority": null,
+    "goalIds": [
+     "01FIXTURE00000000000000002"
+    ],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "단어"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-30T21:00:00+09:00",
+     "amount": 40,
+     "unit": "단어",
+     "reason": null,
+     "reportedAt": "2026-10-30T21:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000014",
+   "kind": "task",
+   "revision": 14,
+   "createdAt": "2026-10-29T22:30:00.000Z",
+   "updatedAt": "2026-10-29T22:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-30",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000003",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-30T07:40:00+09:00",
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000015",
+   "kind": "task",
+   "revision": 15,
+   "createdAt": "2026-10-30T23:30:00.000Z",
+   "updatedAt": "2026-10-30T23:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-31",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 40개",
+    "category": "must",
+    "priority": null,
+    "goalIds": [
+     "01FIXTURE00000000000000002"
+    ],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "단어"
+     }
+    },
+    "outcome": {
+     "result": "partial",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": 15,
+     "unit": "단어",
+     "reason": "야근",
+     "reportedAt": "2026-10-31T23:10:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000016",
+   "kind": "task",
+   "revision": 16,
+   "createdAt": "2026-10-30T22:30:00.000Z",
+   "updatedAt": "2026-10-30T22:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-31",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000003",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "missed",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": "늦잠",
+     "reportedAt": "2026-10-31T22:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000017",
+   "kind": "task",
+   "revision": 17,
+   "createdAt": "2026-10-31T23:30:00.000Z",
+   "updatedAt": "2026-10-31T23:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "단어 40개",
+    "category": "must",
+    "priority": null,
+    "goalIds": [
+     "01FIXTURE00000000000000002"
+    ],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "단어"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-11-01T21:00:00+09:00",
+     "amount": 40,
+     "unit": "단어",
+     "reason": null,
+     "reportedAt": "2026-11-01T21:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000018",
+   "kind": "task",
+   "revision": 18,
+   "createdAt": "2026-10-31T22:30:00.000Z",
+   "updatedAt": "2026-10-31T22:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "아침 스트레칭",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": "01FIXTURE00000000000000003",
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-11-01T07:40:00+09:00",
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000019",
+   "kind": "task",
+   "revision": 19,
+   "createdAt": "2026-10-27T00:00:00.000Z",
+   "updatedAt": "2026-10-27T00:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-27",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "보고서 초안",
+    "category": "must",
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 2,
+      "unit": "시간"
+     }
+    },
+    "outcome": {
+     "result": "unknown",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000020",
+   "kind": "task",
+   "revision": 20,
+   "createdAt": "2026-10-27T13:00:00.000Z",
+   "updatedAt": "2026-10-27T13:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-28",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "보고서 초안",
+    "category": "must",
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 2,
+      "unit": "시간"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": "2026-10-28T17:00:00+09:00",
+     "amount": 2,
+     "unit": "시간",
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000019",
+   "kind": "task",
+   "revision": 21,
+   "createdAt": "2026-10-27T00:00:00.000Z",
+   "updatedAt": "2026-10-27T13:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-27",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "보고서 초안",
+    "category": "must",
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 2,
+      "unit": "시간"
+     }
+    },
+    "outcome": {
+     "result": "postponed",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": "2026-10-27T22:00:00+09:00",
+     "basis": "self_report",
+     "postponedTo": "01FIXTURE00000000000000020"
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000021",
+   "kind": "task",
+   "revision": 22,
+   "createdAt": "2026-10-30T11:00:00.000Z",
+   "updatedAt": "2026-10-30T11:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-30",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "헬스 40분",
+    "category": "want",
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "분"
+     }
+    },
+    "outcome": {
+     "result": "done",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": 40,
+     "unit": "분",
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000021",
+   "kind": "task",
+   "revision": 23,
+   "createdAt": "2026-10-30T11:00:00.000Z",
+   "updatedAt": "2026-10-30T23:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-30",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "헬스 40분",
+    "category": "want",
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "committed",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": {
+      "amount": 40,
+      "unit": "분"
+     }
+    },
+    "outcome": {
+     "result": "partial",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": 20,
+     "unit": "분",
+     "reason": "시간 부족",
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000022",
+   "kind": "task",
+   "revision": 24,
+   "createdAt": "2026-11-01T01:00:00.000Z",
+   "updatedAt": "2026-11-01T01:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "잘못 넣은 일",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "planned",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "unknown",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000022",
+   "kind": "task",
+   "revision": 25,
+   "createdAt": "2026-11-01T01:00:00.000Z",
+   "updatedAt": "2026-11-01T01:05:00.000Z",
+   "deletedAt": "2026-11-01T01:05:00.000Z",
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "title": "잘못 넣은 일",
+    "category": null,
+    "priority": null,
+    "goalIds": [],
+    "projectId": null,
+    "routineId": null,
+    "plan": {
+     "state": "planned",
+     "due": null,
+     "start": null,
+     "end": null,
+     "target": null
+    },
+    "outcome": {
+     "result": "unknown",
+     "actualStart": null,
+     "actualEnd": null,
+     "completedAt": null,
+     "amount": null,
+     "unit": null,
+     "reason": null,
+     "reportedAt": null,
+     "basis": "self_report",
+     "postponedTo": null
+    }
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000023",
+   "kind": "review",
+   "revision": 26,
+   "createdAt": "2026-11-01T14:00:00.000Z",
+   "updatedAt": "2026-11-01T14:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "horizon": "day",
+    "period": "2026-11-01",
+    "text": "주말엔 루틴이 무너진다. 다음 주엔 스트레칭만 고르기."
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000024",
+   "kind": "review",
+   "revision": 27,
+   "createdAt": "2026-10-31T14:30:00.000Z",
+   "updatedAt": "2026-10-31T14:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-31",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "horizon": "day",
+    "period": "2026-10-31",
+    "text": "개인적인 메모"
+   },
+   "privateFields": [
+    "text"
+   ]
+  }
+ ],
+ "nowExample": {
+  "contractVersion": "0",
+  "asOf": "2026-11-01T05:00:00.000Z",
+  "revision": 27,
+  "user": {
+   "tz": "Asia/Seoul",
+   "dayBoundary": "04:00",
+   "logicalDay": "2026-11-01",
+   "localTime": "14:00"
+  },
+  "lastActivityAt": "2026-10-31T14:30:00.000Z",
+  "today": {
+   "tasks": [
+    {
+     "id": "01FIXTURE00000000000000017",
+     "title": "단어 40개",
+     "category": "must",
+     "plan": "committed",
+     "target": "40 단어",
+     "result": "done",
+     "amount": "40 단어",
+     "goalIds": [
+      "01FIXTURE00000000000000002"
+     ],
+     "routineId": null
+    },
+    {
+     "id": "01FIXTURE00000000000000018",
+     "title": "아침 스트레칭",
+     "category": null,
+     "plan": "committed",
+     "target": null,
+     "result": "done",
+     "amount": null,
+     "goalIds": [],
+     "routineId": "01FIXTURE00000000000000003"
+    }
+   ],
+   "counts": {
+    "planned": 2,
+    "committed": 2,
+    "done": 2,
+    "partial": 0,
+    "missed": 0,
+    "postponed": 0,
+    "cancelled": 0,
+    "unknown": 0
+   },
+   "routineRate": {
+    "basis": "committed_today",
+    "done": 1,
+    "of": 1
+   }
+  },
+  "goals": [
+   {
+    "id": "01FIXTURE00000000000000001",
+    "horizon": "year",
+    "period": "2026",
+    "title": "영어로 일하기",
+    "target": null,
+    "progress": null,
+    "parentId": null
+   }
+  ],
+  "condition": {
+   "state": "unset"
+  },
+  "sleep": {
+   "state": "unset"
+  },
+  "freshness": {
+   "todayUpdatedAt": "2026-11-01T14:00:00.000Z",
+   "stale": false
+  }
+ }
+}

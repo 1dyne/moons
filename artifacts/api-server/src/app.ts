@@ -11,6 +11,8 @@ import {CLERK_PROXY_PATH,clerkProxyMiddleware,getClerkProxyHost} from "./middlew
 import {clerkEnabled,clerkProxyEnabled} from "./moons/lib/server/product-config";
 import {serveWeb} from "./web";
 import {mcpRouter} from "./moons/mcp-router";
+import {lifeRouter} from "./life/router";
+import {checkOrigin} from "./moons/workspace-router";
 
 const app: Express = express();
 
@@ -44,6 +46,8 @@ if(clerkEnabled()){
 app.get("/api/version",(_req,res)=>res.set("Cache-Control","no-store").json({commit:process.env.MOONS_BUILD_COMMIT??"unknown"}));
 // OAuth (/.well-known, /authorize, /token, /register) and /mcp live at the root for AI connectors.
 app.use(mcpRouter());
+// Life data hub: the planner Satellite's store and the read API for 모의 우주·에너지긴축모드.
+app.use("/api/life/v1", lifeRouter(checkOrigin));
 app.use("/api", workspaceRouter);
 app.use("/api", productRouter);
 app.use(express.json());

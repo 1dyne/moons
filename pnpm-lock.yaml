@@ -184,9 +184,15 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/life-contract':
+        specifier: workspace:*
+        version: link:../../lib/life-contract
       '@workspace/moons-sync':
         specifier: workspace:*
         version: link:../../lib/moons-sync
+      '@workspace/planner-spec':
+        specifier: workspace:*
+        version: link:../../lib/planner-spec
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -518,7 +524,30 @@ importers:
         specifier: ^0.31.10
         version: 0.31.10
 
+  lib/life-contract:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.6
+
   lib/moons-sync: {}
+
+  lib/planner-spec:
+    dependencies:
+      '@workspace/life-contract':
+        specifier: workspace:*
+        version: link:../life-contract
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.6
 
   scripts:
     devDependencies:

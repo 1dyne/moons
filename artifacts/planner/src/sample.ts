@@ -15,12 +15,20 @@ export function sampleRecords(spec: PlannerSpec, today: string, tz: string): Any
   const out: AnyRecord[] = [year, month, week];
   for (let i = 1; i <= 6; i++) out.push(rec('task', {title: '단어 외우기', category: 'must', goalIds: [month.id], plan: {state: 'committed', target: {amount: 40, unit: '단어'}}, outcome: {result: i === 3 ? 'partial' : 'done', amount: i === 3 ? 15 : 40}}, addDays(today, -i)));
   for (const d of [-1, -3]) out.push(rec('task', {title: '헬스 40분', category: 'want', goalIds: [week.id], plan: {state: 'committed', target: {amount: 40, unit: '분'}}, outcome: {result: 'done'}}, addDays(today, d)));
-  out.push(
-    rec('task', {title: '단어 40개', category: 'must', goalIds: [month.id], plan: {state: 'committed', target: {amount: 40, unit: '단어'}}, outcome: {result: 'done', amount: 40, unit: '단어'}}, today),
-    rec('task', {title: '보고서 초안', category: 'must', priority: 1, plan: {state: 'committed', target: {amount: 2, unit: '시간'}}}, today),
+  const words = rec('task', {title: '단어 40개', category: 'must', goalIds: [month.id], plan: {state: 'committed', target: {amount: 40, unit: '단어'}}, outcome: {result: 'done', amount: 40, unit: '단어'}}, today);
+  const report = rec('task', {title: '보고서 초안', category: 'must', priority: 1, plan: {state: 'committed', target: {amount: 2, unit: '시간'}}, outcome: {result: 'in_progress'}}, today);
+  out.push(words, report,
     rec('task', {title: '헬스 40분', category: 'want', goalIds: [week.id], plan: {state: 'committed', target: {amount: 40, unit: '분'}}}, today),
     rec('task', {title: '영화 보기', category: 'leisure', plan: {state: 'planned'}}, today),
   );
+  // Focus sessions: two finished blocks and one running now, so the timer, timetable and receipt look alive.
+  const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+  out.push(
+    rec('session', {taskId: words.id, label: '단어 40개', start: ago(200), end: ago(150), source: 'timer'}, today),
+    rec('session', {taskId: report.id, label: '보고서 초안', start: ago(130), end: ago(70), source: 'manual'}, today),
+    rec('session', {taskId: report.id, label: '보고서 초안', start: ago(25), source: 'timer'}, today),
+  );
+  for (let i = 1; i <= 6; i++) out.push(rec('session', {taskId: null, label: '단어 외우기', start: `${addDays(today, -i)}T12:00:00.000Z`, end: `${addDays(today, -i)}T${i % 2 ? '13:10' : '14:30'}:00.000Z`}, addDays(today, -i)));
   if (uses(spec, 'routine')) {
     const mode = spec.modules.find(m => m.type === 'routine')!.options.mode === 'fixed_all' ? 'fixed_all' : 'pick_daily';
     const titles = ['아침 스트레칭', '물 2L', '명상 10분', '일기'], rs = titles.map(title => rec('routine', {title, recurrence: {freq: 'daily'}, mode}));

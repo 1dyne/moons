@@ -5,10 +5,10 @@ import {z} from 'zod';
 export const CHIP_COLORS = {sky: '#8aaaf8', blue: '#3a66b8', beige: '#efe2d6', teal: '#00838f', green: '#2f9585', mint: '#3f9a8a', yellow: '#fbe4b0', red: '#b05a57'} as const;
 export type ChipColor = keyof typeof CHIP_COLORS;
 
-export const MODULE_TYPES = ['tasks', 'routine', 'goals', 'condition', 'sleep', 'review', 'timeblock', 'projects', 'metric', 'memo'] as const;
+export const MODULE_TYPES = ['tasks', 'timer', 'routine', 'goals', 'condition', 'sleep', 'review', 'timeblock', 'projects', 'metric', 'memo'] as const;
 export type ModuleType = (typeof MODULE_TYPES)[number];
 /** Modules the renderer draws today. The rest are accepted in a spec but shown as "coming soon". */
-export const RENDERED: ModuleType[] = ['tasks', 'routine', 'goals', 'condition', 'sleep', 'review'];
+export const RENDERED: ModuleType[] = ['tasks', 'timer', 'routine', 'goals', 'condition', 'sleep', 'review'];
 
 const Field = z.object({
   fieldId: z.string().regex(/^[a-z][a-zA-Z0-9_.]{0,60}$/),

@@ -33,6 +33,8 @@ const records = [
   rec('task', 'T3', {title: '스트레칭', routineId: 'R1', plan: {state: 'committed'}, outcome: {result: 'done'}}, '2026-10-31'),
   rec('task', 'T4', {title: '운동', category: 'want', plan: {state: 'committed'}}, '2026-10-31'),
   rec('task', 'T5', {title: '지운 일', goalIds: ['M'], plan: {state: 'committed'}, outcome: {result: 'done', amount: 500, unit: '단어'}}, '2026-10-31', {deletedAt: '2026-10-31T02:00:00Z'}),
+  rec('session', 'S1', {taskId: 'T1', label: '단어 50개', start: '2026-10-31T10:00:00Z', end: '2026-10-31T10:50:00Z'}, '2026-10-31'),
+  rec('session', 'S2', {taskId: 'T4', label: '운동', start: '2026-10-31T12:40:00Z'}, '2026-10-31'),
   rec('condition', 'C1', {at: '2026-10-31T02:00:00Z', energy: 3, mood: '피곤'}, '2026-10-31', {privateFields: ['mood']}),
 ];
 
@@ -59,4 +61,16 @@ test('now: unknown stays unknown, private fields and unshared kinds are withheld
   if (!('state' in planOnly.today)) assert.equal(planOnly.today.tasks[0]!.result, 'not_shared');
   assert.deepEqual(planOnly.condition, {state: 'not_shared'});
   assert.equal(shareable(records.find(r => r.id === 'C1')!, ['life.read.plan']), null);
+});
+
+test('focus: the running session counts up to now and is reported as active', () => {
+  const at = new Date('2026-10-31T13:05:00Z');
+  const n = buildNow(records, settings, at, {revision: rev, scopes: ALL_SCOPES, modules: {sleep: false, condition: true, timer: true}, lastActivityAt: null});
+  assert.ok(n.focus.state === 'ok');
+  if (n.focus.state === 'ok') {
+    assert.equal(n.focus.todayMinutes, 75);
+    assert.deepEqual(n.focus.active, {sessionId: 'S2', taskId: 'T4', title: '운동', startedAt: '2026-10-31T12:40:00Z', minutes: 25});
+    assert.deepEqual(n.focus.byTask.map(r => [r.title, r.minutes]), [['단어 50개', 50], ['운동', 25]]);
+  }
+  assert.deepEqual(buildNow(records, settings, at, {revision: rev, scopes: ['life.read.plan'], modules: {sleep: false, condition: false, timer: true}, lastActivityAt: null}).focus, {state: 'not_shared'});
 });

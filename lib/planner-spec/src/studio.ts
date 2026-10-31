@@ -25,7 +25,10 @@ export function propose(text: string, templateId?: string): Proposal {
   for (const m of requested.length ? requested : template.spec.modules.map(m => m.type))
     for (const c of entry(m)?.companions ?? [])
       if (!base.has(c.module) && !suggested.some(s => s.module === c.module)) suggested.push(c);
-  const questions = [...base].flatMap(m => entry(m)?.questions ?? []).filter(q => requested.length === 0 || requested.includes(q.module)).slice(0, 3);
+  // Up to three questions, taking turns across the modules asked about so each gets its most important one first.
+  const pools = [...base].filter(m => requested.length === 0 || requested.includes(m)).map(m => [...(entry(m)?.questions ?? [])]);
+  const questions: Question[] = [];
+  for (let round = 0; questions.length < 3 && pools.some(q => q.length > round); round++) for (const pool of pools) if (pool[round] && questions.length < 3) questions.push(pool[round]!);
   return {template, requested, suggested, questions};
 }
 

@@ -29,6 +29,7 @@ export const CATALOG: CatalogEntry[] = [
     ],
     companions: [
       {module: 'review', why: '못 한 이유가 쌓이면 루틴을 고칠 근거가 돼요.'},
+      {module: 'timer', why: '루틴에 실제로 쓴 시간을 재면 "했다"보다 정확한 기록이 돼요.'},
       {module: 'goals', why: '루틴이 어떤 목표를 위한 건지 이어 두면 월간 달성률로 볼 수 있어요.'},
     ]},
   {module: 'tasks', label: '할 일', triggers: ['할 일', '할일', '투두', 'todo', 'to-do', '과업', '데일리', '일정', '하루', 'daily', '플래너'],
@@ -43,8 +44,26 @@ export const CATALOG: CatalogEntry[] = [
       ]},
     ],
     companions: [
+      {module: 'timer', why: '할 일에 실제로 몇 분 집중했는지 재면, 하루가 끝날 때 영수증처럼 받아 볼 수 있어요.'},
       {module: 'goals', why: '오늘 할 일을 월간·연간 목표에 이어 두면, 하루를 쓰는 것만으로 목표 진행이 쌓여요.'},
       {module: 'review', why: '하루 끝에 한 줄을 남기면 다음 날 계획이 쉬워져요.'},
+    ]},
+  {module: 'timer', label: '타임 트래커', triggers: ['타임트래커', '타임 트래커', '타이머', '스톱워치', '열품타', '순공', '집중', '공부 시간', '공부시간', '타임테이블', '시간표', '시간 기록', '타임라인', 'time tracker', 'timer', 'pomodoro', '뽀모도로'],
+    questions: [
+      {id: 'timer.input', module: 'timer', text: '시간은 어떻게 남길까요?', choices: [
+        {id: 'both', label: '스톱워치 + 칸 칠하기', effects: [{kind: 'option', module: 'timer', key: 'input', value: 'both'}]},
+        {id: 'timer', label: '스톱워치로만', effects: [{kind: 'option', module: 'timer', key: 'input', value: 'timer'}]},
+        {id: 'manual', label: '끝나고 칸만 칠할래요', effects: [{kind: 'option', module: 'timer', key: 'input', value: 'manual'}]},
+      ]},
+      {id: 'timer.range', module: 'timer', text: '타임테이블은 몇 시부터 그릴까요?', choices: [
+        {id: '5', label: '새벽 5시', effects: [{kind: 'option', module: 'timer', key: 'startHour', value: 5}]},
+        {id: '6', label: '아침 6시', effects: [{kind: 'option', module: 'timer', key: 'startHour', value: 6}]},
+        {id: '8', label: '아침 8시', effects: [{kind: 'option', module: 'timer', key: 'startHour', value: 8}]},
+      ]},
+    ],
+    companions: [
+      {module: 'tasks', why: '할 일마다 실제로 쓴 시간이 붙으면 계획과 실제를 나란히 볼 수 있어요.'},
+      {module: 'review', why: '하루 끝에 영수증을 보고 한 줄 남기면 다음 날 계획이 정확해져요.'},
     ]},
   {module: 'goals', label: '목표', triggers: ['목표', '연간', '월간', '주간', 'goal', '계획', '프로젝트', '대시보드'],
     questions: [
@@ -74,6 +93,7 @@ export const defaultModule = (type: ModuleType, order: number): ModuleSpec => {
   if (type === 'routine') return mod('routine', 'routine', '오늘의 루틴', order, {mode: 'pick_daily'});
   if (type === 'tasks') return mod('tasks', 'tasks', '할 일', order, {categories: true, amounts: true});
   if (type === 'goals') return mod('goals', 'goals', '이어진 목표', order, {levels: ['year', 'month', 'week']});
+  if (type === 'timer') return {...mod('timer', 'timer', '타임테이블', order, {input: 'both', startHour: 6}), view: 'timeline'};
   if (type === 'review') return mod('review', 'review', '하루 돌아보기', order);
   return mod(type, type, label, order);
 };
@@ -85,10 +105,10 @@ const spec = (name: string, accent: PlannerSpec['theme']['accent'], modules: Mod
   rules: [{kind: 'day_boundary', at: '04:00'}, ...rules], source: {kind: 'template'},
 });
 export const TEMPLATES: Template[] = [
-  {id: 'daily', name: '하루 정리', summary: '오늘 할 일을 쓰고, 목표로 이어 보고, 하루를 한 줄로 닫아요.',
-    spec: spec('하루 정리', 'blue', [defaultModule('tasks', 0), defaultModule('goals', 1), defaultModule('review', 2)])},
+  {id: 'daily', name: '하루 정리', summary: '왼쪽엔 할 일, 오른쪽엔 10분 타임테이블. 집중한 시간이 쌓여 하루 영수증이 돼요.',
+    spec: spec('하루 정리', 'blue', [defaultModule('tasks', 0), defaultModule('timer', 1), defaultModule('goals', 2), defaultModule('review', 3)])},
   {id: 'routine', name: '오늘의 루틴', summary: '그날 할 루틴을 고르고, 고른 것만으로 달성률을 봐요. 컨디션도 같이.',
     spec: spec('오늘의 루틴', 'green', [defaultModule('routine', 0), defaultModule('tasks', 1), defaultModule('condition', 2), defaultModule('review', 3)], [{kind: 'achievement_basis', moduleId: 'routine', basis: 'committed_today'}])},
   {id: 'ladder', name: '목표 사다리', summary: '연간 → 월간 → 주간 목표를 세우고, 매일 할 일이 그 사다리를 올라가요.',
-    spec: spec('목표 사다리', 'teal', [defaultModule('goals', 0), defaultModule('tasks', 1), defaultModule('review', 2)])},
+    spec: spec('목표 사다리', 'teal', [defaultModule('goals', 0), defaultModule('tasks', 1), defaultModule('timer', 2), defaultModule('review', 3)])},
 ];

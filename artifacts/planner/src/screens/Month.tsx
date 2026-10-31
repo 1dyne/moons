@@ -1,6 +1,7 @@
-import {addDays, periodContains, weekday} from '@workspace/life-contract';
+import {addDays, focusOf, periodContains, weekday} from '@workspace/life-contract';
 import {ofKind, type Planner} from '../data.ts';
 import {GoalBar, horizonLabel, type Nav} from './Today.tsx';
+import {hm} from './Focus.tsx';
 
 export function Month({p, nav, month, setMonth, today}: {p: Planner; nav: Nav; month: string; setMonth: (m: string) => void; today: string}) {
   const first = `${month}-01`, start = addDays(first, -((weekday(first) + 6) % 7));
@@ -15,8 +16,10 @@ export function Month({p, nav, month, setMonth, today}: {p: Planner; nav: Nav; m
       {['월', '화', '수', '목', '금', '토', '일'].map(d => <span key={d} className="dow">{d}</span>)}
       {cells.map(d => {
         const list = tasks.filter(t => t.logicalDay === d && t.body.plan.state !== 'dropped'), done = list.filter(t => t.body.outcome.result === 'done').length;
+        const focus = focusOf(p.records, d, new Date()).todayMinutes;
         return <button key={d} className={`cell ${periodContains(month, d) ? '' : 'out'} ${d === today ? 'today' : ''}`} onClick={() => nav.setDay(d)}>
           <span className="date">{Number(d.slice(8))}</span>
+          {focus > 0 && <span className="focus-min">{hm(focus)}</span>}
           {list.length > 0 && <span className="count">{done}/{list.length}</span>}
           {list.length > 0 && <i className="fill" style={{height: `${Math.round(done / list.length * 100)}%`}} />}
         </button>;

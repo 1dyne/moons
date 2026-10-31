@@ -56,7 +56,7 @@ export function lifeRouter(checkOrigin: (req: Request) => void) {
     res.set({ETag: tag, 'Cache-Control': 'private, no-cache'});
     if (req.get('if-none-match') === tag) { res.status(304).end(); return undefined; }
     const spec = (await getSpec(owner))?.spec as PlannerSpec | undefined;
-    return buildNow(await allRecords(owner), settings, at, {revision: settings.revision, scopes: ALL_SCOPES, lastActivityAt: await lastActivity(owner), modules: {sleep: !!spec && uses(spec, 'sleep'), condition: !!spec && uses(spec, 'condition')}});
+    return buildNow(await allRecords(owner), settings, at, {revision: settings.revision, scopes: ALL_SCOPES, lastActivityAt: await lastActivity(owner), modules: {sleep: !!spec && uses(spec, 'sleep'), condition: !!spec && uses(spec, 'condition'), timer: !!spec && uses(spec, 'timer')}});
   }));
   return router;
 }

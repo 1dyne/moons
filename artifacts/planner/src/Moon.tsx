@@ -1,7 +1,7 @@
 import {useEffect, useId, useRef} from 'react';
 
-// The MOONS moon, recoloured beige for the planner Satellite: same shape, eyes, gaze and blink, no outline.
-export function Moon({size = 44, body = '#efe2d6', shade = '#d8c3aa'}: {size?: number; body?: string; shade?: string}) {
+// The MOONS moon, recoloured yellow for the planner Satellite: same shape, eyes, gaze and blink, no outline.
+export function Moon({size = 44, body = '#fbe4b0', shade = '#efc86a'}: {size?: number; body?: string; shade?: string}) {
   const clip = useId().replace(/:/g, ''), svg = useRef<SVGSVGElement>(null), eyes = useRef<SVGGElement>(null), shadow = useRef<SVGPathElement>(null);
   useEffect(() => {
     let frame = 0, lastMove = performance.now(), previous = lastMove, lookX = 0, lookY = 0, targetX = 0, targetY = 0, idleX = 0, idleY = 0, nextGlance = lastMove + 1200, nextBlink = lastMove + 3500, blinkStart = -1000;

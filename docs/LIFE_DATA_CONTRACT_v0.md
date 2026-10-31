@@ -39,7 +39,7 @@ type LifeRecord<K extends Kind, B> = {
   body: B;
   ext?: Record<string, unknown>;  // 사용자 추가 속성. 공통 의미 아님. 소비자는 무시해도 된다
 };
-type Kind = 'goal' | 'project' | 'task' | 'routine' | 'sleep' | 'condition' | 'review';
+type Kind = 'goal' | 'project' | 'task' | 'routine' | 'sleep' | 'condition' | 'review' | 'session';
 ```
 
 중복 판단 키: `(sourceKind='moons-life', connectionId, id, revision)`. 같은 키는 같은 데이터다. 같은 `id`의 더 큰 `revision`이 최신이다. 더 작은 revision이 늦게 도착하면 버린다.
@@ -52,7 +52,7 @@ type Kind = 'goal' | 'project' | 'task' | 'routine' | 'sleep' | 'condition' | 'r
 | scope | 내용 |
 | --- | --- |
 | `life.read.plan` | goal·project·task 계획·routine 정의 |
-| `life.read.outcome` | task 결과·routine 인스턴스 결과 |
+| `life.read.outcome` | task 결과·routine 인스턴스 결과·집중 기록(session) |
 | `life.read.condition` | sleep·condition |
 | `life.read.review` | review 중 공유 허용 본문 |
 
@@ -140,6 +140,20 @@ type ConditionBody = {at: string; energy: 1 | 2 | 3 | 4 | 5 | null; mood: string
 ```
 모듈을 쓰지 않으면 기록이 없고, `now`에 `state:'unset'`으로 나온다. 쓰지만 그날 입력이 없으면 `state:'empty'`.
 
+### session — 실제 집중 시간 (타임 트래커)
+
+```ts
+type SessionBody = {
+  taskId: string | null;      // 어떤 할 일에 썼나(없으면 label만)
+  label: string;
+  start: string;              // ISO-8601
+  end: string | null;         // null = 지금 집중 중(한 번에 하나)
+  source: 'timer' | 'manual'; // 스톱워치 / 타임테이블에 직접 칠함
+};
+```
+- `logicalDay`는 시작 시각의 논리 하루. 계획(`task.plan`)이 아니라 **측정값**이다.
+- 버디 피드백의 "실제 집중 시간"은 이 기록에서 나온다. `task.outcome`의 완료 보고와는 별개다.
+
 ### review — 하루·주·월 회고
 
 ```ts
@@ -189,6 +203,12 @@ type ReviewBody = {horizon: 'day' | 'week' | 'month'; period: string; text: stri
   ],
   "condition": {"state": "ok", "energy": 3, "mood": "피곤", "at": "2026-10-31T11:00:00Z"},
   "sleep": {"state": "unset"},
+  "focus": {
+    "state": "ok",
+    "active": {"sessionId": "01J…", "taskId": "01J…", "title": "수학 20문제", "startedAt": "2026-10-31T12:40:00Z", "minutes": 25},
+    "todayMinutes": 135, "firstStart": "2026-10-30T22:00:00Z", "lastEnd": "2026-10-31T13:05:00Z",
+    "byTask": [{"taskId": "01J…", "title": "보고서 초안", "minutes": 85}, {"taskId": "01J…", "title": "수학 20문제", "minutes": 50}]
+  },
   "freshness": {"todayUpdatedAt": "2026-10-31T12:58:00Z", "stale": false}
 }
 ```
@@ -196,6 +216,7 @@ type ReviewBody = {horizon: 'day' | 'week' | 'month'; period: string; text: stri
 - 사람이 읽는 짧은 값(`"50 단어"`)을 함께 주어 소비자의 모델 입력이 작아진다. 정확한 값은 `/items`로.
 - `If-None-Match`로 재조회하면 바뀐 게 없을 때 `304` — 채팅 턴마다 확인해도 싸다.
 - 범위 밖 kind는 빠지고 `"state": "not_shared"`로 표시한다.
+- `focus`는 타임 트래커를 쓰는 플래너만 `ok`, 아니면 `unset`. 분은 `asOf` 시각 기준으로 계산된다. **ETag는 기록이 바뀔 때만 바뀌므로**, 304를 받은 소비자는 `active.startedAt`부터 직접 세면 된다(집중 중인 동안 매 턴 다시 받을 필요 없음).
 
 ## 7. 변경 알림 (확장, 선택)
 
@@ -212,6 +233,8 @@ type ReviewBody = {horizon: 'day' | 'week' | 'month'; period: string; text: stri
 | `sleep.ended` | 수면 기록에 종료 시각이 입력됨 | 기상 감지 |
 | `day.planned` | 그날 첫 `committed` 과업이 생김 | 하루 시작 감지 |
 | `plan.starting` | 과업 `plan.start`(분 단위)의 N분 전, 허브 예약 | 예약 알림 |
+| `focus.started` | 타이머 시작(세션 생성, `end` 없음) | 버디가 집중 시작을 알아챔 |
+| `focus.stopped` | 타이머 멈춤 또는 칸 칠하기 | 집중 끝 피드백 |
 | `day.closed` | 하루 회고 입력 또는 논리 하루 경계 통과 | 하루 결산 |
 
 이벤트 목록은 v0 제안이다. 구현 순서: P3는 `now`·`changes`만, 알림은 모의 우주가 필요한 이벤트를 정한 뒤 추가한다.

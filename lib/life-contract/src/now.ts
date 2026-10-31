@@ -58,7 +58,31 @@ export function routineRate(records: AnyRecord[], day: string) {
   return {basis, done, of};
 }
 
-export type ModuleUse = {sleep: boolean; condition: boolean};
+const minutesBetween = (a: string, b: string) => Math.max(0, (new Date(b).getTime() - new Date(a).getTime()) / 60_000);
+/** Focus for a logical day: what is running now and how much was done, per task. A running session counts up to `at`. */
+export function focusOf(records: AnyRecord[], day: string, at: Date) {
+  const sessions = records.filter((r): r is LifeRecord<'session'> => r.kind === 'session' && live(r) && r.logicalDay === day);
+  const now = at.toISOString();
+  const by = new Map<string, {taskId: string | null; title: string; minutes: number}>();
+  let total = 0;
+  for (const s of sessions) {
+    const m = minutesBetween(s.body.start, s.body.end ?? now);
+    total += m;
+    const key = s.body.taskId ?? `label:${s.body.label}`;
+    const row = by.get(key) ?? {taskId: s.body.taskId, title: s.body.label, minutes: 0};
+    row.minutes += m; by.set(key, row);
+  }
+  const running = records.filter((r): r is LifeRecord<'session'> => r.kind === 'session' && live(r) && !r.body.end).sort((a, b) => b.body.start.localeCompare(a.body.start))[0];
+  const starts = sessions.map(s => s.body.start).sort(), ends = sessions.map(s => s.body.end ?? now).sort();
+  return {
+    active: running ? {sessionId: running.id, taskId: running.body.taskId, title: running.body.label, startedAt: running.body.start, minutes: Math.round(minutesBetween(running.body.start, now))} : null,
+    todayMinutes: Math.round(total),
+    firstStart: starts[0] ?? null, lastEnd: ends.at(-1) ?? null,
+    byTask: [...by.values()].map(r => ({...r, minutes: Math.round(r.minutes)})).sort((a, b) => b.minutes - a.minutes),
+  };
+}
+
+export type ModuleUse = {sleep: boolean; condition: boolean; timer?: boolean};
 export type NowSnapshot = ReturnType<typeof buildNow>;
 
 /** The small, deterministic "right now" a consumer puts into its chat. No AI. */
@@ -101,6 +125,8 @@ export function buildNow(all: AnyRecord[], settings: Settings, at: Date, opts: {
     }) : {state: 'not_shared' as const},
     condition: !has('life.read.condition') ? {state: 'not_shared' as const} : !opts.modules.condition ? {state: 'unset' as const} : condition ? {state: 'ok' as const, energy: condition.body.energy, mood: condition.body.mood, at: condition.body.at} : {state: 'empty' as const},
     sleep: !has('life.read.condition') ? {state: 'not_shared' as const} : !opts.modules.sleep ? {state: 'unset' as const} : sleep ? {state: 'ok' as const, start: sleep.body.start, end: sleep.body.end, quality: sleep.body.quality} : {state: 'empty' as const},
+    // Live: minutes are computed at asOf; a consumer can keep counting from active.startedAt without asking again.
+    focus: !has('life.read.outcome') ? {state: 'not_shared' as const} : !opts.modules.timer ? {state: 'unset' as const} : {state: 'ok' as const, ...focusOf(records, day, at)},
     freshness: {todayUpdatedAt: touched, stale: touched === null},
   };
 }

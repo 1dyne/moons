@@ -86,12 +86,21 @@ export const ReviewBody = z.object({
   text: text(5000).nullable().default(null),
 });
 
-export const BODIES = {goal: GoalBody, project: ProjectBody, task: TaskBody, routine: RoutineBody, sleep: SleepBody, condition: ConditionBody, review: ReviewBody} as const;
+// A stretch of actual focus (time tracker or painted on the timetable). end null = running now.
+export const SessionBody = z.object({
+  taskId: z.string().nullable().default(null),
+  label: text(200).min(1),
+  start: instant,
+  end: instant.nullable().default(null),
+  source: z.enum(['timer', 'manual']).default('timer'),
+}).refine(s => !s.end || s.end > s.start, {message: 'A session must end after it starts.'});
+
+export const BODIES = {goal: GoalBody, project: ProjectBody, task: TaskBody, routine: RoutineBody, sleep: SleepBody, condition: ConditionBody, review: ReviewBody, session: SessionBody} as const;
 export type Kind = keyof typeof BODIES;
 export const KINDS = Object.keys(BODIES) as Kind[];
 export type Bodies = {[K in Kind]: z.infer<(typeof BODIES)[K]>};
 export type Goal = Bodies['goal']; export type Project = Bodies['project']; export type Task = Bodies['task'];
-export type Routine = Bodies['routine']; export type Sleep = Bodies['sleep']; export type Condition = Bodies['condition']; export type Review = Bodies['review'];
+export type Routine = Bodies['routine']; export type Session = Bodies['session']; export type Sleep = Bodies['sleep']; export type Condition = Bodies['condition']; export type Review = Bodies['review'];
 
 export type Source = {type: 'planner' | 'import:notion' | 'import:paper' | 'import:csv' | 'kit'; ref?: string; confirmed: boolean};
 export type LifeRecord<K extends Kind = Kind> = {
@@ -135,7 +144,7 @@ export const ALL_SCOPES: Scope[] = ['life.read.plan', 'life.read.outcome', 'life
 /** Drops what a grant does not cover: kinds out of scope, outcome without outcome scope, private fields always. */
 export function shareable(record: AnyRecord, scopes: Scope[]): AnyRecord | null {
   const has = (s: Scope) => scopes.includes(s);
-  const need: Record<Kind, Scope> = {goal: 'life.read.plan', project: 'life.read.plan', task: 'life.read.plan', routine: 'life.read.plan', sleep: 'life.read.condition', condition: 'life.read.condition', review: 'life.read.review'};
+  const need: Record<Kind, Scope> = {goal: 'life.read.plan', project: 'life.read.plan', task: 'life.read.plan', routine: 'life.read.plan', sleep: 'life.read.condition', condition: 'life.read.condition', review: 'life.read.review', session: 'life.read.outcome'};
   if (!has(need[record.kind])) return null;
   const copy = structuredClone(record) as AnyRecord;
   delete copy.ext;

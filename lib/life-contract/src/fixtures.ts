@@ -22,8 +22,9 @@ export function weekBasic(start = '2026-10-26') {
   for (let i = 0; i < 7; i++) {
     const day = addDays(start, i);
     if (i === 3) continue; // a day with no entries: consumers must not read it as "nothing done"
-    put('task', {title: '단어 40개', category: 'must', goalIds: [month.id], plan: {state: 'committed', target: {amount: 40, unit: '단어'}},
+    const words = put('task', {title: '단어 40개', category: 'must', goalIds: [month.id], plan: {state: 'committed', target: {amount: 40, unit: '단어'}},
       outcome: i === 5 ? {result: 'partial', amount: 15, unit: '단어', reason: '야근', reportedAt: at(day, '23:10')} : {result: 'done', amount: 40, unit: '단어', completedAt: at(day, '21:00'), reportedAt: at(day, '21:00')}}, day, at(day, '08:30'));
+    put('session', {taskId: words.id, label: '단어 40개', start: at(day, '20:05'), end: at(day, i === 5 ? '20:25' : '20:55'), source: i % 2 ? 'manual' : 'timer'}, day, at(day, '21:00'));
     put('task', {title: '아침 스트레칭', routineId: stretch.id, plan: {state: 'committed'}, outcome: i % 2 ? {result: 'missed', reason: '늦잠', reportedAt: at(day, '22:00')} : {result: 'done', completedAt: at(day, '07:40')}}, day, at(day, '07:30'));
     if (i < 2) put('task', {title: '물 2L', routineId: water.id, plan: {state: 'committed'}}, day, at(day, '07:31')); // picked, never reported → unknown
   }
@@ -34,6 +35,9 @@ export function weekBasic(start = '2026-10-26') {
   // Corrected: marked done, then the user fixed it to partial the next morning (two revisions).
   const gym = put('task', {title: '헬스 40분', category: 'want', plan: {state: 'committed', target: {amount: 40, unit: '분'}}, outcome: {result: 'done', amount: 40, unit: '분'}}, addDays(start, 4), at(addDays(start, 4), '20:00'));
   put('task', {...gym.body, outcome: {result: 'partial', amount: 20, unit: '분', reason: '시간 부족'}}, addDays(start, 4), at(addDays(start, 5), '08:00'), gym);
+  // Running now: started on the last day and not stopped yet (end null).
+  const last = addDays(start, 6);
+  put('session', {taskId: null, label: '보고서 검토', start: at(last, '13:30')}, last, at(last, '13:30'));
   // Deleted: a tombstone, not a disappearance.
   const typo = put('task', {title: '잘못 넣은 일', plan: {state: 'planned'}}, addDays(start, 6), at(addDays(start, 6), '10:00'));
   put('task', typo.body, addDays(start, 6), at(addDays(start, 6), '10:05'), typo, {deletedAt: new Date(at(addDays(start, 6), '10:05')).toISOString()});
@@ -41,5 +45,5 @@ export function weekBasic(start = '2026-10-26') {
   put('review', {horizon: 'day', period: addDays(start, 5), text: '개인적인 메모'}, addDays(start, 5), at(addDays(start, 5), '23:30'), undefined, {privateFields: ['text']});
   const latest = new Map<string, AnyRecord>();
   for (const r of history) latest.set(r.id, r);
-  return {settings: FIXTURE_SETTINGS, modules: {sleep: false, condition: false}, records: [...latest.values()].sort((a, b) => a.revision - b.revision), history};
+  return {settings: FIXTURE_SETTINGS, modules: {sleep: false, condition: false, timer: true}, records: [...latest.values()].sort((a, b) => a.revision - b.revision), history};
 }

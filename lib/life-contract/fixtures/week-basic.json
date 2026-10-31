@@ -5,7 +5,8 @@
  },
  "modules": {
   "sleep": false,
-  "condition": false
+  "condition": false,
+  "timer": true
  },
  "records": [
   {
@@ -156,8 +157,29 @@
   },
   {
    "id": "01FIXTURE00000000000000006",
-   "kind": "task",
+   "kind": "session",
    "revision": 6,
+   "createdAt": "2026-10-26T12:00:00.000Z",
+   "updatedAt": "2026-10-26T12:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-26",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": "01FIXTURE00000000000000005",
+    "label": "단어 40개",
+    "start": "2026-10-26T20:05:00+09:00",
+    "end": "2026-10-26T20:55:00+09:00",
+    "source": "timer"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000007",
+   "kind": "task",
+   "revision": 7,
    "createdAt": "2026-10-25T22:30:00.000Z",
    "updatedAt": "2026-10-25T22:30:00.000Z",
    "deletedAt": null,
@@ -196,9 +218,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000007",
+   "id": "01FIXTURE00000000000000008",
    "kind": "task",
-   "revision": 7,
+   "revision": 8,
    "createdAt": "2026-10-25T22:31:00.000Z",
    "updatedAt": "2026-10-25T22:31:00.000Z",
    "deletedAt": null,
@@ -237,9 +259,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000008",
+   "id": "01FIXTURE00000000000000009",
    "kind": "task",
-   "revision": 8,
+   "revision": 9,
    "createdAt": "2026-10-26T23:30:00.000Z",
    "updatedAt": "2026-10-26T23:30:00.000Z",
    "deletedAt": null,
@@ -283,9 +305,30 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000009",
+   "id": "01FIXTURE00000000000000010",
+   "kind": "session",
+   "revision": 10,
+   "createdAt": "2026-10-27T12:00:00.000Z",
+   "updatedAt": "2026-10-27T12:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-27",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": "01FIXTURE00000000000000009",
+    "label": "단어 40개",
+    "start": "2026-10-27T20:05:00+09:00",
+    "end": "2026-10-27T20:55:00+09:00",
+    "source": "manual"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000011",
    "kind": "task",
-   "revision": 9,
+   "revision": 11,
    "createdAt": "2026-10-26T22:30:00.000Z",
    "updatedAt": "2026-10-26T22:30:00.000Z",
    "deletedAt": null,
@@ -324,9 +367,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000010",
+   "id": "01FIXTURE00000000000000012",
    "kind": "task",
-   "revision": 10,
+   "revision": 12,
    "createdAt": "2026-10-26T22:31:00.000Z",
    "updatedAt": "2026-10-26T22:31:00.000Z",
    "deletedAt": null,
@@ -365,9 +408,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000011",
+   "id": "01FIXTURE00000000000000013",
    "kind": "task",
-   "revision": 11,
+   "revision": 13,
    "createdAt": "2026-10-27T23:30:00.000Z",
    "updatedAt": "2026-10-27T23:30:00.000Z",
    "deletedAt": null,
@@ -411,9 +454,30 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000012",
+   "id": "01FIXTURE00000000000000014",
+   "kind": "session",
+   "revision": 14,
+   "createdAt": "2026-10-28T12:00:00.000Z",
+   "updatedAt": "2026-10-28T12:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-28",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": "01FIXTURE00000000000000013",
+    "label": "단어 40개",
+    "start": "2026-10-28T20:05:00+09:00",
+    "end": "2026-10-28T20:55:00+09:00",
+    "source": "timer"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000015",
    "kind": "task",
-   "revision": 12,
+   "revision": 15,
    "createdAt": "2026-10-27T22:30:00.000Z",
    "updatedAt": "2026-10-27T22:30:00.000Z",
    "deletedAt": null,
@@ -452,9 +516,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000013",
+   "id": "01FIXTURE00000000000000016",
    "kind": "task",
-   "revision": 13,
+   "revision": 16,
    "createdAt": "2026-10-29T23:30:00.000Z",
    "updatedAt": "2026-10-29T23:30:00.000Z",
    "deletedAt": null,
@@ -498,9 +562,30 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000014",
+   "id": "01FIXTURE00000000000000017",
+   "kind": "session",
+   "revision": 17,
+   "createdAt": "2026-10-30T12:00:00.000Z",
+   "updatedAt": "2026-10-30T12:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-30",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": "01FIXTURE00000000000000016",
+    "label": "단어 40개",
+    "start": "2026-10-30T20:05:00+09:00",
+    "end": "2026-10-30T20:55:00+09:00",
+    "source": "timer"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000018",
    "kind": "task",
-   "revision": 14,
+   "revision": 18,
    "createdAt": "2026-10-29T22:30:00.000Z",
    "updatedAt": "2026-10-29T22:30:00.000Z",
    "deletedAt": null,
@@ -539,9 +624,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000015",
+   "id": "01FIXTURE00000000000000019",
    "kind": "task",
-   "revision": 15,
+   "revision": 19,
    "createdAt": "2026-10-30T23:30:00.000Z",
    "updatedAt": "2026-10-30T23:30:00.000Z",
    "deletedAt": null,
@@ -585,9 +670,30 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000016",
+   "id": "01FIXTURE00000000000000020",
+   "kind": "session",
+   "revision": 20,
+   "createdAt": "2026-10-31T12:00:00.000Z",
+   "updatedAt": "2026-10-31T12:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-31",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": "01FIXTURE00000000000000019",
+    "label": "단어 40개",
+    "start": "2026-10-31T20:05:00+09:00",
+    "end": "2026-10-31T20:25:00+09:00",
+    "source": "manual"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000021",
    "kind": "task",
-   "revision": 16,
+   "revision": 21,
    "createdAt": "2026-10-30T22:30:00.000Z",
    "updatedAt": "2026-10-30T22:30:00.000Z",
    "deletedAt": null,
@@ -626,9 +732,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000017",
+   "id": "01FIXTURE00000000000000022",
    "kind": "task",
-   "revision": 17,
+   "revision": 22,
    "createdAt": "2026-10-31T23:30:00.000Z",
    "updatedAt": "2026-10-31T23:30:00.000Z",
    "deletedAt": null,
@@ -672,9 +778,30 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000018",
+   "id": "01FIXTURE00000000000000023",
+   "kind": "session",
+   "revision": 23,
+   "createdAt": "2026-11-01T12:00:00.000Z",
+   "updatedAt": "2026-11-01T12:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": "01FIXTURE00000000000000022",
+    "label": "단어 40개",
+    "start": "2026-11-01T20:05:00+09:00",
+    "end": "2026-11-01T20:55:00+09:00",
+    "source": "timer"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000024",
    "kind": "task",
-   "revision": 18,
+   "revision": 24,
    "createdAt": "2026-10-31T22:30:00.000Z",
    "updatedAt": "2026-10-31T22:30:00.000Z",
    "deletedAt": null,
@@ -713,9 +840,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000020",
+   "id": "01FIXTURE00000000000000026",
    "kind": "task",
-   "revision": 20,
+   "revision": 26,
    "createdAt": "2026-10-27T13:00:00.000Z",
    "updatedAt": "2026-10-27T13:00:00.000Z",
    "deletedAt": null,
@@ -757,9 +884,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000019",
+   "id": "01FIXTURE00000000000000025",
    "kind": "task",
-   "revision": 21,
+   "revision": 27,
    "createdAt": "2026-10-27T00:00:00.000Z",
    "updatedAt": "2026-10-27T13:00:00.000Z",
    "deletedAt": null,
@@ -796,14 +923,14 @@
      "reason": null,
      "reportedAt": "2026-10-27T22:00:00+09:00",
      "basis": "self_report",
-     "postponedTo": "01FIXTURE00000000000000020"
+     "postponedTo": "01FIXTURE00000000000000026"
     }
    }
   },
   {
-   "id": "01FIXTURE00000000000000021",
+   "id": "01FIXTURE00000000000000027",
    "kind": "task",
-   "revision": 23,
+   "revision": 29,
    "createdAt": "2026-10-30T11:00:00.000Z",
    "updatedAt": "2026-10-30T23:00:00.000Z",
    "deletedAt": null,
@@ -845,9 +972,30 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000022",
+   "id": "01FIXTURE00000000000000028",
+   "kind": "session",
+   "revision": 30,
+   "createdAt": "2026-11-01T04:30:00.000Z",
+   "updatedAt": "2026-11-01T04:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": null,
+    "label": "보고서 검토",
+    "start": "2026-11-01T13:30:00+09:00",
+    "end": null,
+    "source": "timer"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000029",
    "kind": "task",
-   "revision": 25,
+   "revision": 32,
    "createdAt": "2026-11-01T01:00:00.000Z",
    "updatedAt": "2026-11-01T01:05:00.000Z",
    "deletedAt": "2026-11-01T01:05:00.000Z",
@@ -886,9 +1034,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000023",
+   "id": "01FIXTURE00000000000000030",
    "kind": "review",
-   "revision": 26,
+   "revision": 33,
    "createdAt": "2026-11-01T14:00:00.000Z",
    "updatedAt": "2026-11-01T14:00:00.000Z",
    "deletedAt": null,
@@ -905,9 +1053,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000024",
+   "id": "01FIXTURE00000000000000031",
    "kind": "review",
-   "revision": 27,
+   "revision": 34,
    "createdAt": "2026-10-31T14:30:00.000Z",
    "updatedAt": "2026-10-31T14:30:00.000Z",
    "deletedAt": null,
@@ -1076,8 +1224,29 @@
   },
   {
    "id": "01FIXTURE00000000000000006",
-   "kind": "task",
+   "kind": "session",
    "revision": 6,
+   "createdAt": "2026-10-26T12:00:00.000Z",
+   "updatedAt": "2026-10-26T12:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-26",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": "01FIXTURE00000000000000005",
+    "label": "단어 40개",
+    "start": "2026-10-26T20:05:00+09:00",
+    "end": "2026-10-26T20:55:00+09:00",
+    "source": "timer"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000007",
+   "kind": "task",
+   "revision": 7,
    "createdAt": "2026-10-25T22:30:00.000Z",
    "updatedAt": "2026-10-25T22:30:00.000Z",
    "deletedAt": null,
@@ -1116,9 +1285,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000007",
+   "id": "01FIXTURE00000000000000008",
    "kind": "task",
-   "revision": 7,
+   "revision": 8,
    "createdAt": "2026-10-25T22:31:00.000Z",
    "updatedAt": "2026-10-25T22:31:00.000Z",
    "deletedAt": null,
@@ -1157,9 +1326,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000008",
+   "id": "01FIXTURE00000000000000009",
    "kind": "task",
-   "revision": 8,
+   "revision": 9,
    "createdAt": "2026-10-26T23:30:00.000Z",
    "updatedAt": "2026-10-26T23:30:00.000Z",
    "deletedAt": null,
@@ -1203,9 +1372,30 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000009",
+   "id": "01FIXTURE00000000000000010",
+   "kind": "session",
+   "revision": 10,
+   "createdAt": "2026-10-27T12:00:00.000Z",
+   "updatedAt": "2026-10-27T12:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-27",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": "01FIXTURE00000000000000009",
+    "label": "단어 40개",
+    "start": "2026-10-27T20:05:00+09:00",
+    "end": "2026-10-27T20:55:00+09:00",
+    "source": "manual"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000011",
    "kind": "task",
-   "revision": 9,
+   "revision": 11,
    "createdAt": "2026-10-26T22:30:00.000Z",
    "updatedAt": "2026-10-26T22:30:00.000Z",
    "deletedAt": null,
@@ -1244,9 +1434,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000010",
+   "id": "01FIXTURE00000000000000012",
    "kind": "task",
-   "revision": 10,
+   "revision": 12,
    "createdAt": "2026-10-26T22:31:00.000Z",
    "updatedAt": "2026-10-26T22:31:00.000Z",
    "deletedAt": null,
@@ -1285,9 +1475,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000011",
+   "id": "01FIXTURE00000000000000013",
    "kind": "task",
-   "revision": 11,
+   "revision": 13,
    "createdAt": "2026-10-27T23:30:00.000Z",
    "updatedAt": "2026-10-27T23:30:00.000Z",
    "deletedAt": null,
@@ -1331,9 +1521,30 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000012",
+   "id": "01FIXTURE00000000000000014",
+   "kind": "session",
+   "revision": 14,
+   "createdAt": "2026-10-28T12:00:00.000Z",
+   "updatedAt": "2026-10-28T12:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-28",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": "01FIXTURE00000000000000013",
+    "label": "단어 40개",
+    "start": "2026-10-28T20:05:00+09:00",
+    "end": "2026-10-28T20:55:00+09:00",
+    "source": "timer"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000015",
    "kind": "task",
-   "revision": 12,
+   "revision": 15,
    "createdAt": "2026-10-27T22:30:00.000Z",
    "updatedAt": "2026-10-27T22:30:00.000Z",
    "deletedAt": null,
@@ -1372,9 +1583,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000013",
+   "id": "01FIXTURE00000000000000016",
    "kind": "task",
-   "revision": 13,
+   "revision": 16,
    "createdAt": "2026-10-29T23:30:00.000Z",
    "updatedAt": "2026-10-29T23:30:00.000Z",
    "deletedAt": null,
@@ -1418,9 +1629,30 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000014",
+   "id": "01FIXTURE00000000000000017",
+   "kind": "session",
+   "revision": 17,
+   "createdAt": "2026-10-30T12:00:00.000Z",
+   "updatedAt": "2026-10-30T12:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-30",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": "01FIXTURE00000000000000016",
+    "label": "단어 40개",
+    "start": "2026-10-30T20:05:00+09:00",
+    "end": "2026-10-30T20:55:00+09:00",
+    "source": "timer"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000018",
    "kind": "task",
-   "revision": 14,
+   "revision": 18,
    "createdAt": "2026-10-29T22:30:00.000Z",
    "updatedAt": "2026-10-29T22:30:00.000Z",
    "deletedAt": null,
@@ -1459,9 +1691,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000015",
+   "id": "01FIXTURE00000000000000019",
    "kind": "task",
-   "revision": 15,
+   "revision": 19,
    "createdAt": "2026-10-30T23:30:00.000Z",
    "updatedAt": "2026-10-30T23:30:00.000Z",
    "deletedAt": null,
@@ -1505,9 +1737,30 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000016",
+   "id": "01FIXTURE00000000000000020",
+   "kind": "session",
+   "revision": 20,
+   "createdAt": "2026-10-31T12:00:00.000Z",
+   "updatedAt": "2026-10-31T12:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-10-31",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": "01FIXTURE00000000000000019",
+    "label": "단어 40개",
+    "start": "2026-10-31T20:05:00+09:00",
+    "end": "2026-10-31T20:25:00+09:00",
+    "source": "manual"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000021",
    "kind": "task",
-   "revision": 16,
+   "revision": 21,
    "createdAt": "2026-10-30T22:30:00.000Z",
    "updatedAt": "2026-10-30T22:30:00.000Z",
    "deletedAt": null,
@@ -1546,9 +1799,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000017",
+   "id": "01FIXTURE00000000000000022",
    "kind": "task",
-   "revision": 17,
+   "revision": 22,
    "createdAt": "2026-10-31T23:30:00.000Z",
    "updatedAt": "2026-10-31T23:30:00.000Z",
    "deletedAt": null,
@@ -1592,9 +1845,30 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000018",
+   "id": "01FIXTURE00000000000000023",
+   "kind": "session",
+   "revision": 23,
+   "createdAt": "2026-11-01T12:00:00.000Z",
+   "updatedAt": "2026-11-01T12:00:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": "01FIXTURE00000000000000022",
+    "label": "단어 40개",
+    "start": "2026-11-01T20:05:00+09:00",
+    "end": "2026-11-01T20:55:00+09:00",
+    "source": "timer"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000024",
    "kind": "task",
-   "revision": 18,
+   "revision": 24,
    "createdAt": "2026-10-31T22:30:00.000Z",
    "updatedAt": "2026-10-31T22:30:00.000Z",
    "deletedAt": null,
@@ -1633,9 +1907,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000019",
+   "id": "01FIXTURE00000000000000025",
    "kind": "task",
-   "revision": 19,
+   "revision": 25,
    "createdAt": "2026-10-27T00:00:00.000Z",
    "updatedAt": "2026-10-27T00:00:00.000Z",
    "deletedAt": null,
@@ -1677,9 +1951,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000020",
+   "id": "01FIXTURE00000000000000026",
    "kind": "task",
-   "revision": 20,
+   "revision": 26,
    "createdAt": "2026-10-27T13:00:00.000Z",
    "updatedAt": "2026-10-27T13:00:00.000Z",
    "deletedAt": null,
@@ -1721,9 +1995,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000019",
+   "id": "01FIXTURE00000000000000025",
    "kind": "task",
-   "revision": 21,
+   "revision": 27,
    "createdAt": "2026-10-27T00:00:00.000Z",
    "updatedAt": "2026-10-27T13:00:00.000Z",
    "deletedAt": null,
@@ -1760,14 +2034,14 @@
      "reason": null,
      "reportedAt": "2026-10-27T22:00:00+09:00",
      "basis": "self_report",
-     "postponedTo": "01FIXTURE00000000000000020"
+     "postponedTo": "01FIXTURE00000000000000026"
     }
    }
   },
   {
-   "id": "01FIXTURE00000000000000021",
+   "id": "01FIXTURE00000000000000027",
    "kind": "task",
-   "revision": 22,
+   "revision": 28,
    "createdAt": "2026-10-30T11:00:00.000Z",
    "updatedAt": "2026-10-30T11:00:00.000Z",
    "deletedAt": null,
@@ -1809,9 +2083,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000021",
+   "id": "01FIXTURE00000000000000027",
    "kind": "task",
-   "revision": 23,
+   "revision": 29,
    "createdAt": "2026-10-30T11:00:00.000Z",
    "updatedAt": "2026-10-30T23:00:00.000Z",
    "deletedAt": null,
@@ -1853,9 +2127,30 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000022",
+   "id": "01FIXTURE00000000000000028",
+   "kind": "session",
+   "revision": 30,
+   "createdAt": "2026-11-01T04:30:00.000Z",
+   "updatedAt": "2026-11-01T04:30:00.000Z",
+   "deletedAt": null,
+   "logicalDay": "2026-11-01",
+   "tz": "Asia/Seoul",
+   "source": {
+    "type": "planner",
+    "confirmed": true
+   },
+   "body": {
+    "taskId": null,
+    "label": "보고서 검토",
+    "start": "2026-11-01T13:30:00+09:00",
+    "end": null,
+    "source": "timer"
+   }
+  },
+  {
+   "id": "01FIXTURE00000000000000029",
    "kind": "task",
-   "revision": 24,
+   "revision": 31,
    "createdAt": "2026-11-01T01:00:00.000Z",
    "updatedAt": "2026-11-01T01:00:00.000Z",
    "deletedAt": null,
@@ -1894,9 +2189,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000022",
+   "id": "01FIXTURE00000000000000029",
    "kind": "task",
-   "revision": 25,
+   "revision": 32,
    "createdAt": "2026-11-01T01:00:00.000Z",
    "updatedAt": "2026-11-01T01:05:00.000Z",
    "deletedAt": "2026-11-01T01:05:00.000Z",
@@ -1935,9 +2230,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000023",
+   "id": "01FIXTURE00000000000000030",
    "kind": "review",
-   "revision": 26,
+   "revision": 33,
    "createdAt": "2026-11-01T14:00:00.000Z",
    "updatedAt": "2026-11-01T14:00:00.000Z",
    "deletedAt": null,
@@ -1954,9 +2249,9 @@
    }
   },
   {
-   "id": "01FIXTURE00000000000000024",
+   "id": "01FIXTURE00000000000000031",
    "kind": "review",
-   "revision": 27,
+   "revision": 34,
    "createdAt": "2026-10-31T14:30:00.000Z",
    "updatedAt": "2026-10-31T14:30:00.000Z",
    "deletedAt": null,
@@ -1979,7 +2274,7 @@
  "nowExample": {
   "contractVersion": "0",
   "asOf": "2026-11-01T05:00:00.000Z",
-  "revision": 27,
+  "revision": 34,
   "user": {
    "tz": "Asia/Seoul",
    "dayBoundary": "04:00",
@@ -1990,7 +2285,7 @@
   "today": {
    "tasks": [
     {
-     "id": "01FIXTURE00000000000000017",
+     "id": "01FIXTURE00000000000000022",
      "title": "단어 40개",
      "category": "must",
      "plan": "committed",
@@ -2003,7 +2298,7 @@
      "routineId": null
     },
     {
-     "id": "01FIXTURE00000000000000018",
+     "id": "01FIXTURE00000000000000024",
      "title": "아침 스트레칭",
      "category": null,
      "plan": "committed",
@@ -2046,6 +2341,31 @@
   },
   "sleep": {
    "state": "unset"
+  },
+  "focus": {
+   "state": "ok",
+   "active": {
+    "sessionId": "01FIXTURE00000000000000028",
+    "taskId": null,
+    "title": "보고서 검토",
+    "startedAt": "2026-11-01T13:30:00+09:00",
+    "minutes": 30
+   },
+   "todayMinutes": 80,
+   "firstStart": "2026-11-01T13:30:00+09:00",
+   "lastEnd": "2026-11-01T20:55:00+09:00",
+   "byTask": [
+    {
+     "taskId": "01FIXTURE00000000000000022",
+     "title": "단어 40개",
+     "minutes": 50
+    },
+    {
+     "taskId": null,
+     "title": "보고서 검토",
+     "minutes": 30
+    }
+   ]
   },
   "freshness": {
    "todayUpdatedAt": "2026-11-01T14:00:00.000Z",

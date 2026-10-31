@@ -21,6 +21,7 @@ test('fixture: now snapshot for the last day, and the JSON file is current', () 
   const now = buildNow(fx.records, fx.settings, new Date('2026-11-01T14:00:00+09:00'), {revision: fx.records.at(-1)!.revision, scopes: ALL_SCOPES, modules: fx.modules, lastActivityAt: fx.records.at(-1)!.updatedAt});
   assert.equal(now.user.logicalDay, '2026-11-01');
   assert.deepEqual(now.condition, {state: 'unset'});
+  assert.ok(now.focus.state === 'ok' && now.focus.active?.title === '보고서 검토' && now.focus.active.minutes === 30);
   const file = new URL('../fixtures/week-basic.json', import.meta.url);
   const json = JSON.stringify({...fx, nowExample: now}, null, 1) + '\n';
   if (process.env.WRITE_FIXTURES) writeFileSync(file, json);

@@ -34,7 +34,7 @@ v9는 사용자가 분류를 고민하지 않고 바로 쓰게 하고, 쌓인 �
 | 8 | 확신은 개념과 페이지마다 **별 5개(반 개 단위 = 1~10점)**로 매긴다 |
 | 9 | MOONS 추천(형식·모행성·연결)은 설정에서 켠 사람에게만, 떠 있는 달이 제안한다 |
 | 10 | 임포스터는 **MOONS로 비춰본 결과 안에서만** 나온다. 사용자의 페이지 원문에는 섞지 않는다 |
-| 11 | 첫 화면의 큰 캐릭터는 없앤다. 헤더 로고 자리를 **MOONS 달 캐릭터**로 바꾼다. 아치 로고 + 말풍선 인사는 **처음 들어올 때만** 보인다 |
+| 11 | 기록 첫 화면의 큰 로고(입력창 위의 아치 + 파란 달 + MOONS 명판, `Brand.tsx`의 `Logo`)는 없앤다. 대신 **그 로고를 작게 줄여 헤더(레일 맨 위) 로고 자리**에 둔다(지금의 선 로고 `LineLogo`를 대체, 눈이 커서를 따라가는 동작 유지). 큰 로고 + 말풍선 인사는 **처음 들어올 때만** 보인다. 떠 있는 달 버튼(`MoonCharacter`)은 그대로 |
 | 12 | 커넥터(MCP)는 읽기·제안·Satellite 등록까지만 맡는다. 더 큰 작업은 Satellite로 확장한다 |
 
 **유지할 원칙**
@@ -79,10 +79,11 @@ v9는 사용자가 분류를 고민하지 않고 바로 쓰게 하고, 쌓인 �
 | Space | 내가 구성하는 전체 보기 | 내 우주, 개념 목록·개념 페이지, 저장된 보기, 보드 | 항상 |
 | 공유 | 같은 자료를 두고 이해 비교 | 팀 | 팀에 초대받았거나 만든 사람 |
 | 마켓 | 내 구조 공유·판매 | 신규 | 출시 때 |
-| ─ (구분선) | 고정한 Satellite | 플래너, LEET drill, Dock … | 사용자가 고정한 것 |
+| ─ (구분선) | **내 Satellite** | 지금의 Satellite '내 장치': Dock, 플래너, 임포스터, LEET drill, 달그락 대장간 … | 설치·등록한 것 중 고정한 것 |
 
-- **헤더 로고 자리**: MOONS 달 캐릭터(`MoonCharacter`, 눈이 커서를 따라감). 누르면 기록 공간.
-- **프로필 메뉴**: 계정, 설정, 내 구조 관리, Satellite 목록(설치·제거), 공유 공간 만들기.
+- **레일 맨 위 로고**: 입력창 위에 있던 MOONS 로고(`Logo`: 아치 + 파란 달 + MOONS 명판)를 작게 줄인 것. 눈이 커서를 따라간다. 누르면 기록 공간.
+- **프로필 메뉴**: 계정, 설정, 내 구조 관리, 공유 공간 만들기.
+- **Satellite 레일**: 구분선 아래가 내 Satellite다(v8 Satellite 화면의 '내 장치'가 레일로 나온 것). 맨 아래 `+`는 Satellite 광장(둘러보기·설치·주소로 추가·고정 관리). 기존에 Dock·플래너·임포스터를 쓰던 사람은 그 Satellite가 고정된 채로 시작한다.
 - **떠 있는 달 버튼**: 그대로 유지. 누르면 MOONS 대화(지금 보는 페이지·개념이 맥락으로 붙음). MOONS 추천이 켜져 있고 제안이 있으면 달 옆에 말풍선(8장).
 - **맥락 유지**: 공간을 바꿔도 보던 대상을 이어간다. 기록에서 페이지를 보다 학습으로 가면 그 페이지의 구조·비교가 열리고, Space로 가면 그 페이지의 위치로 확대된다.
 - **v7 탭과의 대응**: 노트 화면의 `원문`은 기록(페이지), `구조도 · 비교 · 다음 탐색`은 학습의 오른쪽 패널, 개념 페이지는 어디서 눌러도 오른쪽 패널로 열리고 `전체 보기`를 누르면 Space의 개념 보기로 간다.
@@ -97,7 +98,7 @@ v9는 사용자가 분류를 고민하지 않고 바로 쓰게 하고, 쌓인 �
 - 가운데: 빈 페이지와 제목 자리. 커서가 바로 놓이고, 치면 줄글이 된다.
 - 위: 즐겨찾기 도구줄 + `더보기`.
 - 왼쪽: 최근 페이지(최근 순, 모행성으로 거르기) + `새 페이지`.
-- 처음 들어올 때(세션 첫 진입): 빈 페이지 위에 아치 로고 + 손그림 말풍선 인사(v8 `Logo`·`Speech` 재사용). 첫 글자를 치면 접힌다.
+- 처음 들어올 때(세션 첫 진입, `sessionStorage`): 빈 페이지 위에 큰 MOONS 로고 + 손그림 말풍선 인사(v8 `Logo`·`Speech` 재사용). 첫 글자를 치면 로고가 레일 맨 위 자리로 줄어들며 접힌다. 그 뒤에는 레일의 작은 로고만 보인다.
 - 쓰기 시작 후: 최근 페이지는 접히고 페이지가 넓어진다.
 - 모바일: 도구줄은 키보드 위, 최근 페이지는 밀어서 연다.
 
@@ -152,7 +153,7 @@ v9는 사용자가 분류를 고민하지 않고 바로 쓰게 하고, 쌓인 �
 1. **무엇을 기록하나요** — 칩 여러 개 선택: 공부 · 시험 · 일 · 프로젝트 · 독서 · 일상 …(선택 결과로 첫 모행성 후보를 만든다. 사용자가 이름을 고친다.)
 2. **자주 쓸 형식** — 기본 블록과 기본 내 구조를 **미리보기 타일**로 보여준다(예: 오답 노트, 뒤집는 카드, 코넬, 표). 고른 것이 즐겨찾기 도구줄에 올라간다. 고르지 않아도 줄글·제목·채팅·표·첨부는 기본으로 있다.
 3. **MOONS 추천** — 켜기/끄기(8장). 기본값은 켜기.
-4. 끝나면 빈 페이지로 들어간다. 아치 로고 + 말풍선 인사가 처음으로 보인다.
+4. 끝나면 빈 페이지로 들어간다. 큰 MOONS 로고 + 말풍선 인사가 처음으로 보인다.
 
 도구줄은 쓰면서 언제든 바꾼다(`더보기` → 끌어서 올리기·내리기).
 
@@ -340,7 +341,7 @@ U_f = \frac{\sum_{c \in f} n_c s_c}{\sum_{c \in f} n_c}
 
 ### 9.4 플래너와 Dock
 - **플래너**는 독립 Satellite 앱이다(`artifacts/planner`, 자기 주소, PWA). 기록은 생활 데이터 허브(`/life/v1`, `life_*`)에 쌓인다. 설계는 브랜치 `claude/moons-planner-builder-agent-embo97`의 `docs/PLANNER_SPEC_v1.md`, `docs/LIFE_DATA_CONTRACT_v0.md`. v9에서는 레일에 고정할 수 있는 Satellite로 보이고, 확신·작업 시간 데이터는 허락한 범위만 읽는다.
-- **Dock**(`docs/MOONS_DOCK.md`)은 프로젝트 관리 장치다. 프로젝트별 목표·일정·검토함·맥락 노트, GitHub·Railway 등 연결, 확정한 지시서를 Claude Code/Codex에 넘기는 흐름. v9에서는 내장 Satellite로 Satellite 목록에 두고, 원하면 레일에 고정한다.
+- **Dock**(`docs/MOONS_DOCK.md`)은 프로젝트 관리 Satellite다. 프로젝트별 목표·일정·검토함·맥락 노트, GitHub·Railway 등 연결, 확정한 지시서를 Claude Code/Codex에 넘기는 흐름. v9에서는 **Satellite 레일**에 놓인다(3장). 로직·API는 그대로.
 - **임포스터**: 내장 Satellite. 1장 결정 10의 범위로 줄인다(MOONS로 비춰본 구조·비교 결과 안에서만 나오고, 공개 규칙은 v6 8장 그대로).
 
 ---
@@ -461,3 +462,118 @@ type ConceptKnowledge = {       // 파생값, 저장하지 않음
 - **우주 보기 바탕 톤**: S8에서 실제 화면으로 비교해 정한다.
 - **3D 탐방**: 후속 범위.
 - **마켓 수수료·정책**: S10 전까지 설계하지 않는다.
+
+---
+
+## 14. 설계 상세
+
+### 14.1 화면 골격 (S1)
+
+```
+┌─ 레일 72px ─┬─ 공간 패널(공간별) ────────────────┬─ 오른쪽 패널(선택한 것) ─┐
+│ [MOONS 로고] │                                      │                          │
+│  기록        │   기록: 빈 페이지 / 최근 페이지       │  개념·근거·다음 질문     │
+│  학습        │   학습: 요약 · 달 · 단면 · 도구       │  (학습·Space에서 열림)   │
+│  Space       │   Space: 보기                         │                          │
+│  공유        │                                      │                          │
+│  (마켓)      │                                      │                          │
+│ ──────────── │                                      │                          │
+│  Dock        │                                      │                          │
+│  플래너      │                                      │                          │
+│  …  [+]      │                                      │                          │
+│ ──────────── │                                      │                          │
+│ 받은함 알림 나│                                      │                [떠 있는 달]│
+└──────────────┴──────────────────────────────────────┴──────────────────────────┘
+```
+
+- 레일 아이콘 아래에는 한 단어 이름을 쓴다(`기록` `학습` `Space` `공유` `마켓`).
+- 레일 맨 아래: 받은함(들어온 것 함), 알림, 프로필. 저장 상태 표시(`저장됨`)는 공간 패널 오른쪽 위로 옮긴다.
+- 820px 이하에서는 레일이 아래 탭(기록·학습·Space·공유·더보기)이 된다. `더보기`에 내 Satellite와 프로필이 들어간다.
+- 지금의 `site-header`·`nav-v7`(햄버거 + 탭 묶음)은 지운다.
+
+### 14.2 경로와 공간 (S1)
+경로는 그대로 두고(0.1), 경로를 공간에 대응시켜 레일의 현재 위치를 정한다. S1에서는 기존 화면을 새 자리에서 연다. 새 화면(페이지 편집기·달)은 S2·S5에서 같은 경로에 들어간다.
+
+| 공간 | 경로 | S1에서 보이는 것 |
+|---|---|---|
+| 기록 | `/`, `/notes`, `/media`, `/forms`, `/entries/:id/original` | 기록(입력), 노트 목록, 노트 원문 |
+| 학습 | `/learn`(신규), `/station/*`, `/compare*`, `/chat/*`, `/entries/:id`, `/entries/:id/compare` | `/learn`은 질문·비교·대화 입구 모음(S5에서 달로 교체), 구조도·비교 |
+| Space | `/galaxy`(`/universe`), `/concepts/*` | 내 우주, 개념 |
+| 공유 | `/teams/*` | 팀 |
+| Satellite | `/satellite`, `/projects/*`(Dock), `/planner`, `/connect` | Satellite 광장, Dock, 플래너, 연결 |
+| 프로필 | `/settings`, `/inbox` | 설정, 받은함 |
+
+- 대응 표는 `lib/spaces.ts` 한 곳에 둔다: `spaceOf(path): 'record' | 'learn' | 'space' | 'share' | 'satellite' | 'profile'`.
+
+### 14.3 맥락 유지 (S1)
+- `lib/focus.ts`: 지금 보고 있는 대상 `{type:'entry'|'concept'|'question', id}`를 `sessionStorage`에 기록한다(노트·개념·질문 화면에 들어갈 때 갱신).
+- 레일을 누를 때 대상이 있으면:
+  - 기록 → `/entries/:id/original`
+  - 학습 → 노트면 `/entries/:id`(구조도), 질문이면 `/station/:id`
+  - Space → `/galaxy?focus=:id` (그 노트·개념이 있는 모행성으로 확대)
+- 대상이 없으면 각 공간의 첫 화면. 같은 공간을 다시 누르면 첫 화면으로.
+
+### 14.4 로고와 인사 (S1)
+- `Brand.tsx`의 `Logo`에 크기 옵션(`size:'rail'|'hero'`)을 더해 레일 맨 위(약 52px 폭)에도 쓴다. 눈 따라가기(`useMoonGaze`)는 그대로.
+- 인사(`Logo` hero + `Speech`)는 `sessionStorage['moons.greeted']`가 없을 때만 기록 첫 화면에 보이고, 첫 입력이나 공간 이동 때 저장된다.
+- `LineLogo`는 인쇄·공유 페이지에서만 쓴다.
+
+### 14.5 용어·단어 정리 (S1)
+- `i18n-ko.ts`: `'Dwarf Planet'`·`'None (Dwarf Planet)'` → `왜소행성`, `'Dwarf planets'`(개념 필터) → `설명 전`, `DwarfBadge` 문구 → `설명 전`. 주제/모행성 혼용은 `모행성`으로 맞춘다.
+- 버튼·탭은 0.2 규칙으로 바꾼다. 바꾸는 목록은 S1 보고서에 표로 남긴다.
+
+### 14.6 새 테이블 (S2~S7)
+공간 데이터(jsonb)에 넣지 않고 따로 둔다. 편집이 잦아 변경 기록이 과도하게 쌓이는 것을 막기 위해서다.
+
+```sql
+create table if not exists pages (
+  id text primary key, owner_id text not null,
+  title text, blocks jsonb not null default '[]',
+  planet_ids text[] not null default '{}',
+  structure_id text, asset_id text, latest_entry_id text,
+  confidence int check (confidence between 1 and 10),
+  revision int not null default 1,            -- 낙관적 잠금(다른 기기 동시 편집)
+  created_at timestamptz default now(), updated_at timestamptz default now(), deleted_at timestamptz
+);
+create index if not exists pages_owner_updated on pages(owner_id, updated_at desc);
+
+create table if not exists structures (
+  id text primary key, owner_id text not null, name text not null,
+  level text not null check (level in ('block','page','view')),
+  body jsonb not null, source text not null default 'manual',
+  favorite boolean not null default false, position int not null default 0,
+  created_at timestamptz default now(), updated_at timestamptz default now()
+);
+
+create table if not exists folders (id text primary key, owner_id text not null, name text not null, parent_id text, created_at timestamptz default now());
+create table if not exists assets (
+  id text primary key, owner_id text not null, folder_id text,
+  name text not null, mime text not null, size bigint not null,
+  storage_key text, url text, created_at timestamptz default now(), deleted_at timestamptz
+);
+```
+- `planets`는 공간 데이터 그대로, `Planet.parentId`만 더한다.
+- 확신은 공간 데이터의 `confidence` 컬렉션 그대로, `targetType`에 `page`를 더한다(페이지 표의 `confidence` 열은 최신 값 캐시).
+- `forms`는 S7에서 `structures`로 옮긴다(옮긴 뒤에도 읽기 호환 유지).
+- API: `GET/PUT /api/pages/:id`(revision 비교), `GET /api/pages?planet=&q=&cursor=`, `POST /api/pages/:id/snapshot`, `GET/POST /api/structures`, `GET/POST /api/assets`, `POST /api/assets/:id/to-page`.
+
+### 14.7 스냅샷 (S2)
+- 페이지 저장은 입력이 멈춘 뒤 1.5초에 `PUT`(이벤트 없음).
+- 페이지를 나가거나 30분 넘게 편집이 없으면 `snapshot`: 직전 스냅샷과 글이 다를 때만 새 `Entry`를 만든다. `user` 블록 → `kind:'dump'`, `source` 블록 → `kind:'media'`(블록마다 하나), `parentEntryId`로 이전 스냅샷 연결. 이때 `workspace_events`에 `entries.created`가 남는다.
+- 예약 구조화(S4)는 하루 마지막 스냅샷에만, `runDaily`와 다른 시간대에 실행한다.
+
+### 14.8 Knowledge 집계 (S4)
+- 서버 함수 `knowledgeOf(store, pages): ConceptKnowledge[]` 하나에서만 계산한다. 학습 화면·Space 보기·테스트가 모두 이 결과를 쓴다.
+- 입력: `concepts`(단계·`unfamiliar`·mentions), 각 Entry의 `comparison`, `satellite_records`의 `attempt`, `confidence`, `pages.planet_ids` + `planets.parentId`.
+- 결정적이어야 한다: 같은 입력 → 같은 출력(정렬·해시 고정). 6장 규칙의 경계값은 상수로 export해 테스트에서 쓴다.
+
+### 14.9 단계별 파일 (S1 기준)
+| 파일 | 할 일 |
+|---|---|
+| `components/Moons.tsx` | `site-header`·`navGroups` 제거, `<Shell>`로 감싸기 |
+| `components/shell/Shell.tsx`, `Rail.tsx` (신규) | 레일, 아래 탭, 내 Satellite, 프로필 메뉴 |
+| `lib/spaces.ts`, `lib/focus.ts` (신규) | 경로 → 공간, 맥락 유지 |
+| `components/Brand.tsx` | `Logo` 크기 옵션, 인사 표시 조건 |
+| `styles/rail.css` (신규), `styles/nav-v7.css` | 레일 스타일, 옛 내비 스타일 제거 |
+| `lib/i18n-ko.ts`, `lib/i18n.ts` | 14.5 |
+| `src/tests/spaces.test.ts` (신규) | 모든 기존 경로가 공간 하나에 대응, 맥락 유지 경로 계산 |

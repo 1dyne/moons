@@ -22,6 +22,7 @@ import {accountId} from './lib/server/v5/identity';
 import {readNotation} from './lib/server/v5/notation';
 import {projectsRouter} from './projects-router';
 import {satellitesRouter} from './satellites-router';
+import {v9Router} from './v9-router';
 
 const router:IRouter=Router();
 const HAND_MODEL_URL='https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
@@ -209,4 +210,5 @@ router.post('/cron/daily',route(async(req,res)=>{
 }));
 router.use(projectsRouter(checkOrigin));
 router.use(satellitesRouter(checkOrigin));
+router.use(v9Router(checkOrigin));
 export default router;

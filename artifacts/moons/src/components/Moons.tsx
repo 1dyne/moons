@@ -1,5 +1,12 @@
 import './../styles/personal.css';
 import '../styles/nav-v7.css';
+import '../styles/rail.css';
+import '../styles/v9.css';
+import Rail from './shell/Rail';
+import RecordSpace from './record/RecordSpace';
+import Onboarding from './record/Onboarding';
+import {usePages} from '@/lib/v9-store';
+import {focusOfPath,writeFocus} from '@/lib/spaces';
 import GraphLines from './GraphLines';
 import UniverseWorkspace from './UniverseWorkspace';
 import ChatWorkspace from './ChatWorkspace';
@@ -67,6 +74,7 @@ const missedLines=(e:Entry)=>e.kind!=='dump'||e.comparison||(e as {crossChecks?:
 export default function Moons(){
   const router=useRouter(),path=usePathname();const route=path.split('/').filter(Boolean);const view=route[0]==='galaxy'?'universe':route[0]??'home';const entryId=route[1];const tab=route[2]==='original'?'original':route[2]==='compare'?'compare':'structure';const original=tab==='original';
   const ws=useWorkspace();const {commit}=ws;
+  const {pages}=usePages();
   const projectHub=useProjectHub(ws.status==='ready');
   const [sparkProjects,setSparkProjects]=useState<string[]>([]);
   const [mode,setMode]=useState<string>(()=>new URLSearchParams(window.location.search).get('form')??'dump'),[toast,setToast]=useState(''),[search,setSearch]=useState(''),[filter,setFilter]=useState('all'),[planetFilter,setPlanetFilter]=useState('all'),[tagTarget,setTagTarget]=useState<string|null>(null),[newPlanet,setNewPlanet]=useState(false),[activeNode,setActiveNode]=useState<string|null>(null),[highlight,setHighlight]=useState<number[]>([]),[historyIndex,setHistoryIndex]=useState(-1),[pending,setPending]=useState<string|null>(null),[received,setReceived]=useState<Entry|null>(null),[mobileNav,setMobileNav]=useState(false),[comparing,setComparing]=useState<Entry|null>(null);
@@ -77,6 +85,7 @@ export default function Moons(){
   const [comment,setComment]=useState<string|null>(null),[focusPart,setFocusPart]=useState<string|null>(null),[layer,setLayer]=useState<'sentence'|'structure'>('sentence'),[renaming,setRenaming]=useState<string|null>(null);
   const store=ws.store;const current=store?.entries.find(e=>e.id===entryId);
   useEffect(()=>()=>{if(toastTimer.current)clearTimeout(toastTimer.current)},[]);
+  useEffect(()=>{const f=focusOfPath(path);if(f)writeFocus(f);},[path]);
   useEffect(()=>{setActiveNode(null);setHistoryIndex(-1);setComment(null);setFocusPart(null);setMobileNav(false);const formParam=new URLSearchParams(window.location.search).get('form');if(formParam)setMode(formParam);const indices=new URLSearchParams(window.location.search).get('source');setHighlight(indices?indices.split(',').map(Number).filter(Number.isFinite):[]);window.scrollTo(0,0)},[path]);
   useEffect(()=>{const close=(event:KeyboardEvent)=>{if(event.key==='Escape')setMobileNav(false)};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close)},[]);
   useEffect(()=>{if(original&&highlight.length)document.getElementById(`sentence-${highlight[0]}`)?.scrollIntoView({behavior:'smooth',block:'center'})},[original,highlight,ws.status]);
@@ -148,6 +157,7 @@ const activeForm=forms.find(f=>f.id===mode)??null;
     if(next.settings?.language!==lang)next={...next,settings:{...(next.settings??defaultSettings()),language:lang}};
     if(next!==store)ws.commit(()=>next)},[ready]);
   const sats=store?enabledSatellites(store):new Set<string>();
+  const pageEntry=(id:string)=>pages.find(p=>p.id===id)?.latestEntryId;
   const navGroups=[
     {label:tr('Make'),items:[{url:'/',label:tr('Capture'),active:view==='home'||view==='media',icon:NotebookPen},{url:'/chat',label:tr('Chat'),active:view==='chat',icon:MessagesSquare}]},
     {label:tr('Knowing'),items:[{url:'/notes',label:tr('Notes'),active:view==='notes'||view==='entries',icon:FileText},{url:'/concepts',label:tr('Concepts'),active:view==='concepts',icon:Lightbulb},{url:'/station',label:tr('Station'),active:view==='station'||view==='compare',icon:Columns2}]},
@@ -158,24 +168,16 @@ const activeForm=forms.find(f=>f.id===mode)??null;
       ...(sats.has('planner')?[{url:'/planner',label:tr('Schedule'),active:view==='planner',icon:CalendarClock}]:[]),
       ...(sats.has('forms')?[{url:'/forms/new',label:tr('Form builder'),active:view==='forms',icon:ClipboardList}]:[])]}]:[]),
   ];
-  return <div className={`app view-${view}`}>
+  return <div className={`app v9 view-${view}`}>
    <a className="skip-link" href="#main">{tr('Skip to content')}</a>
-   <header className="site-header"><button className="menu-toggle" onClick={()=>setMobileNav(!mobileNav)} aria-label={tr('Menu')} aria-controls="main-navigation" aria-expanded={mobileNav}><Menu size={24}/></button><button className="wordmark" onClick={()=>go('/')} aria-label={tr('MOONS home')}><LineLogo/></button><nav id="main-navigation" aria-label={tr('Navigation')} className={mobileNav?'nav open':'nav'}>{navGroups.map(g=><div className="nav-group" role="group" aria-label={g.label} key={g.label}><span className="nav-group-label">{g.label}</span>{g.items.map(({url,label,active,icon:Icon})=><button key={url} className={active?'active':''} aria-current={active?'page':undefined} onClick={()=>go(url)}><Icon size={16}/>{label}</button>)}</div>)}</nav>
-    <div className="header-tools">{ready&&<InboxButton go={go} active={view==='inbox'}/>}{ready&&<AccountMenu go={go} download={exportData} feedback={()=>setFeedback(true)} active={view==='settings'}/>}{ready&&<span className={`sync-pill ${ws.conflict?'bad':ws.sync}`} role="status" title={ws.syncError}>{ws.sync==='error'||ws.conflict?<CloudOff size={14}/>:<Cloud size={14}/>}{syncText}{ws.sync==='error'&&!ws.conflict&&<button onClick={ws.retry}>{tr('Retry')}</button>}</span>}{ready&&<NotificationBell notices={notices} resolve={resolveEvidence} apply={applyNotice} canApply={canApplyNotice} applyLabel={applyLabel} sideBySide={n=>go(deskUrl(noteEvidence(n)))} canSideBySide={n=>noteEvidence(n).length>=2} talk={talk} dismiss={n=>void setNotice(n,'dismissed')} markSeen={markSeen}/>}</div></header>
+   <Rail path={path} go={go} store={store??null} showShare={true} showMarket={false} entryOfPage={pageEntry} tools={<>{ready&&<InboxButton go={go} active={view==='inbox'}/>}{ready&&<NotificationBell notices={notices} resolve={resolveEvidence} apply={applyNotice} canApply={canApplyNotice} applyLabel={applyLabel} sideBySide={n=>go(deskUrl(noteEvidence(n)))} canSideBySide={n=>noteEvidence(n).length>=2} talk={talk} dismiss={n=>void setNotice(n,'dismissed')} markSeen={markSeen}/>}{ready&&<AccountMenu go={go} download={exportData} feedback={()=>setFeedback(true)} active={view==='settings'}/>}</>}/>
+   <div className="v9-topbar">{ready&&<span className={`sync-pill ${ws.conflict?'bad':ws.sync}`} role="status" title={ws.syncError}>{ws.sync==='error'||ws.conflict?<CloudOff size={14}/>:<Cloud size={14}/>}{syncText}{ws.sync==='error'&&!ws.conflict&&<button onClick={ws.retry}>{tr('Retry')}</button>}</span>}</div>
    {ws.conflict&&<div role="alert" className="error-banner conflict"><AlertCircle size={16}/><span>{tr('This space was changed somewhere else. Your unsaved changes are protected and nothing will be overwritten automatically.')}</span><button onClick={exportData}>{tr('Download my version')}</button><button onClick={()=>void ws.reload()}>{tr('Load latest, discard mine')}</button><button onClick={()=>void ws.overwrite()}>{tr('Keep mine, overwrite')}</button></div>}
    {ready&&view!=='chat'&&view!=='universe'&&<NotificationBanner notices={notices} resolve={resolveEvidence} apply={applyNotice} canApply={canApplyNotice} applyLabel={applyLabel} sideBySide={n=>go(deskUrl(noteEvidence(n)))} canSideBySide={n=>noteEvidence(n).length>=2} talk={talk} dismiss={n=>void setNotice(n,'dismissed')}/>}
    <main id="main">
    {ws.status==='error'?<div className="empty-state"><CloudOff size={40} strokeWidth={1}/><h2>{tr('Can’t reach your space')}</h2><p>{ws.loadError}</p><button className="primary" onClick={()=>void ws.load()}>{tr('Try again')}<RotateCcw size={16}/></button></div>
-   :!ready?<div className="loading-page skeleton-page" aria-busy="true"><LoaderCircle className="spin"/>{tr('Opening your space…')}<div className="skeleton-row"/><div className="skeleton-row short"/></div>:view==='home'?<>
-    <section className="home-hero" aria-label={tr('Matter')}>
-     <div className="mascot-stage"><Speech mode={mode==='media'?'media':'dump'}/><Logo/></div>
-     <div className="composer-area"><div className="composer-top"><div className="mode-switch" role="group" aria-label={tr('Writing mode')}><button className={mode==='dump'?'selected':''} aria-label={tr('Sparks')} title={tr('Sparks')} aria-pressed={mode==='dump'} onClick={()=>setMode('dump')}><Flame size={20}/><span>{tr('Sparks')}</span></button><button className={mode==='media'?'selected':''} aria-label={tr('Materials')} title={tr('Materials')} aria-pressed={mode==='media'} onClick={()=>setMode('media')}><LibraryBig size={20}/><span>{tr('Materials')}</span></button>{forms.map(f=>{const FI=iconFor(f.icon);return <button key={f.id} className={mode===f.id?'selected':''} aria-pressed={mode===f.id} title={f.name} onClick={()=>setMode(f.id)}><FI size={20}/><span>{f.name}</span></button>})}<button className="form-tab-add" aria-label={tr('New form')} title={tr('New form')} onClick={()=>go('/forms/new')}><Plus size={18}/></button></div></div>
-     {activeForm?<FormFill key={activeForm.id} form={activeForm} ctx={{store,ws,notify,go,saved:id=>{const e=ws.getStore()?.entries.find(x=>x.id===id);if(e)setReceived(e)}}}/>:mode==='dump'?<SparkComposer draftKey="moons.draft.v1" label={tr('Write a spark')} onSubmit={saveSpark}/>:<MaterialTiles ctx={{store,ws,notify,go,saved:id=>{const e=ws.getStore()?.entries.find(x=>x.id===id);if(e)setReceived(e)}}} open={id=>go(`/media/${id}`)}/>}
-     <VoiceOriginal ws={ws} saved={id=>{const entry=ws.getStore()?.entries.find(e=>e.id===id);if(entry)setReceived(entry)}}/>
-     {mode==='dump'&&sats.has('projects')&&<ProjectTags projects={projectHub.data.projects} value={sparkProjects} onChange={setSparkProjects}/>}
-     </div>
-    </section>
-   </>:view==='media'?<MaterialPage key={route[1]} tileId={route[1]??''} back={()=>go('/')} ctx={{store,ws,notify,go,saved:id=>{const e=ws.getStore()?.entries.find(x=>x.id===id);if(e)setReceived(e)}}}/>
+   :!ready?<div className="loading-page skeleton-page" aria-busy="true"><LoaderCircle className="spin"/>{tr('Opening your space…')}<div className="skeleton-row"/><div className="skeleton-row short"/></div>:view==='home'||view==='pages'?<RecordSpace key="record" ctx={{store,ws,notify,go}} pageId={view==='pages'?route[1]:undefined} onAsk={(eid,title)=>{if(eid)startThread({kind:'node',ref:eid},[eid],undefined,title);else go('/chat')}}/>
+   :view==='media'?<MaterialPage key={route[1]} tileId={route[1]??''} back={()=>go('/')} ctx={{store,ws,notify,go,saved:id=>{const e=ws.getStore()?.entries.find(x=>x.id===id);if(e)setReceived(e)}}}/>
    :view==='forms'?<FormBuilder key={route[1]??'new'} formId={route[1]&&route[1]!=='new'?route[1]:null} ctx={{store,ws,notify,go,saved:()=>undefined}}/>
    :view==='planner'?(route[1]==='projects'&&route[2]?<ProjectPage key={route[2]} id={route[2]} ctx={{store,ws,notify,go}}/>:<DailyPlanner ctx={{store,ws,notify,go}}/>)
    :view==='print'?<PrintView store={store}/>
@@ -214,6 +216,7 @@ const activeForm=forms.find(f=>f.id===mode)??null;
    {legend&&<LegendSuggest found={legend} close={()=>setLegend(null)} save={rows=>{if(commit(st=>({...st,notation:[...(st.notation??[]),...rows]}))){notify(tr('Saved to my symbols. Edit them any time in Settings.'));setLegend(null)}}}/>}
    {replayStep!==null&&current&&displayAnalysis&&view==='entries'&&tab==='structure'&&<MapReplay analysis={displayAnalysis} entry={current} step={replayStep} setStep={setReplayStep} close={()=>setReplayStep(null)} openSource={idx=>{setHighlight(idx);go(`/entries/${current.id}/original?source=${idx.join(',')}`)}}/>}
    {asking&&store&&<NewQuestion ctx={{store,ws,notify,go}} close={()=>setAsking(null)} from={asking} initial={(store.entries.find(e=>e.id===asking.entryId)?.sentences[asking.sentence]??'').replace(/[.。!]?\s*$/,'?')}/>}
+   {ready&&!store.settings?.onboarded&&<Onboarding store={store} ws={ws} done={()=>notify(tr('Ready. Just start writing.'))}/>}
    <ConceptPopover store={store} go={go}/>
    {conceptOpen&&store&&<ConceptPanel ctx={{store,ws,notify,go}} id={conceptOpen} close={()=>setConceptOpen(null)}/>}
    {feedback&&<FeedbackDialog close={()=>setFeedback(false)} notify={notify}/>}{reviewing&&<ReviewDialog entryId={reviewing} close={()=>setReviewing(null)} notify={notify}/>}

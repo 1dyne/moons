@@ -50,7 +50,10 @@ export type Relation='updates'|'contradicts'|'extends';
 export type NodeLink={id:string;from:string;to:string;relation:Relation|'related';reason:string;createdAt:string};
 export type Tile={id:string;name:string;icon:string;adapters:string[];defaultPlanet?:string;fields:string[];position:number};
 export type Notice={id:string;kind:string;headline:string;evidence:string[];status:'new'|'seen'|'dismissed';createdAt:string;key?:string};
-export type Settings={showSatellites?:boolean;satelliteAgent?:{minHours?:number;maxRecords?:number};profileContext:boolean;notificationKinds:Record<string,boolean>;language?:'ko'|'en';impostor?:'off'|'rare'|'sometimes'|'often';
+export type Settings={
+  /** v9: toolbar tool ids, pinned Satellites on the rail, MOONS suggestions, onboarding done, scheduled structuring. */
+  toolbar?:string[];pinnedSatellites?:string[];moonsSuggest?:boolean;onboarded?:boolean;autoStructure?:boolean;onboardKinds?:string[];
+  showSatellites?:boolean;satelliteAgent?:{minHours?:number;maxRecords?:number};profileContext:boolean;notificationKinds:Record<string,boolean>;language?:'ko'|'en';impostor?:'off'|'rare'|'sometimes'|'often';
   /** Satellites switched on (lib/satellites.ts). Unset: worked out from what the user already uses. */
   satellites?:string[];satelliteInstalls?:import('@workspace/moons-sync/satellites').DeviceSettings['satelliteInstalls']};
 export const noticeKinds=['breaking_news','bias_watch','adjustment','spy_reveal','source_ready'] as const;
@@ -59,7 +62,9 @@ export const defaultTiles=():Tile[]=>[{id:'tile-dump',name:'Dump',icon:'Flame',a
 export type Entry = {revision?:import('./concepts').Revision;projectIds?:string[];knowledge?:Knowledge;anchors?:Anchor[];comparison?:Comparison;crossChecks?:CrossCheck[];checks?:IntentCheck[];parentEntryId?:string;relation?:Relation;id:string;kind:'dump'|'media'|'question'|'chat'|'record';mediaType?:MediaType;title?:string;meta?:{author?:string;publishedAt?:string;readAt?:string;url?:string;source?:string;doi?:string;[key:string]:unknown};body:string;sentences:string[];locked:boolean;createdAt:string;analysis?:Analysis;analyses?:Analysis[];status:'saved'|'analyzing'|'done'|'failed';planetIds:string[];example?:boolean;
   /** What the user did with each MOONS comment, by comment key (lib/structure.ts). */
   commentStates?:Record<string,'applied'|'kept'>};
-export type Planet = {id:string;name:string;position:{x:number;y:number};entryCount:number;openSignalRatio:number;color:string};
+export type Planet = {id:string;name:string;position:{x:number;y:number};entryCount:number;openSignalRatio:number;color:string;
+  /** v9 4.8: the parent mother planet; colorBy 'user' keeps a colour the user picked instead of the parent's hue. */
+  parentId?:string;colorBy?:'user'};
 export type Store = {version:1;entries:Entry[];planets:Planet[];universe?:UniverseState;views?:UniverseView[];profile?:Profile;chats?:ChatThread[];activeChatId?:string;baselines?:SpatialBaseline[];tiles?:Tile[];forms?:FormTemplate[];links?:NodeLink[];notation?:Notation[];projects?:Project[];tasks?:Task[];sessions?:Session[];confidence?:Confidence[];notifications?:Notice[];settings?:Settings;concepts?:import("./concepts").Concept[];memos?:import("./concepts").Memo[];artifacts?:import("./chat-notes").Artifact[];exploreMaps?:import("./chat-notes").ExploreMap[];satellites?:import("./satellite-spaces").Space[]};
 export const uid = () => crypto.randomUUID();
 /** What a node shows: the user's own correction when there is one, else the quote. */

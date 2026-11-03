@@ -65,3 +65,24 @@ test('a structure keeps the shape and drops the words', () => {
   assert.equal((s[1]!.value as {text: string}).text, '');
   assert.deepEqual((s[2]!.value as {messages: unknown[]; steps: string[]}).messages, []);
 });
+
+import {isBridgeRequest,originOf} from '../lib/sat-bridge.ts';
+import {columnKind} from '../lib/space-views.ts';
+import {dueSnapshots} from '../lib/scheduled.ts';
+test('the Satellite bridge only reads its own message shape and origin', () => {
+  assert.equal(isBridgeRequest({moons: 'v1', id: '1', op: 'set', key: 'a', value: 1}), true);
+  assert.equal(isBridgeRequest({moons: 'v1', id: '1', op: 'eval'}), false);
+  assert.equal(isBridgeRequest('hi'), false);
+  assert.equal(originOf('https://drill.example.com/app?x=1'), 'https://drill.example.com');
+  assert.equal(originOf('nope'), null);
+});
+test('a table column kind is read from its values', () => {
+  assert.equal(columnKind(['1', '2.5', '']), 'number');
+  assert.equal(columnKind(['2026-11-01', '2026-11-03']), 'date');
+  assert.equal(columnKind(['상황', '3']), 'text');
+});
+test('scheduled structuring takes the last snapshot of an earlier day only', () => {
+  const mk = (id: string, at: string, extra = {}) => ({id, kind: 'dump' as const, body: 'x', sentences: ['x'], locked: true, createdAt: at, status: 'saved' as const, planetIds: [], meta: {pageId: 'p'}, ...extra});
+  const entries = [mk('a', '2026-11-01T10:00:00'), mk('b', '2026-11-01T12:00:00', {parentEntryId: 'a'}), mk('c', '2026-11-03T09:00:00', {meta: {pageId: 'q'}})];
+  assert.deepEqual(dueSnapshots({entries}, new Date('2026-11-03T12:00:00')).map(e => e.id), ['b']);
+});

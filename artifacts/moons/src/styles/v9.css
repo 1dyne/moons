@@ -374,3 +374,4 @@ svg.cut{display:block;width:100%;min-width:600px;height:auto}
 .seg{font:inherit;font-size:13px;padding:6px 11px;border:0;background:transparent;color:#5a5c52;border-radius:8px;min-height:32px}
 .seg.on{background:#252932;color:#fff;font-weight:600}
 .sat-pins{padding-bottom:0}.sat-pins h2{font-size:15px;margin:0 0 8px}
+@media(max-width:820px){.recent-open{top:auto;bottom:calc(84px + env(safe-area-inset-bottom,0px));left:12px;z-index:30}}

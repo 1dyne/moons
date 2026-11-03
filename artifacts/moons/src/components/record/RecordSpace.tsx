@@ -21,7 +21,7 @@ export default function RecordSpace({ctx,pageId,onAsk,startWith}:{ctx:Ctx;pageId
   const {store,go}=ctx;const router=useRouter();
   const {pages,loaded}=usePages();
   const [draft,setDraft]=useState<Page>(()=>startWith??newPage());
-  const [open,setOpen]=useState(true),[planet,setPlanet]=useState('all'),[q,setQ]=useState(''),[greet,setGreet]=useState(()=>!greeted());
+  const [open,setOpen]=useState(()=>typeof window==='undefined'||!window.matchMedia('(max-width: 820px)').matches),[planet,setPlanet]=useState('all'),[q,setQ]=useState(''),[greet,setGreet]=useState(()=>!greeted());
   useEffect(()=>{if(!pageId&&startWith)setDraft(startWith)},[startWith]);
   // Leaving the draft for another page: coming back loads the saved copy instead of the stale draft.
   useEffect(()=>{if(pageId&&pageId!==draft.id)setDraft(newPage())},[pageId]);
@@ -37,7 +37,7 @@ export default function RecordSpace({ctx,pageId,onAsk,startWith}:{ctx:Ctx;pageId
       <div className="recent-head"><button className="primary small" onClick={()=>{const p=newPage();setDraft(p);go('/')}}><Plus size={15}/>{tr('New page')}</button><button className="icon-button" aria-label={tr('Hide list')} onClick={()=>setOpen(false)}><ChevronLeft size={16}/></button></div>
       <label className="search-field small"><Search size={14}/><input aria-label={tr('Search')} placeholder={tr('Search')} value={q} onChange={e=>setQ(e.target.value)}/></label>
       <select aria-label={tr('Mother planet')} value={planet} onChange={e=>setPlanet(e.target.value)}><option value="all">{tr('All planets')}</option>{tree.map(p=><option key={p.id} value={p.id}>{'　'.repeat(p.depth)}{p.name}</option>)}<option value="none">{tr('Dwarf planet')}</option></select>
-      <ul className="recent-list">{list.map(p=><li key={p.id}><button className={(pageId??draft.id)===p.id?'on':''} onClick={()=>go(`/pages/${p.id}`)}>
+      <ul className="recent-list">{list.map(p=><li key={p.id}><button className={(pageId??draft.id)===p.id?'on':''} onClick={()=>{go(`/pages/${p.id}`);if(window.matchMedia('(max-width: 820px)').matches)setOpen(false)}}>
         <span className="rl-title">{pageTitle(p)||tr('Untitled')}</span>
         <span className="rl-meta">{p.planetIds.slice(0,2).map(id=>{const pl=store.planets.find(x=>x.id===id);return pl?<i key={id} style={{background:colorOf(pl,store.planets)}} title={pl.name}/>:null})}{when(p.updatedAt)}</span>
       </button></li>)}{loaded&&!list.length&&<li className="muted rl-empty">—</li>}</ul>

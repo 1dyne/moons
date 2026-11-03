@@ -49,7 +49,15 @@ claude.ai 아티팩트: 외부 fetch가 막혀 있으니 MOONS MCP 도구 add_re
 - userText에는 사용자가 친 글만 넣는다. Satellite나 AI가 만든 글은 summary/items/note에.
 - 버튼 방식: 페이지에 "MOONS에 추가" 버튼을 두고 누르면 apply:"request"로 보낸다.
 - 에이전트 방식: apply 없이 보내 두면, 사용자가 켜 둔 경우 MOONS 에이전트가 모아서 정리안을 만든다.
-- CORS 허용. 브라우저에서 바로 보낼 수 있지만 토큰이 페이지에 드러나므로 사용자 개인용 페이지에서만 그렇게 한다.`;
+- CORS 허용. 브라우저에서 바로 보낼 수 있지만 토큰이 페이지에 드러나므로 사용자 개인용 페이지에서만 그렇게 한다.
+
+[v9] MOONS 안에서 열릴 때 (postMessage, 토큰 없음)
+- MOONS가 이 페이지를 iframe으로 열면 먼저 {moons:'v1', hello:true, satellite:'<id>'} 를 보낸다. 이걸 받으면 MOONS 안에 있는 것이다.
+- 요청: window.parent.postMessage({moons:'v1', id:'<요청마다 다른 값>', op, key?, value?}, '*'). 답: {moons:'v1', id, ok, value|error}.
+  op: 'list'(이 Satellite 저장소 전체) · 'get'(key) · 'set'(key, value ≤256KB) · 'delete'(key) · 'record'(value = 위 기록 형식, 노트는 들어온 것 함 승인을 거친다).
+- 저장소는 Satellite마다 따로다(최대 500개 키). 다른 Satellite나 노트는 읽을 수 없다.
+- 등록한 주소의 origin에서 온 메시지만 받는다. 페이지 코드에 토큰을 넣지 않는다.
+- MOONS 밖(새 탭)에서 열렸으면 hello가 오지 않는다. 그때는 위의 토큰 방식(서버에서)으로 보낸다.`;
 
 const text = (v: unknown, max = 600) => typeof v === 'string' ? v.slice(0, max) : '';
 const label = (e: Entry) => e.title || e.body.slice(0, 60);

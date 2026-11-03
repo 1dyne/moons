@@ -29,3 +29,4 @@
   .rail-tools [class*="-pop"]{left:auto!important;right:0!important;bottom:calc(100% + 8px)!important}
   .v9-topbar{top:10px;right:12px}
 }
+@media(max-width:820px){.app.v9 .agent-launch{bottom:calc(78px + env(safe-area-inset-bottom,0px))!important;right:14px!important}}

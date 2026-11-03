@@ -9,6 +9,7 @@ import {getV9,saveStructure,upsertPage,dropPage,usePages} from '@/lib/v9-store';
 import {colorOf,withAncestors} from '@/lib/planets';
 import {rate,ratingsFor} from '@/lib/planner';
 import {uid,type Store} from '@/lib/model';
+import {dismiss,publishSuggestions,suggestFor,toErrorNote} from '@/lib/suggest';
 import type {WorkspaceApi} from '@/lib/workspace-client';
 import type {RichHandle} from './RichText';
 import Stars from './Stars';
@@ -52,12 +53,23 @@ export default function PageEditor({id,ctx,initial,onAsk,greeting}:{id?:string;c
   function change(next:Page){next={...next,updatedAt:new Date().toISOString()};setPage(next);pageRef.current=next;dirty.current=true;
     if(saveTimer.current)clearTimeout(saveTimer.current);saveTimer.current=setTimeout(()=>void persist(),1500);
     if(idleTimer.current)clearTimeout(idleTimer.current);idleTimer.current=setTimeout(()=>void snapRef.current(),IDLE_SNAPSHOT)}
+  // v9 8장: suggestions for this page, shown by the floating moon when the user turned them on.
+  const changeRef=useRef<(p:Page)=>void>(()=>undefined);
+  useEffect(()=>{if(!page||store.settings?.moonsSuggest===false){publishSuggestions({list:[]});return}
+    const t=setTimeout(()=>publishSuggestions({list:suggestFor(page,store),apply:sg=>{const cur=pageRef.current;if(!cur)return;dismiss(sg.key);
+      if(sg.kind==='format')changeRef.current({...cur,blocks:toErrorNote(cur)});
+      else if(sg.kind==='planet'&&sg.planetId)changeRef.current({...cur,planetIds:[...cur.planetIds,sg.planetId]});
+      else if(sg.kind==='link'&&sg.entryId){const target=sg.entryId;void snapRef.current().then(eid=>{if(!eid)return;ws.commit(st=>({...st,links:[...(st.links??[]),{id:uid(),from:eid,to:target,relation:'related',reason:'',createdAt:new Date().toISOString()}]}));notify(tr('Connected.'))})}
+      publishSuggestions({list:suggestFor(pageRef.current!,ws.getStore()??store)})}}),1200);
+    return()=>clearTimeout(t)},[page?.blocks,page?.planetIds,store.concepts,store.settings?.moonsSuggest]);
+  useEffect(()=>()=>publishSuggestions({list:[]}),[]);
   const snapRef=useRef(snapshot);snapRef.current=snapshot;
   const pendingFocus=useRef<{id:string;at?:'start'|'end'|number}|null>(null);
   useLayoutEffect(()=>{const f=pendingFocus.current;if(!f)return;const h=handles.current.get(f.id);if(h){pendingFocus.current=null;h.focus(f.at)}});
   useEffect(()=>{const hide=()=>{if(document.visibilityState==='hidden')void snapRef.current()};document.addEventListener('visibilitychange',hide);window.addEventListener('pagehide',hide);
     return()=>{document.removeEventListener('visibilitychange',hide);window.removeEventListener('pagehide',hide);if(idleTimer.current)clearTimeout(idleTimer.current);void snapRef.current()}},[]);
 
+  changeRef.current=change;
   if(!page)return <div className="loading-page"><Icons.LoaderCircle className="spin"/>{tr('Opening…')}</div>;
   const blocks=page.blocks;
   const setBlocks=(b:Block[])=>change({...page,blocks:b});

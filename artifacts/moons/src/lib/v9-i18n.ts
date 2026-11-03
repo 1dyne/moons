@@ -31,7 +31,7 @@ export const v9Ko: Record<string, string> = {
   'Study': '공부', 'Exam': '시험', 'Work': '일', 'Project': '프로젝트', 'Reading': '독서', 'Daily life': '일상', 'Language': '어학', 'Development': '개발',
 };
 Object.assign(v9Ko, {
-  'My moon': '내 달', 'Based on my records': '내 기록 기준', 'Fields': '분야', 'Forming': '형성 중', 'evidence {n}': '근거 {n}', 'Structure': '구조', 'Compare': '비교', 'Original': '원문',
+  'My moon': '내 달', 'Based on my records': '내 기록 기준', 'Field list': '분야', 'Forming': '형성 중', 'evidence {n}': '근거 {n}', 'Structure': '구조', 'Compare': '비교', 'Original': '원문',
   'Places to look': '확인할 곳', 'Felt sure, not there yet': '확신과 어긋남', 'Know more than you think': '생각보다 앎', 'Never explained': '설명 전', 'Often, but low': '자주, 낮음', 'Not checked yet': '점검 전',
   'Back side · not checked yet': '뒷면 · 점검 전', '{n} kept only': '넣어두기만 한 것 {n}개', 'Concept': '개념', '{name} cross-section': '{name} 단면', 'Study tools': '학습 도구', 'Questions': '질문', 'Chats': '대화', 'Concepts': '개념',
   'You felt sure, but the records show a lower stage.': '확신에 비해 기록의 단계가 낮아요.', 'The records show more than you felt.': '느낀 것보다 기록이 더 많이 보여줘요.', 'Not yet explained in your own words.': '아직 내 말로 설명한 기록이 없어요.', 'No comparison, attempt or explanation yet.': '비교 · 풀이 · 설명 근거가 아직 없어요.',
@@ -41,4 +41,14 @@ Object.assign(v9Ko, {
   'Front': '앞면', 'Back side': '뒷면', 'No concepts with records here yet.': '아직 개념이 없어요.', 'Cross-section: stage and confidence by concept': '개념별 단계와 확신 단면도',
   'Ground: stage': '땅 높이: 단계', 'Dashed: how sure you felt': '점선: 느낀 확신', 'Lower layer: records': '아래층: 쌓인 기록', 'Under water: not explained yet': '수면 아래: 설명 전',
   'Came in': '들어옴', 'Organised': '정리됨', 'Checked': '확인됨', 'Can explain': '설명 가능',
+});
+Object.assign(v9Ko, {
+  'MOONS suggestion': 'MOONS 제안', 'Make it an error note?': '오답 노트로 바꿀까요?', 'Problem · situation · reason · next try are already here.': '문항 · 상황 · 이유 · 다음 시도가 이미 있어요.',
+  'Put it on {name}?': '{name}에 둘까요?', 'Related planets to connect?': '관련 있는 행성을 더 연결해볼까요?', 'Connected.': '연결했어요.', 'Apply': '적용', 'Leave it': '그냥 두기', 'Close': '닫기',
+});
+Object.assign(v9Ko, {
+  'Folder': '폴더', 'Folders': '폴더', 'Folder name': '폴더 이름', 'Web link': '웹 링크', 'Upload': '올리기', 'All': '전체', 'Rename': '이름 바꾸기', 'Name': '이름', 'Move': '옮기기', 'Open': '열기', 'Organize': '정리',
+  'Delete this folder? Files move up one level.': '이 폴더를 지울까요? 파일은 한 단계 위로 옮겨져요.', 'Delete this file?': '이 파일을 지울까요?',
+  'My structures': '내 구조', 'Make a shared space': '공유 공간 만들기', 'Toolbar': '도구줄', 'Built in': '기본', 'Copy': '복제', 'mine': '내 것', 'Move up': '앞으로', 'Remove': '빼기',
+  'Delete this structure? Pages made with it stay.': '이 구조를 지울까요? 이걸로 만든 페이지는 남아요.', 'Copied. Insert it in a page, change it, then save structure again.': '복제했어요. 페이지에 넣어 고친 뒤 다시 구조 저장하세요.',
 });

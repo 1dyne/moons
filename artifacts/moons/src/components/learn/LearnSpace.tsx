@@ -41,7 +41,7 @@ export default function LearnSpace({ctx,focusEntry,focusConcept}:{ctx:Ctx;focusE
   const back=mine.filter(k=>k.side==='back');
   return <section className="learn">
     <header className="learn-head"><h1>{tr('My moon')}</h1><small className="muted">{tr('Based on my records')}</small>
-      <div className="learn-fields" role="group" aria-label={tr('Fields')}>{(summaries.length?summaries:[{field:NO_FIELD,concepts:0,evidence:0,understanding:null,open:false,backPages:[]}]).map(s=>{const p=store.planets.find(x=>x.id===s.field);
+      <div className="learn-fields" role="group" aria-label={tr('Field list')}>{(summaries.length?summaries:[{field:NO_FIELD,concepts:0,evidence:0,understanding:null,open:false,backPages:[]}]).map(s=>{const p=store.planets.find(x=>x.id===s.field);
         return <button key={s.field} className={`field-chip ${s.field===f?'on':''}`} aria-pressed={s.field===f} onClick={()=>{setField(s.field);setSelected(null)}}>{p&&<i style={{background:colorOf(p,store.planets)}}/>}{fname(s.field)}<b>{s.open?s.understanding??'—':tr('Forming')}</b><small>{s.open?tr('evidence {n}',{n:s.evidence}):`${Math.min(s.concepts,KNOWLEDGE_REVEAL.concepts)}/${KNOWLEDGE_REVEAL.concepts} · ${Math.min(s.evidence,KNOWLEDGE_REVEAL.evidence)}/${KNOWLEDGE_REVEAL.evidence}`}</small></button>})}</div>
     </header>
 

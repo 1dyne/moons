@@ -60,3 +60,18 @@ export function shapeOf(blocks: Block[]): Block[] {
     return {...x, id: uid(), by: 'user', value: v} as Block;
   });
 }
+
+/** v6 forms become my structures (v9 4.5): words-type blocks become fields, lists stay lists. */
+export function formToStructure(f: {id: string; name: string; icon: string; blocks: {kind: string; label: string; options?: string[]}[]}): Structure {
+  const blocks: Block[] = [];
+  let fields: {label: string; text: string}[] = [];
+  const flush = () => { if (fields.length) { blocks.push(newBlock('fields', {fields})); fields = []; } };
+  for (const b of f.blocks) {
+    if (b.kind === 'checklist') { flush(); blocks.push(newBlock('checklist', {items: (b.options?.length ? b.options : ['']).map(t => ({text: t, done: false}))})); }
+    else if (b.kind === 'steps') { flush(); blocks.push(newBlock('steps', {items: b.options?.length ? [...b.options] : ['']})); }
+    else if (b.kind === 'planet') continue;
+    else fields.push({label: b.label, text: ''});
+  }
+  flush();
+  return {id: `form-${f.id}`, name: f.name || 'Form', level: 'page', icon: f.icon || 'ClipboardList', blocks, source: 'manual'};
+}

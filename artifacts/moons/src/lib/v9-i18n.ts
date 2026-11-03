@@ -30,3 +30,15 @@ export const v9Ko: Record<string, string> = {
   'Formats · planets · connections': '형식 · 모행성 · 연결', 'On': '켜기', 'Off': '끄기', 'Skip': '건너뛰기', 'Start': '시작', 'Ready. Just start writing.': '바로 써 보세요.',
   'Study': '공부', 'Exam': '시험', 'Work': '일', 'Project': '프로젝트', 'Reading': '독서', 'Daily life': '일상', 'Language': '어학', 'Development': '개발',
 };
+Object.assign(v9Ko, {
+  'My moon': '내 달', 'Based on my records': '내 기록 기준', 'Fields': '분야', 'Forming': '형성 중', 'evidence {n}': '근거 {n}', 'Structure': '구조', 'Compare': '비교', 'Original': '원문',
+  'Places to look': '확인할 곳', 'Felt sure, not there yet': '확신과 어긋남', 'Know more than you think': '생각보다 앎', 'Never explained': '설명 전', 'Often, but low': '자주, 낮음', 'Not checked yet': '점검 전',
+  'Back side · not checked yet': '뒷면 · 점검 전', '{n} kept only': '넣어두기만 한 것 {n}개', 'Concept': '개념', '{name} cross-section': '{name} 단면', 'Study tools': '학습 도구', 'Questions': '질문', 'Chats': '대화', 'Concepts': '개념',
+  'You felt sure, but the records show a lower stage.': '확신에 비해 기록의 단계가 낮아요.', 'The records show more than you felt.': '느낀 것보다 기록이 더 많이 보여줘요.', 'Not yet explained in your own words.': '아직 내 말로 설명한 기록이 없어요.', 'No comparison, attempt or explanation yet.': '비교 · 풀이 · 설명 근거가 아직 없어요.',
+  'Next place to look': '다음에 볼 곳', 'Chosen concept': '고른 개념', 'Actual stage': '실제 단계', 'Felt': '느낀 확신', 'Records': '쌓인 기록', 'page': '페이지 기준', 'Attempt': '풀이', 'Explained': '설명',
+  'Explain {name} in your own words?': '{name}을(를) 내 말로 설명해 볼까요?', 'Where else would {name} apply?': '{name}을(를) 다른 곳에도 쓸 수 있을까요?', 'Explain': '설명',
+  'This device cannot draw the 3D moon. The cross-section and lists below still work.': '이 기기에서는 3D 달을 그릴 수 없어요. 아래 단면도와 목록은 그대로 쓸 수 있어요.', 'My moon. Drag to turn it.': '내 달. 끌어서 돌릴 수 있어요.',
+  'Front': '앞면', 'Back side': '뒷면', 'No concepts with records here yet.': '아직 개념이 없어요.', 'Cross-section: stage and confidence by concept': '개념별 단계와 확신 단면도',
+  'Ground: stage': '땅 높이: 단계', 'Dashed: how sure you felt': '점선: 느낀 확신', 'Lower layer: records': '아래층: 쌓인 기록', 'Under water: not explained yet': '수면 아래: 설명 전',
+  'Came in': '들어옴', 'Organised': '정리됨', 'Checked': '확인됨', 'Can explain': '설명 가능',
+});

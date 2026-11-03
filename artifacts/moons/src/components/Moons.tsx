@@ -5,6 +5,10 @@ import '../styles/v9.css';
 import Rail from './shell/Rail';
 import RecordSpace from './record/RecordSpace';
 import Onboarding from './record/Onboarding';
+import LearnSpace from './learn/LearnSpace';
+import {newPage} from '@/lib/pages';
+import {useScheduledStructuring} from '@/lib/scheduled';
+import {useMemo} from 'react';
 import {usePages} from '@/lib/v9-store';
 import {focusOfPath,writeFocus} from '@/lib/spaces';
 import GraphLines from './GraphLines';
@@ -75,6 +79,9 @@ export default function Moons(){
   const router=useRouter(),path=usePathname();const route=path.split('/').filter(Boolean);const view=route[0]==='galaxy'?'universe':route[0]??'home';const entryId=route[1];const tab=route[2]==='original'?'original':route[2]==='compare'?'compare':'structure';const original=tab==='original';
   const ws=useWorkspace();const {commit}=ws;
   const {pages}=usePages();
+  const query=new URLSearchParams(typeof window==='undefined'?'':window.location.search);
+  const titleParam=view==='home'?query.get('title'):null;
+  const startWith=useMemo(()=>titleParam?newPage({title:titleParam}):undefined,[titleParam]);
   const projectHub=useProjectHub(ws.status==='ready');
   const [sparkProjects,setSparkProjects]=useState<string[]>([]);
   const [mode,setMode]=useState<string>(()=>new URLSearchParams(window.location.search).get('form')??'dump'),[toast,setToast]=useState(''),[search,setSearch]=useState(''),[filter,setFilter]=useState('all'),[planetFilter,setPlanetFilter]=useState('all'),[tagTarget,setTagTarget]=useState<string|null>(null),[newPlanet,setNewPlanet]=useState(false),[activeNode,setActiveNode]=useState<string|null>(null),[highlight,setHighlight]=useState<number[]>([]),[historyIndex,setHistoryIndex]=useState(-1),[pending,setPending]=useState<string|null>(null),[received,setReceived]=useState<Entry|null>(null),[mobileNav,setMobileNav]=useState(false),[comparing,setComparing]=useState<Entry|null>(null);
@@ -124,6 +131,7 @@ export default function Moons(){
   const syncText=ws.conflict?tr('Conflict'):ws.sync==='saving'||ws.busy?tr('Saving…'):ws.sync==='error'?tr('Not saved'):tr('Saved');
   const notices:Notice[]=[...(store&&enabledSatellites(store).has('projects')?projectHub.data.proposals.map(p=>({id:p.id,kind:'project_review',headline:p.draft.title,evidence:[p.projectId,p.entryId],status:p.notice,createdAt:p.createdAt})):[]),...(store?.notifications??[])];
   const ready=ws.status==='ready'&&!!store;
+  useScheduledStructuring(ws,store,ready);
   const [exporting,setExporting]=useState<{ids:string[];title:string}|null>(null);
   const replay=useReplay();
   const [legend,setLegend]=useState<Notation[]|null>(null),[conceptOpen,setConceptOpen]=useState<string|null>(null),[mapView,setMapView]=useState<'parts'|'whole'>('parts'),[asking,setAsking]=useState<{entryId:string;sentence:number}|null>(null),[replayStep,setReplayStep]=useState<number|null>(null);
@@ -176,7 +184,8 @@ const activeForm=forms.find(f=>f.id===mode)??null;
    {ready&&view!=='chat'&&view!=='universe'&&<NotificationBanner notices={notices} resolve={resolveEvidence} apply={applyNotice} canApply={canApplyNotice} applyLabel={applyLabel} sideBySide={n=>go(deskUrl(noteEvidence(n)))} canSideBySide={n=>noteEvidence(n).length>=2} talk={talk} dismiss={n=>void setNotice(n,'dismissed')}/>}
    <main id="main">
    {ws.status==='error'?<div className="empty-state"><CloudOff size={40} strokeWidth={1}/><h2>{tr('Can’t reach your space')}</h2><p>{ws.loadError}</p><button className="primary" onClick={()=>void ws.load()}>{tr('Try again')}<RotateCcw size={16}/></button></div>
-   :!ready?<div className="loading-page skeleton-page" aria-busy="true"><LoaderCircle className="spin"/>{tr('Opening your space…')}<div className="skeleton-row"/><div className="skeleton-row short"/></div>:view==='home'||view==='pages'?<RecordSpace key="record" ctx={{store,ws,notify,go}} pageId={view==='pages'?route[1]:undefined} onAsk={(eid,title)=>{if(eid)startThread({kind:'node',ref:eid},[eid],undefined,title);else go('/chat')}}/>
+   :!ready?<div className="loading-page skeleton-page" aria-busy="true"><LoaderCircle className="spin"/>{tr('Opening your space…')}<div className="skeleton-row"/><div className="skeleton-row short"/></div>:view==='learn'?<LearnSpace key={query.get('focus')??query.get('concept')??'learn'} ctx={{store,ws,notify,go}} focusEntry={query.get('focus')??undefined} focusConcept={query.get('concept')??undefined}/>
+   :view==='home'||view==='pages'?<RecordSpace key="record" ctx={{store,ws,notify,go}} startWith={startWith} pageId={view==='pages'?route[1]:undefined} onAsk={(eid,title)=>{if(eid)startThread({kind:'node',ref:eid},[eid],undefined,title);else go('/chat')}}/>
    :view==='media'?<MaterialPage key={route[1]} tileId={route[1]??''} back={()=>go('/')} ctx={{store,ws,notify,go,saved:id=>{const e=ws.getStore()?.entries.find(x=>x.id===id);if(e)setReceived(e)}}}/>
    :view==='forms'?<FormBuilder key={route[1]??'new'} formId={route[1]&&route[1]!=='new'?route[1]:null} ctx={{store,ws,notify,go,saved:()=>undefined}}/>
    :view==='planner'?(route[1]==='projects'&&route[2]?<ProjectPage key={route[2]} id={route[2]} ctx={{store,ws,notify,go}}/>:<DailyPlanner ctx={{store,ws,notify,go}}/>)

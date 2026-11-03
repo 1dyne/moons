@@ -3,14 +3,22 @@
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "paths": {"@/*": ["./src/moons/*"]},
+    "paths": {
+      "@/*": [
+        "./src/moons/*"
+      ]
+    },
     "incremental": true,
     "tsBuildInfoFile": ".tsbuildinfo",
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
     {
       "path": "../../lib/db"
@@ -20,6 +28,12 @@
     },
     {
       "path": "../../lib/moons-sync"
+    },
+    {
+      "path": "../../lib/life-contract"
+    },
+    {
+      "path": "../../lib/planner-spec"
     }
   ]
 }

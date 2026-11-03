@@ -14,6 +14,12 @@
     },
     {
       "path": "./lib/moons-sync"
+    },
+    {
+      "path": "./lib/life-contract"
+    },
+    {
+      "path": "./lib/planner-spec"
     }
   ]
 }

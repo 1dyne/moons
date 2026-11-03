@@ -69,6 +69,8 @@ export async function withAi<T>(owner:string,work:()=>Promise<T>,opts:{operator?
  if(opts.operator)return aiScope.run({owner,operator:true,models:await modelChoices(owner),...project},work);
  const key=await ownKey(owner);
  if(key)return aiScope.run({apiKey:key,owner,...project},work);
+ // The operator key is for signed-in accounts only; a guest cookie must not get (and reset) a free daily allowance.
+ if(!await mayUseOperatorKey(owner))throw new WorkspaceError(403,'Sign in to use MOONS AI, or connect your own API key in Settings.');
  const day=kstDay(),limit=dailyLimit();
  const row=(await q<{calls:number}>(`insert into ai_usage(owner_id,day,calls) values($1,$2,1)
   on conflict(owner_id,day) do update set calls=ai_usage.calls+1 where ai_usage.calls<$3 returning calls`,[owner,day,limit]))[0];
@@ -76,10 +78,15 @@ export async function withAi<T>(owner:string,work:()=>Promise<T>,opts:{operator?
  return aiScope.run({owner,...project},work);
 }
 
+/** With sign-in set up (Clerk), only spaces tied to an account may use the operator key. Without sign-in (self-hosted, local) everyone may. */
+export async function mayUseOperatorKey(owner:string){
+ if(!process.env.CLERK_SECRET_KEY)return true;
+ return (await q('select 1 from guests where id=$1 and user_id is not null union all select 1 from user_workspaces where owner_id=$1 limit 1',[owner])).length>0;
+}
 export async function aiStatus(owner:string,operator=false){
  const own=(await q<{provider:string;created_at:string}>('select provider,created_at::text from ai_keys where owner_id=$1',[owner]))[0];
  const used=(await q<{calls:number}>('select calls from ai_usage where owner_id=$1 and day=$2',[owner,kstDay()]))[0]?.calls??0;
- const base={ownKey:own?{provider:own.provider,since:own.created_at}:null,used,limit:dailyLimit(),operator};
+ const base={ownKey:own?{provider:own.provider,since:own.created_at}:null,used,limit:operator||own||await mayUseOperatorKey(owner)?dailyLimit():0,operator};
  if(!operator)return base;
  return {...base,models:{catalog:MODELS,steps:[...STEPS.map(s=>s.id),'other'],ready:{openai:providerReady('openai'),anthropic:providerReady('anthropic'),gemini:providerReady('gemini')},
   defaults:{fast:defaultModel('fast'),deep:defaultModel('deep')},chosen:await modelChoices(owner)}};

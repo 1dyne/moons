@@ -52,3 +52,11 @@ Object.assign(v9Ko, {
   'My structures': '내 구조', 'Make a shared space': '공유 공간 만들기', 'Toolbar': '도구줄', 'Built in': '기본', 'Copy': '복제', 'mine': '내 것', 'Move up': '앞으로', 'Remove': '빼기',
   'Delete this structure? Pages made with it stay.': '이 구조를 지울까요? 이걸로 만든 페이지는 남아요.', 'Copied. Insert it in a page, change it, then save structure again.': '복제했어요. 페이지에 넣어 고친 뒤 다시 구조 저장하세요.',
 });
+Object.assign(v9Ko, {
+  'Views': '보기', 'Universe': '우주', 'Board': '보드', 'Board {n}': '보드 {n}', 'Table {n}': '표 {n}', 'View name': '보기 이름', 'Delete view': '보기 삭제', 'Delete this view? Your notes stay.': '이 보기를 지울까요? 노트는 남아요.',
+  'All fields': '분야', 'Go into {name}': '{name} 들어가기', 'To board': '보드로', 'New tab': '새 탭', 'Zoom out': '축소', 'Zoom in': '확대', 'Show all': '전체 보기', 'Nothing here yet.': '아직 비어 있어요.',
+  'Board style': '보드 모양', 'Pinboard': '핀보드', 'Moodboard': '무드보드', 'Thread': '잇기', 'Sticky note': '포스트잇', 'Image': '이미지', 'Switch: whole Space / this board': '전체 · 이 보드 바꾸기', 'this board': '이 보드',
+  'Remove from board': '보드에서 빼기', 'Counterexample': '반례', 'Same habit': '같은 습관', 'Where it shows': '보이는 곳', 'Whole Space': '전체', 'This board': '이 보드',
+  'Columns from fields': '칸에서 열 가져오기', 'Columns made from fields.': '칸 이름으로 열을 만들었어요.', 'Stage': '단계', 'Date': '날짜', 'Sort': '정렬', 'Delete column': '열 삭제', 'New column': '새 열',
+});
+Object.assign(v9Ko, {'On the rail': '레일에 두기'});

@@ -11,7 +11,7 @@ export type RailSatellite = {id: string; name: string; url: string; icon?: Lucid
 const deviceIcons: Record<string, LucideIcon> = {projects: FolderOpen, planner: CalendarClock, impostor: VenetianMask, forms: ClipboardList};
 
 /** v9 9.3: the Satellites under the rail divider. Pinned ones first; without a choice, every installed one is pinned. */
-export function railSatellites(store: Store): RailSatellite[] {
+export function railSatellites(store: Store, all_ = false): RailSatellite[] {
   const all: RailSatellite[] = [];
   for (const id of enabledSatellites(store)) {
     const m = deviceManifest(id); if (!m) continue;
@@ -19,6 +19,7 @@ export function railSatellites(store: Store): RailSatellite[] {
   }
   for (const s of store.satellites ?? []) if (s.kind === 'external') all.push({id: s.id, name: s.name, url: `/satellite/${s.id}`, initial: s.name.trim().slice(0, 1).toUpperCase()});
   const pinned = (store.settings as {pinnedSatellites?: string[]} | undefined)?.pinnedSatellites;
+  if (all_) return all;
   return pinned ? pinned.map(id => all.find(s => s.id === id)).filter((s): s is RailSatellite => !!s) : all;
 }
 

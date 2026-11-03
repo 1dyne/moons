@@ -5,6 +5,7 @@ import {WorkspaceError} from './lib/server/v5/types.ts';
 import {limited} from './lib/server/http.ts';
 import {q, newId} from './lib/server/db.ts';
 import {saveObject, readObject} from './lib/server/v5/storage.ts';
+import {storeRecord} from './lib/server/satellites/store.ts';
 
 // v9 10.3/14.6: pages, my structures, folders and stored files live outside the workspace snapshot,
 // so typing in a page does not grow the change log. Snapshots for analysis stay ordinary entries.
@@ -171,6 +172,8 @@ export function v9Router(checkOrigin: (req: Request) => void) {
     await q(`insert into satellite_store(owner_id,satellite_id,key,value) values($1,$2,$3,$4) on conflict(owner_id,satellite_id,key) do update set value=$4,updated_at=now()`, [owner, id(req.params.sat), key, value]);
     res.json({ok: true});
   }));
+  // A Satellite opened inside MOONS sends records the same way as with its token (v8 3.1); notes still wait in the inbox.
+  router.post('/sat-store/:sat/record', wrap(async (req, res, owner) => { res.status(202).json(await storeRecord(owner, id(req.params.sat), req.body)); }));
   router.delete('/sat-store/:sat/:key', wrap(async (req, res, owner) => { await q(`delete from satellite_store where owner_id=$1 and satellite_id=$2 and key=$3`, [owner, id(req.params.sat), String(req.params.key)]); res.json({ok: true}); }));
   return router;
 }

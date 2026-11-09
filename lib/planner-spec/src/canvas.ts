@@ -12,7 +12,7 @@ export const METRICS: Record<CanvasMode, {cols: number; row: number; gap: number
   free: {cols: 48, row: 10, gap: 0, kx: 4, ky: 3},
 };
 export const WIDGET_TYPES = ['focus', 'tasks', 'timetable', 'receipt', 'hourly', 'bullet', 'page', 'checkin', 'carry', 'routine', 'habits',
-  'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'text', 'sticker', 'tape', 'image', 'shape'] as const;
+  'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'table', 'text', 'sticker', 'tape', 'image', 'shape'] as const;
 export type WidgetType = (typeof WIDGET_TYPES)[number];
 
 export type WidgetInfo = {type: WidgetType; label: string; desc: string; group: '기록' | '시간' | '목표' | '나' | '꾸미기'; w: number; h: number; minW: number; minH: number; module?: ModuleType};
@@ -20,6 +20,7 @@ export const WIDGETS: WidgetInfo[] = [
   {type: 'tasks', label: '할 일', desc: '○△× 체크, 분량·예상 시간, 목표 연결', group: '기록', w: 7, h: 12, minW: 3, minH: 5, module: 'tasks'},
   {type: 'bullet', label: '빠른 기록', desc: '불렛저널처럼 • 할 일 ○ 일정 – 메모', group: '기록', w: 7, h: 12, minW: 3, minH: 5, module: 'memo'},
   {type: 'page', label: '자유 페이지', desc: '모눈 위에 자유롭게 쓰는 칸', group: '기록', w: 6, h: 10, minW: 3, minH: 4, module: 'memo'},
+  {type: 'table', label: '표 (내가 만드는 DB)', desc: '열 이름·종류를 직접 정하는 표. 공부 기록, 지출, 독서…', group: '기록', w: 8, h: 8, minW: 3, minH: 4},
   {type: 'carry', label: '어제 못 끝낸 일', desc: '오늘로 옮기기', group: '기록', w: 6, h: 4, minW: 3, minH: 3, module: 'tasks'},
   {type: 'review', label: '하루 돌아보기', desc: '한 줄 회고, 나만 보기', group: '기록', w: 6, h: 5, minW: 3, minH: 4, module: 'review'},
   {type: 'focus', label: '집중 타이머', desc: '지금 하는 일과 흐르는 시간, 오늘 순집중', group: '시간', w: 12, h: 3, minW: 4, minH: 3, module: 'timer'},
@@ -42,6 +43,28 @@ export const WIDGETS: WidgetInfo[] = [
   {type: 'shape', label: '도형·라벨', desc: '하트·별·구름·라벨 위에 글자', group: '꾸미기', w: 3, h: 3, minW: 1, minH: 1},
 ];
 export const widgetInfo = (t: WidgetType) => WIDGETS.find(w => w.type === t)!;
+/** A user-made property (Notion-style): a column in a table widget or an extra field on tasks. */
+export const PROP_TYPES = [{id: 'text', name: '글'}, {id: 'number', name: '숫자'}, {id: 'select', name: '선택'}, {id: 'check', name: '체크'}, {id: 'date', name: '날짜'}] as const;
+export type PropType = typeof PROP_TYPES[number]['id'];
+export const PropDef = z.object({
+  id: z.string().regex(/^[a-z0-9]{1,24}$/),
+  name: z.string().trim().min(1).max(30),
+  type: z.enum(PROP_TYPES.map(t => t.id) as [PropType, ...PropType[]]),
+  options: z.array(z.string().trim().min(1).max(30)).max(30).default([]),
+});
+export type PropDef = z.infer<typeof PropDef>;
+export const newPropId = () => Math.random().toString(36).slice(2, 10);
+
+/** Words on a widget's buttons and boxes the user may rename. key → default text. */
+export const WIDGET_LABELS: Partial<Record<WidgetType, {key: string; def: string}[]>> = {
+  focus: [{key: 'ask', def: '지금 무엇에 집중하나요?'}, {key: 'other', def: '다른 일'}, {key: 'running', def: '지금 집중 중'}, {key: 'total', def: '오늘 순집중'}],
+  tasks: [{key: 'placeholder', def: '할 일 · 예) 수학 20문제, 보고서 90분, 14:00-15:00 회의'}, {key: 'add', def: '추가'}, {key: 'cat.must', def: '꼭'}, {key: 'cat.want', def: '하고 싶은'}, {key: 'cat.leisure', def: '여가'}],
+  routine: [{key: 'placeholder', def: '루틴 추가 (매일)'}, {key: 'add', def: '추가'}, {key: 'missed', def: '× 못 했어요'}],
+  sleep: [{key: 'sleep', def: '☾ 잘게요'}, {key: 'wake', def: '일어났어요'}],
+  review: [{key: 'placeholder', def: '오늘은 어땠나요? 한 줄이면 충분해요.'}],
+  table: [{key: 'add', def: '+ 새 줄'}],
+};
+
 /** Decorations float: they may overlap anything, rotate, and never push other widgets. */
 export const DECOR: WidgetType[] = ['sticker', 'tape', 'image', 'shape'];
 export const isDecor = (t: WidgetType) => DECOR.includes(t);

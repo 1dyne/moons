@@ -1,6 +1,6 @@
 import {useMemo, useState} from 'react';
 import {logicalDay, type Settings} from '@workspace/life-contract';
-import {CHECKS, DONE_STYLES, FONTS, METRICS, PALETTE, SKIN_PRESETS, Skin, WIDGETS, applyCanvas, fontInfo, isDecor, minSize, placeNew, settle, toFree, toGrid, widgetInfo, type CanvasMode, type PlannerSpec, type WidgetType, type Widget} from '@workspace/planner-spec';
+import {CHECKS, DONE_STYLES, FONTS, METRICS, WIDGET_LABELS, tabsOf, type PropDef, PALETTE, SKIN_PRESETS, Skin, WIDGETS, applyCanvas, fontInfo, isDecor, minSize, placeNew, settle, toFree, toGrid, widgetInfo, type CanvasMode, type PlannerSpec, type WidgetType, type Widget} from '@workspace/planner-spec';
 import {useFontFamily} from '../fonts.ts';
 import {ofKind, type Planner} from '../data.ts';
 import {DayCanvas, canvasOf, modeOf, skinProps} from './Canvas.tsx';
@@ -13,9 +13,11 @@ const SWATCHES = PALETTE;
 let seq = 0;
 const newId = (type: string) => `${type}-${Date.now().toString(36)}${(seq++).toString(36)}`.slice(0, 40);
 
-export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {spec: PlannerSpec; settings: Settings; p: Planner; saveLabel: string; onSave: (spec: PlannerSpec) => Promise<void> | void; onCancel?: () => void; hint?: string}) {
+export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pageId}: {spec: PlannerSpec; settings: Settings; p: Planner; saveLabel: string; onSave: (spec: PlannerSpec) => Promise<void> | void; onCancel?: () => void; hint?: string; pageId?: string}) {
   const today = logicalDay(new Date(), settings);
-  const [widgets, setWidgets] = useState<Widget[]>(() => canvasOf(spec)), [mode, setMode] = useState(() => modeOf(spec));
+  // A page tab is edited the same way; it is always 다꾸형.
+  const pageTab = pageId ? tabsOf(spec).find(t => t.id === pageId) : undefined;
+  const [widgets, setWidgets] = useState<Widget[]>(() => pageTab ? pageTab.widgets ?? [] : canvasOf(spec)), [mode, setMode] = useState<CanvasMode>(() => pageTab ? 'free' : modeOf(spec));
   const M = METRICS[mode];
   // 다꾸형 ↔ 정리형 converts the same page; nothing is lost.
   const switchMode = (m: CanvasMode) => { if (m === mode) return; change(m === 'free' ? toFree(widgets) : toGrid(widgets)); setMode(m); };
@@ -30,7 +32,7 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {
   const opt = (id: string, key: string, value: unknown) => change(widgets.map(w => w.id === id ? {...w, options: {...w.options, [key]: value}} : w));
   const nav = useMemo(() => ({day: today, setDay: () => {}, openGoal: () => {}}), [today]);
   const sp = skinProps(skin);
-  const save = async () => { setBusy(true); setError(''); try { await onSave(applyCanvas(spec, widgets, skin, mode)); } catch (e) { setError((e as Error).message); setBusy(false); } };
+  const save = async () => { setBusy(true); setError(''); try { await onSave(pageTab ? {...spec, skin, tabs: tabsOf(spec).map(t => t.id === pageTab.id ? {...t, widgets} : t)} : applyCanvas(spec, widgets, skin, mode)); } catch (e) { setError((e as Error).message); setBusy(false); } };
   const goals = ofKind(p.records, 'goal');
 
   return <div className="editor">
@@ -39,10 +41,11 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {
         <button role="tab" aria-selected={panel === 'widgets'} className={panel === 'widgets' ? 'on' : ''} onClick={() => setPanel('widgets')}>＋ 위젯</button>
         <button role="tab" aria-selected={panel === 'skin'} className={panel === 'skin' ? 'on' : ''} onClick={() => setPanel('skin')}>스킨</button>
       </div>
-      <div className="seg" role="radiogroup" aria-label="배치 방식">
+      {pageTab && <strong className="ed-page">{pageTab.name} 페이지</strong>}
+      {!pageTab && <div className="seg" role="radiogroup" aria-label="배치 방식">
         <button role="radio" aria-checked={mode === 'free'} className={mode === 'free' ? 'on' : ''} onClick={() => switchMode('free')} title="겹치고 원하는 곳에 두기">다꾸형</button>
         <button role="radio" aria-checked={mode === 'grid'} className={mode === 'grid' ? 'on' : ''} onClick={() => switchMode('grid')} title="칸에 맞춰 가지런히">정리형</button>
-      </div>
+      </div>}
       <span className="muted small ed-hint"><Tip id={hint ? `editor-${hint.slice(0, 12)}` : 'editor-drag'}>{hint ?? '위젯 머리(⠿)를 끌어 옮기고, 오른쪽 아래 모서리를 끌어 크기를 바꿔요.'}</Tip></span>
       <button className="ghost small" onClick={undo} disabled={!history.length}>되돌리기</button>
       {onCancel && <button className="ghost small" onClick={onCancel}>취소</button>}
@@ -63,6 +66,7 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {
         <DayCanvas spec={{...spec, skin}} settings={settings} p={p} today={today} day={today} nav={nav}
           edit={{widgets, mode, selected, select: setSelected, change: ws => change(ws)}} />
       </GaugeProvider></div>
+      {!sel && <aside className="ed-inspect empty" aria-label="위젯 설정"><p className="muted small">위젯을 누르면 여기서 설정해요.</p></aside>}
       {sel && <aside className="ed-inspect" aria-label="위젯 설정">
         <div className="ed-inspect-head"><strong>{widgetInfo(sel.type).label}</strong><button className="ghost small" onClick={() => setSelected(null)} aria-label="닫기">✕</button></div>
         <label>제목 <input value={sel.title ?? widgetInfo(sel.type).label} onChange={e => patch(sel.id, {title: e.target.value})} /></label>
@@ -89,7 +93,11 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {
           <option value="">스킨 따라가기</option><option value="card">카드(그림자)</option><option value="line">선</option><option value="filled">색 채움</option><option value="plain">테두리 없음</option></select></label>}
         <div className="inline"><label>너비 <input type="number" min={minSize(sel.type, mode).w} max={M.cols} value={sel.w} onChange={e => patch(sel.id, {w: Number(e.target.value)})} className="num" /></label>
           <label>높이 <input type="number" min={minSize(sel.type, mode).h} max={240} value={sel.h} onChange={e => patch(sel.id, {h: Number(e.target.value)})} className="num" /></label></div>
-        <WidgetOptions w={sel} opt={(k, v) => opt(sel.id, k, v)} goals={goals.map(g => ({id: g.id, title: g.body.title}))} />
+        <WidgetOptions w={sel} opt={(k, v) => opt(sel.id, k, v)} goals={goals.map(g => ({id: g.id, title: g.body.title}))} props={spec.props?.task ?? []} />
+        {WIDGET_LABELS[sel.type] && <details className="ed-labels"><summary>버튼·칸 문구 바꾸기</summary>
+          {WIDGET_LABELS[sel.type]!.map(l => { const cur = (sel.options.labels as Record<string, string> | undefined) ?? {}; return <label key={l.key}>{l.def || '(빈 칸)'}
+            <input value={cur[l.key] ?? ''} placeholder={l.def} maxLength={60} onChange={e => opt(sel.id, 'labels', {...cur, [l.key]: e.target.value})} /></label>; })}
+        </details>}
         <div className="inline">
           <button className="small" onClick={() => { const c = {...sel, id: newId(sel.type), y: sel.y + sel.h}; change(settle([...widgets, c], c.id, mode)); setSelected(c.id); }}>복제</button>
           <button className="small danger" onClick={() => { change(widgets.filter(w => w.id !== sel.id)); setSelected(null); }}>지우기</button>
@@ -99,11 +107,11 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {
   </div>;
 }
 
-function WidgetOptions({w, opt, goals}: {w: Widget; opt: (k: string, v: unknown) => void; goals: {id: string; title: string}[]}) {
+function WidgetOptions({w, opt, goals, props}: {w: Widget; opt: (k: string, v: unknown) => void; goals: {id: string; title: string}[]; props: PropDef[]}) {
   const o = w.options;
   switch (w.type) {
     case 'text': return <>
-      <label>문구 <textarea rows={3} value={String(o.text ?? '')} onChange={e => opt('text', e.target.value)} placeholder="좌우명, 오늘의 다짐…" /></label>
+      <label>문구 <textarea rows={3} value={String(o.text ?? '')} onChange={e => opt('text', e.target.value)} placeholder="" /></label>
       <label>글자 크기 <select value={String(o.size ?? 'm')} onChange={e => opt('size', e.target.value)}><option value="s">작게</option><option value="m">보통</option><option value="l">크게</option><option value="xl">아주 크게</option></select></label>
       <label>정렬 <select value={String(o.align ?? 'left')} onChange={e => opt('align', e.target.value)}><option value="left">왼쪽</option><option value="center">가운데</option><option value="right">오른쪽</option></select></label></>;
     case 'sticker': return <>
@@ -128,14 +136,17 @@ function WidgetOptions({w, opt, goals}: {w: Widget; opt: (k: string, v: unknown)
     case 'progress': case 'dday': return <>
       <label>목표 <select value={String(o.goalId ?? '')} onChange={e => opt('goalId', e.target.value || undefined)}><option value="">자동(첫 큰 목표)</option>{goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>
       {w.type === 'dday' && <><label>날짜(목표 대신) <input type="date" value={String(o.date ?? '')} onChange={e => opt('date', e.target.value || undefined)} /></label>
-        <label>이름 <input value={String(o.label ?? '')} onChange={e => opt('label', e.target.value)} placeholder="예: LEET 시험" /></label></>}</>;
+        <label>이름 <input value={String(o.label ?? '')} onChange={e => opt('label', e.target.value)} placeholder="이름" /></label></>}</>;
     case 'timetable': case 'hourly': case 'page': return <label>시작 시각 <select value={String(o.startHour ?? 6)} onChange={e => opt('startHour', Number(e.target.value))}>{[4, 5, 6, 7, 8, 9, 10].map(h => <option key={h} value={h}>{h}시</option>)}</select></label>;
     case 'tasks': return <>
-      <label className="row-check"><input type="checkbox" checked={o.categories !== false} onChange={e => opt('categories', e.target.checked)} /> 꼭·하고 싶은·여가로 나누기</label>
+      <label>나누는 기준 <select value={typeof o.groupBy === 'string' ? o.groupBy : o.categories === false ? 'none' : 'category'} onChange={e => opt('groupBy', e.target.value)}>
+        <option value="category">꼭·하고 싶은·여가</option><option value="none">나누지 않기</option>
+        {props.filter(d => d.type === 'select').map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
       <label className="row-check"><input type="checkbox" checked={o.amounts !== false} onChange={e => opt('amounts', e.target.checked)} /> 분량 적기</label></>;
     case 'routine': return <>
       <label>세는 방식 <select value={String(o.mode ?? 'pick_daily')} onChange={e => opt('mode', e.target.value)}><option value="pick_daily">그날 고른 것만</option><option value="fixed_all">정해 둔 것 전부</option></select></label>
       <label className="row-check"><input type="checkbox" checked={o.askReason === true} onChange={e => opt('askReason', e.target.checked)} /> 못 한 이유 남기기</label></>;
+    case 'table': return <label>보이는 줄 <select value={o.scope === 'all' ? 'all' : 'day'} onChange={e => opt('scope', e.target.value)}><option value="day">그날 쓴 줄만</option><option value="all">모든 날 함께</option></select></label>;
     case 'checkin': return <div className="inline">
       <label>기상 <input type="time" value={String(o.wake ?? '07:00')} onChange={e => opt('wake', e.target.value)} /></label>
       <label>취침 <input type="time" value={String(o.sleep ?? '00:00')} onChange={e => opt('sleep', e.target.value)} /></label></div>;

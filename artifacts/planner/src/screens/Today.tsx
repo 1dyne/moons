@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import {addDays, goalPercent, goalProgress, logicalDay, periodContains, personaShare, suggestGoal, routineDue, routineRate, type AnyRecord, type LifeRecord, type Settings, type Task} from '@workspace/life-contract';
-import {modulesFor, uses, type ModuleSpec, type PlannerSpec} from '@workspace/planner-spec';
+import {modulesFor, uses, type ModuleSpec, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
 import {FocusBar, Receipt, Timetable, colors, hm, useTimer, type Timer} from './Focus.tsx';
 import {CheckIn, ConditionDay} from './CheckIn.tsx';
@@ -11,6 +11,8 @@ import {BulletDay, HourlyDay, OnePageDay} from './DayLayouts.tsx';
 import {Gauge} from '../Gauge.tsx';
 import {HIGHLIGHTS} from '@workspace/planner-spec';
 import {Tip} from '../Tip.tsx';
+import {useL} from '../labels.tsx';
+import {PropForm, PropInput, showValue} from './Table.tsx';
 export {parseEntry, parseTarget} from '../parse.ts';
 
 const CATEGORY: Record<string, string> = {must: '꼭', want: '하고 싶은', leisure: '여가'};
@@ -35,7 +37,13 @@ export function CarryOver({ctx}: {ctx: Ctx}) {
 
 export function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
   const {p, day} = ctx;
-  const cats = m.options.categories !== false;
+  const L = useL(), defs = ctx.spec?.props?.task ?? [];
+  // How the list is split: 꼭·하고 싶은·여가, not at all, or by one of the user's 선택 properties.
+  const groupBy = typeof m.options.groupBy === 'string' ? m.options.groupBy : m.options.categories === false ? 'none' : 'category';
+  const byProp = defs.find(d => d.id === groupBy && d.type === 'select');
+  const cats = groupBy === 'category';
+  const [propVal, setPropVal] = useState(''), [propsOpen, setPropsOpen] = useState<string | null>(null);
+  const catName = (c: string) => L(`cat.${c}`, CATEGORY[c]!);
   const goals = linkableGoals(p.records, day), personas = ofKind(p.records, 'persona').filter(x => x.body.active);
   const tasks = ofKind(p.records, 'task').filter(t => t.logicalDay === day && !t.body.routineId && !t.body.plan.fixed).sort((a, b) => (a.body.priority ?? 9) - (b.body.priority ?? 9) || a.createdAt.localeCompare(b.createdAt));
   const [title, setTitle] = useState(''), [cat, setCat] = useState('must'), [goal, setGoal] = useState(''), [persona, setPersona] = useState('');
@@ -46,32 +54,43 @@ export function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
   const goalId = picked ? goal : auto?.id ?? '';
   const add = async () => {
     if (!title.trim()) return;
-    if (await p.write(null, {kind: 'task', logicalDay: day, body: {title: parsed.title, category: cats && !parsed.fixed ? cat : null, goalIds: goalId ? [goalId] : [], personaIds: persona ? [persona] : [],
+    if (await p.write(null, {kind: 'task', logicalDay: day, body: {title: parsed.title, category: cats && !parsed.fixed ? cat : null, props: byProp && propVal ? {[byProp.id]: propVal} : {}, goalIds: goalId ? [goalId] : [], personaIds: persona ? [persona] : [],
       plan: {state: 'committed', target, estimateMin: parsed.estimateMin, ...(parsed.fixed ? {fixed: true, ...parsed.fixed} : {})}}})) { setTitle(''); setPicked(false); setGoal(''); }
   };
-  const groups = cats ? (['must', 'want', 'leisure', null] as const).map(c => [c, tasks.filter(t => t.body.category === c)] as const).filter(([, l]) => l.length) : [[null, tasks] as const];
+  const groups: (readonly [string | null, typeof tasks])[] = byProp ? [...byProp.options, null].map(o => [o, tasks.filter(t => (t.body.props?.[byProp.id] ?? null) === o)] as const).filter(([, l]) => l.length)
+    : cats ? (['must', 'want', 'leisure', null] as const).map(c => [c, tasks.filter(t => t.body.category === c)] as const).filter(([, l]) => l.length) : [[null, tasks] as const];
+  const saveDefs = (next: PropDef[]) => ctx.saveSpec?.(sp => ({...sp, props: {...sp.props, task: next}}));
   const done = tasks.filter(t => t.body.outcome.result === 'done').length, live = tasks.filter(t => !['cancelled', 'postponed'].includes(t.body.outcome.result)).length;
   return <>
     {tasks.length > 0 && <p className="tally muted small">{done}/{live} 완료 <Tip id="tasks-cycle">체크 칸을 누를 때마다 완료 → 일부 → 못 함 → 처음으로</Tip></p>}
-    {tasks.length === 0 && <p className="muted">아직 오늘 할 일이 없어요. 아래에 적어 보세요.</p>}
+    {tasks.length === 0 && <Tip id="tasks-empty" block>아직 오늘 할 일이 없어요. 아래에 적어 보세요.</Tip>}
     {groups.map(([c, list]) => <div key={String(c)} className="task-group">
-      {cats && c && <span className={`cat cat-${c}`}>{CATEGORY[c]}</span>}
+      {cats && c && <span className={`cat cat-${c}`}>{catName(c)}</span>}
+      {byProp && <span className="cat">{c ?? `${byProp.name} 없음`}</span>}
       <ul className="prows">{list.map(t => <TaskRow key={t.id} t={t} ctx={ctx} />)}</ul>
     </div>)}
     <form className="padd" onSubmit={e => { e.preventDefault(); void add(); }}>
       <span className="mark static" aria-hidden="true">+</span>
-      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="할 일 · 예) 수학 20문제, 보고서 90분, 14:00-15:00 회의" aria-label="할 일" />
+      <input value={title} onChange={e => setTitle(e.target.value)} placeholder={L('placeholder', '할 일')} aria-label="할 일" />
       {parsed.fixed ? <span className="parsed" title="고정 일정으로 읽었어요">고정 일정</span> : parsed.estimateMin ? <span className="parsed" title="예상 시간으로 읽었어요">예상 {parsed.estimateMin}분</span> : target && <span className="parsed" title="분량으로 읽었어요">{target.amount}{target.unit}</span>}
-      {cats && <select value={cat} onChange={e => setCat(e.target.value)} aria-label="분류">{Object.entries(CATEGORY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>}
+      {byProp && <select value={propVal} onChange={e => setPropVal(e.target.value)} aria-label={byProp.name}><option value="">{byProp.name}</option>{byProp.options.map(o => <option key={o} value={o}>{o}</option>)}</select>}
+      {cats && <select value={cat} onChange={e => setCat(e.target.value)} aria-label="분류">{Object.keys(CATEGORY).map(k => <option key={k} value={k}>{catName(k)}</option>)}</select>}
       {auto && <span className="parsed auto-goal" title="제목으로 고른 목표예요. 바꾸려면 옆에서 고르세요">→ {auto.body.title}</span>}
       {goals.length > 0 && <select value={goalId} onChange={e => { setGoal(e.target.value); setPicked(true); }} aria-label="이어질 목표"><option value="">목표 없음</option>{goals.map(g => <option key={g.id} value={g.id}>{g.body.horizon === 'milestone' ? '◆ ' : ''}{g.body.title}</option>)}</select>}
       {personas.length > 0 && <select value={persona} onChange={e => setPersona(e.target.value)} aria-label="페르소나"><option value="">페르소나</option>{personas.map(x => <option key={x.id} value={x.id}>{x.body.name}</option>)}</select>}
-      <button className="primary small">추가</button>
+      <button className="primary small">{L('add', '추가')}</button>
     </form>
+    {ctx.saveSpec && <div className="props-bar">
+      {defs.map(d => propsOpen === d.id ? <PropForm key={d.id} initial={d} onCancel={() => setPropsOpen(null)} onSave={x => { void saveDefs(defs.map(y => y.id === d.id ? x : y)); setPropsOpen(null); }} onDelete={() => { void saveDefs(defs.filter(y => y.id !== d.id)); setPropsOpen(null); }} />
+        : <button key={d.id} className="ghost small prop-chip" onClick={() => setPropsOpen(d.id)} title="이름·종류 바꾸기">{d.name}</button>)}
+      {propsOpen === 'new' ? <PropForm onCancel={() => setPropsOpen(null)} onSave={x => { void saveDefs([...defs, x]); setPropsOpen(null); }} />
+        : <button className="ghost small" onClick={() => setPropsOpen('new')}>+ 속성</button>}
+    </div>}
   </>;
 }
 
 function TaskRow({t, ctx}: {t: LifeRecord<'task'>; ctx: Ctx}) {
+  const defs = ctx.spec?.props?.task ?? [];
   const {p, nav, timer, color} = ctx;
   const [open, setOpen] = useState(false), [amount, setAmount] = useState(''), [reason, setReason] = useState('');
   const o = t.body.outcome, target = t.body.plan.target;
@@ -94,6 +113,7 @@ function TaskRow({t, ctx}: {t: LifeRecord<'task'>; ctx: Ctx}) {
         {target && <span className="qty">{o.amount !== null && o.result !== 'done' ? `${o.amount}/` : ''}{target.amount}{target.unit}</span>}
         {goals.map(g => <button key={g.id} className="goal-chip" onClick={() => nav.openGoal(g.id)} title="이 할 일이 올리는 목표">→ {g.body.title} <b>{goalPercent(g.id, p.records).pct}%</b></button>)}
         {personas.map(x => <span key={x.id} className="persona-chip" style={{'--pc': x.body.color} as React.CSSProperties}>{x.body.name}</span>)}
+        {defs.map(d => { const v = showValue(d, t.body.props?.[d.id]); return v && <span key={d.id} className="prop-val"><em>{d.name}</em> {v}</span>; })}
         {o.reason && <span className="reason">· {o.reason}</span>}
         {o.result === 'postponed' && <span>내일로 미룸</span>}
       </span>
@@ -112,6 +132,7 @@ function TaskRow({t, ctx}: {t: LifeRecord<'task'>; ctx: Ctx}) {
       <button className="small" onClick={() => moveTo(ctx, t, addDays(t.logicalDay!, 1))}>내일로 →</button>
       <button className="small" onClick={() => set('cancelled', {reason: reason.trim() || null})}>취소</button>
       {o.result !== 'unknown' && <button className="small" onClick={() => set('unknown')}>되돌리기</button>}
+      {defs.map(d => <label key={d.id} className="inline prop-edit"><span className="muted small">{d.name}</span><PropInput def={d} value={t.body.props?.[d.id]} onChange={v => void saveTask(ctx, t, {props: {...t.body.props, [d.id]: v}})} /></label>)}
       <span className="inline pens" role="group" aria-label="형광펜"><span className="muted small">형광펜</span>
         {HIGHLIGHTS.map(h => <button key={h.id} className={`pen ${t.body.highlight === h.id ? 'on' : ''}`} style={{'--hl': h.color} as React.CSSProperties} aria-pressed={t.body.highlight === h.id} onClick={() => void pen(t.body.highlight === h.id ? null : h.id)} aria-label={`${h.name} 형광펜`} />)}
         {t.body.highlight && <button className="small ghost" onClick={() => void pen(null)}>지우기</button>}</span>
@@ -127,7 +148,7 @@ export function Routines({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
   const instances = ofKind(p.records, 'task').filter(t => t.logicalDay === day && t.body.routineId);
   const inst = (id: string) => instances.find(t => t.body.routineId === id);
   const [title, setTitle] = useState(''), [reasons, setReasons] = useState<Record<string, string>>({});
-  const rate = routineRate(p.records, day);
+  const rate = routineRate(p.records, day), L = useL();
   const due = routines.filter(r => pick || routineDue(r.body, day));
   const shown = pick ? due.filter(r => inst(r.id)?.body.plan.state === 'committed') : due;
   const commit = (r: LifeRecord<'routine'>) => p.write(null, {kind: 'task', logicalDay: day, body: {title: r.body.title, routineId: r.id, goalIds: r.body.goalIds, plan: {state: 'committed', target: r.body.target}}}) as Promise<LifeRecord<'task'> | null>;
@@ -139,11 +160,11 @@ export function Routines({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
       : {result, completedAt: null, reportedAt: null, reason: null}));
   };
   return <>
-    <p className="tally"><strong>{rate.done}</strong>/{rate.of} <span className="muted small">{pick ? '오늘 고른 루틴만 세요' : '정해 둔 루틴 전부를 세요'}</span></p>
+    <p className="tally"><strong>{rate.done}</strong>/{rate.of} <Tip id="routine-count">{pick ? '오늘 고른 루틴만 세요' : '정해 둔 루틴 전부를 세요'}</Tip></p>
     {pick && <div className="pick">
       {due.filter(r => !inst(r.id)).map(r => <button key={r.id} className="chip" onClick={() => commit(r)}>+ {r.body.title}</button>)}
       {due.length > 0 && due.every(r => inst(r.id)) && <span className="muted small">오늘 할 루틴을 모두 골랐어요</span>}
-      {due.length === 0 && <span className="muted small">루틴을 추가하면 여기서 오늘 할 것을 골라요</span>}
+      {due.length === 0 && <Tip id="routine-empty">루틴을 추가하면 여기서 오늘 할 것을 골라요</Tip>}
     </div>}
     <ul className="prows">{shown.map(r => {
       const t = inst(r.id), result = t?.body.outcome.result ?? 'unknown', running = !!t && timer?.running?.body.taskId === t.id;
@@ -152,7 +173,7 @@ export function Routines({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
         <span className="ptitle"><span className="pname">{r.body.title}</span>{t?.body.outcome.reason && <span className="psub reason">· {t.body.outcome.reason}</span>}</span>
         {result !== 'done' && result !== 'missed' && <>
           {askReason && <input className="reason-in" value={reasons[r.id] ?? ''} onChange={e => setReasons({...reasons, [r.id]: e.target.value})} placeholder="못 한 이유" aria-label={`${r.body.title} 못 한 이유`} />}
-          <button className="ghost small" onClick={() => set(r, 'missed')}>× 못 했어요</button>
+          <button className="ghost small" onClick={() => set(r, 'missed')}>{L('missed', '× 못 했어요')}</button>
           {timer && t && (running ? <button className="play on" onClick={timer.stop} aria-label="멈추기">■</button> : <button className="play" onClick={() => timer.start({task: t})} aria-label={`${r.body.title} 시작`}>▶</button>)}
         </>}
         {result === 'missed' && <button className="ghost small" onClick={() => set(r, 'unknown')}>되돌리기</button>}
@@ -161,8 +182,8 @@ export function Routines({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
     })}</ul>
     <form className="padd" onSubmit={async e => { e.preventDefault(); if (title.trim() && await p.write(null, {kind: 'routine', body: {title: title.trim(), recurrence: {freq: 'daily'}, mode: pick ? 'pick_daily' : 'fixed_all'}})) setTitle(''); }}>
       <span className="mark static" aria-hidden="true">+</span>
-      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="루틴 추가 (매일)" aria-label="루틴" />
-      <button className="primary small">추가</button>
+      <input value={title} onChange={e => setTitle(e.target.value)} placeholder={L('placeholder', '루틴')} aria-label="루틴" />
+      <button className="primary small">{L('add', '추가')}</button>
     </form>
   </>;
 }
@@ -180,7 +201,8 @@ export const horizonLabel = (h: string) => HORIZON[h] ?? h;
 export function DayGoals({ctx}: {ctx: Ctx}) {
   const order = ['week', 'milestone', 'month', 'quarter', 'year'];
   const goals = linkableGoals(ctx.p.records, ctx.day).sort((a, b) => order.indexOf(a.body.horizon) - order.indexOf(b.body.horizon) || a.body.period.localeCompare(b.body.period)).slice(0, 8);
-  if (!goals.length) return <p className="muted">이 날에 걸린 목표가 없어요. 목표 탭에서 연간·월간·주간 목표를 세워 보세요.</p>;
+  if (!goals.length) return ctx.preview ? <ul className="rows">{[['주간', '예시 목표', 64], ['월간', '예시 목표', 30]].map(([h, t, n]) => <li key={h} className="row goal-row"><span><span className="horizon">{h}</span>{t}</span><Gauge pct={n as number} size="sm" /></li>)}</ul>
+    : <Tip id="goals-empty" block>이 날에 걸린 목표가 없어요.</Tip>;
   return <ul className="rows">{goals.map(g => <li key={g.id} className="row goal-row">
     <button className="link" onClick={() => ctx.nav.openGoal(g.id)}><span className="horizon">{horizonLabel(g.body.horizon)}</span>{g.body.title}</button>
     <GoalBar g={g} records={ctx.p.records} />
@@ -189,7 +211,7 @@ export function DayGoals({ctx}: {ctx: Ctx}) {
 
 export function PersonaToday({ctx}: {ctx: Ctx}) {
   const share = personaShare(ctx.p.records, ctx.day, 1), recent = personaShare(ctx.p.records, ctx.day, 14);
-  if (!share.rows.length) return <p className="muted small">설정 → 페르소나에서 나의 역할(예: 수험생, 직장인, 창작자)을 만들면 할 일에 붙일 수 있어요.</p>;
+  if (!share.rows.length) return <Tip id="personas-empty" block>설정 → 페르소나에서 나의 역할을 만들면 할 일에 붙일 수 있어요.</Tip>;
   return <div className="persona-today">
     {share.rows.map(r => <span key={r.id} className="persona-chip big" style={{'--pc': r.color} as React.CSSProperties}>{r.name} <b>{hm(r.minutes)}</b> <small>할 일 {r.done}/{r.tasks}</small></span>)}
     {recent.total > 0 && <p className="muted small">최근 2주: {recent.rows.filter(r => r.minutes).map(r => `${r.name} ${r.share}%`).join(' · ')}</p>}
@@ -202,7 +224,7 @@ export function SleepBox({ctx}: {ctx: Ctx}) {
   const sleeps = ofKind(ctx.p.records, 'sleep');
   const running = sleeps.find(r => r.body.start && !r.body.end);
   const night = sleeps.filter(r => r.logicalDay === ctx.day && r.body.end).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-  const [edit, setEdit] = useState(false);
+  const [edit, setEdit] = useState(false), L = useL();
   const local = (iso: string | null | undefined) => iso ? new Date(new Date(iso).getTime() - new Date(iso).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
   const clock = (iso: string) => new Date(iso).toTimeString().slice(0, 5);
   const start = () => { const at = ctx.now(); return ctx.p.write(null, {kind: 'sleep', logicalDay: logicalDay(at, settings), body: {start: at}}); };
@@ -210,7 +232,7 @@ export function SleepBox({ctx}: {ctx: Ctx}) {
   const save = (key: 'start' | 'end', v: string) => night && ctx.p.write(night.id, {kind: 'sleep', logicalDay: night.logicalDay, body: {...night.body, [key]: v ? new Date(v).toISOString() : null}, baseRevision: night.revision});
   if (running) return <div className="sleep running">
     <span className="sleep-moon" aria-hidden="true">☾</span><span>{clock(running.body.start!)}부터 자는 중 · {hm((Date.now() - Date.parse(running.body.start!)) / 60000)}</span>
-    <button className="primary" onClick={wake}>일어났어요</button>
+    <button className="primary" onClick={wake}>{L('wake', '일어났어요')}</button>
     <button className="ghost small" onClick={() => ctx.p.remove(running.id)}>취소</button>
   </div>;
   return <div className="sleep">
@@ -221,17 +243,17 @@ export function SleepBox({ctx}: {ctx: Ctx}) {
     {edit && night && <div className="inline">
       <label>잠든 시각 <input type="datetime-local" defaultValue={local(night.body.start)} onBlur={e => save('start', e.target.value)} /></label>
       <label>일어난 시각 <input type="datetime-local" defaultValue={local(night.body.end)} onBlur={e => save('end', e.target.value)} /></label></div>}
-    <button className="small" onClick={start}>☾ 잘게요</button>
+    <button className="small" onClick={start}>{L('sleep', '☾ 잘게요')}</button>
   </div>;
 }
 
 export function ReviewBox({ctx}: {ctx: Ctx}) {
   const r = ofKind(ctx.p.records, 'review').find(x => x.logicalDay === ctx.day && x.body.horizon === 'day');
   const [text, setText] = useState<string | null>(null);
-  const priv = r?.privateFields?.includes('text') ?? false;
+  const priv = r?.privateFields?.includes('text') ?? false, L = useL();
   const save = (body: string, makePrivate = priv) => ctx.p.write(r?.id ?? null, {kind: 'review', logicalDay: ctx.day, body: {horizon: 'day', period: ctx.day, text: body || null}, privateFields: makePrivate ? ['text'] : [], ...(r ? {baseRevision: r.revision} : {})});
   return <div className="review">
-    <textarea rows={3} value={text ?? r?.body.text ?? ''} onChange={e => setText(e.target.value)} onBlur={() => text !== null && text !== (r?.body.text ?? '') && save(text)} placeholder="오늘은 어땠나요? 한 줄이면 충분해요." aria-label="하루 돌아보기" />
+    <textarea rows={3} value={text ?? r?.body.text ?? ''} onChange={e => setText(e.target.value)} onBlur={() => text !== null && text !== (r?.body.text ?? '') && save(text)} placeholder={L('placeholder', '')} aria-label="하루 돌아보기" />
     <label className="muted small-label"><input type="checkbox" checked={priv} onChange={e => save(text ?? r?.body.text ?? '', e.target.checked)} /> 나만 보기 (다른 서비스에 보내지 않아요)</label>
     {r && <button className="ghost small danger" onClick={async () => { await ctx.p.remove(r.id); setText(''); }}>지우기</button>}
   </div>;

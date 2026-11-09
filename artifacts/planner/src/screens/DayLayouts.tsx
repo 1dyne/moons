@@ -59,7 +59,7 @@ export function HourlyDay({ctx, startHour, endHour}: {ctx: Ctx; startHour: numbe
 const SIGN: Record<string, string> = {...MARK, unknown: '•', done: '×', postponed: '>', in_progress: '•'};
 export function BulletDay({ctx}: {ctx: Ctx}) {
   const [text, setText] = useState(''), [editing, setEditing] = useState<string | null>(null), [draft, setDraft] = useState('');
-  const tasks = dayTasks(ctx), notes = ofKind(ctx.p.records, 'note').filter(n => n.logicalDay === ctx.day && n.body.signifier !== 'page');
+  const tasks = dayTasks(ctx), notes = ofKind(ctx.p.records, 'note').filter(n => n.logicalDay === ctx.day && n.body.signifier !== 'page' && n.body.signifier !== 'row');
   const rows = [...tasks.map(t => ({at: t.createdAt, t})), ...notes.map(n => ({at: n.createdAt, n}))].sort((a, b) => a.at.localeCompare(b.at));
   const add = async () => {
     const raw = text.trim(); if (!raw) return;
@@ -83,7 +83,7 @@ export function BulletDay({ctx}: {ctx: Ctx}) {
       <button className="ghost small" onClick={() => ctx.p.remove(r.n.id)} aria-label="메모 지우기">✕</button>
     </li> : <BulletTask key={r.t.id} t={r.t} ctx={ctx} toggle={toggle} />)}</ul>
     <form className="bj-add" onSubmit={e => { e.preventDefault(); void add(); }}>
-      <span className="bj-sign">•</span><input value={text} onChange={e => setText(e.target.value)} placeholder="빠르게 적기 · 예) 보고서 60분 / o 14:00 치과 / - 오늘 날씨 좋음 / ! 새 아이디어" aria-label="빠르게 적기" />
+      <span className="bj-sign">•</span><input value={text} onChange={e => setText(e.target.value)} placeholder="빠르게 적기" aria-label="빠르게 적기" />
     </form>
   </div>;
 }
@@ -113,7 +113,7 @@ export function OnePageDay({ctx, startHour, endHour}: {ctx: Ctx; startHour: numb
       return <span key={h} className="op-hour"><em>{h % 24}</em><i style={{width: `${Math.round(mins / 60 * 100)}%`}} title={`${h % 24}시 집중 ${Math.round(mins)}분`} /></span>;
     })}</div>
     <div className="op-paper">
-      <textarea className="op-page" value={text ?? page?.body.text ?? ''} onChange={e => setText(e.target.value)} onBlur={save} placeholder="오늘의 페이지 — 무엇이든 자유롭게. 생각, 그림 대신 단어, 붙여 둘 메모." aria-label="오늘의 페이지" />
+      <textarea className="op-page" value={text ?? page?.body.text ?? ''} onChange={e => setText(e.target.value)} onBlur={save} placeholder="" aria-label="오늘의 페이지" />
       {page && <button className="ghost small danger op-clear" onClick={async () => { await ctx.p.remove(page.id); setText(''); }}>페이지 지우기</button>}
       <div className="op-check">
         <span className="muted small">체크</span>

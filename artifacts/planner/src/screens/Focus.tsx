@@ -3,6 +3,7 @@ import {actualMin, addDays, dayCondition, focusOf, logicalDay, personaShare, typ
 import type {ModuleSpec} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
 import {Scale} from './Scale.tsx';
+import {useL} from '../labels.tsx';
 
 // Time tracker: one running session at a time, painted on a 10-minute timetable and summed into a receipt.
 const PALETTE = ['#8aaaf8', '#2f9585', '#e9b949', '#b05a57', '#00838f', '#3a66b8', '#3f9a8a', '#c9a98a'];
@@ -61,30 +62,31 @@ export function FocusBar({p, day, timer, color}: {p: Planner; day: string; timer
     return <div className="focus-bar ask" role="dialog" aria-label="방금 집중 어땠어요">
       <div className="focus-what"><span className="muted small">{done.body.label} · {hm(m)} 집중했어요</span><strong>방금 컨디션은 몇 점이었어요?</strong>
         <Scale value={null} onPick={n => { void timer.rate(n, note); setNote(''); }} label="방금 집중할 때 컨디션 1~10" />
-        <input className="label-in wide" value={note} onChange={e => setNote(e.target.value)} placeholder="한 줄 메모(선택) · 예) 졸렸음, 카페에서 잘 됨" aria-label="메모" />
+        <input className="label-in wide" value={note} onChange={e => setNote(e.target.value)} placeholder="메모" aria-label="메모" />
       </div>
       <button className="ghost small skip" onClick={() => { void timer.rate(null, note); setNote(''); }}>건너뛰기</button>
     </div>;
   }
   const r = timer.running;
+  const L = useL();
   const todo = ofKind(p.records, 'task').filter(t => t.logicalDay === day && !t.body.plan.fixed && !['done', 'cancelled', 'postponed'].includes(t.body.outcome.result)).slice(0, 6);
   return <div className={`focus-bar ${r ? 'on' : ''}`} style={r ? {'--focus': color(sessionKey(r))} as React.CSSProperties : undefined}>
     {r ? <>
       <span className="focus-dot" />
-      <div className="focus-what"><span className="muted small">지금 집중 중</span><strong>{r.body.label}</strong></div>
+      <div className="focus-what"><span className="muted small">{L('running', '지금 집중 중')}</span><strong>{r.body.label}</strong></div>
       <span className="focus-time" aria-live="off">{hms(now.getTime() - new Date(r.body.start).getTime())}</span>
       <button className="stop" onClick={timer.stop} aria-label="멈추기">■</button>
     </> : <>
-      <div className="focus-what"><span className="muted small">지금 무엇에 집중하나요?</span>
+      <div className="focus-what"><span className="muted small">{L('ask', '지금 무엇에 집중하나요?')}</span>
         <div className="chips">
           {todo.map(t => <button key={t.id} className="chip" onClick={() => timer.start({task: t})}>▶ {t.body.title}</button>)}
           <form className="inline" onSubmit={e => { e.preventDefault(); if (label.trim()) { void timer.start({label: label.trim()}); setLabel(''); } }}>
-            <input className="label-in" value={label} onChange={e => setLabel(e.target.value)} placeholder="다른 일" aria-label="집중할 일" />
+            <input className="label-in" value={label} onChange={e => setLabel(e.target.value)} placeholder={L('other', '다른 일')} aria-label="집중할 일" />
           </form>
         </div>
       </div>
     </>}
-    <div className="focus-total"><span className="muted small">오늘 순집중</span><strong>{hm(focus.todayMinutes)}</strong></div>
+    <div className="focus-total"><span className="muted small">{L('total', '오늘 순집중')}</span><strong>{hm(focus.todayMinutes)}</strong></div>
   </div>;
 }
 

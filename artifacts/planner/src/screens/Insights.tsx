@@ -35,15 +35,15 @@ export function Insights({p, settings, today}: {p: Planner; settings: Settings; 
     <section className="part"><h3>언제 집중이 잘 되나</h3>
       <table className="eff"><thead><tr><th>시간대</th><th>집중</th><th>한 번에</th><th>컨디션</th></tr></thead>
         <tbody>{e.byTime.map(b => <tr key={b.id}><td>{b.label}</td><td>{hm(b.minutes)}</td><td>{b.avgSession ? `${b.avgSession}분` : '–'}</td><td>{b.condition ?? '–'}</td></tr>)}</tbody></table>
-      {e.tips.length > 0 ? <ul className="tips">{e.tips.map(t => <li key={t}>{t}</li>)}</ul> : <p className="muted small">타이머를 멈출 때 컨디션을 남기면 여기에 시간대별 조언이 생겨요.</p>}
+      {e.tips.length > 0 ? <ul className="tips">{e.tips.map(t => <li key={t}>{t}</li>)}</ul> : <Tip id="insights-tips" block>타이머를 멈출 때 컨디션을 남기면 여기에 시간대별 조언이 생겨요.</Tip>}
     </section>
     <section className="part"><h3>예상 대비 실제 시간</h3>
-      {est.ratio === null ? <p className="muted small">예상 시간을 적고(예: "보고서 60분") 타이머로 재면 비교가 쌓여요.</p> : <>
+      {est.ratio === null ? <Tip id="insights-est" block>예상 시간을 적고 타이머로 재면 비교가 쌓여요.</Tip> : <>
         <p className="big-num"><strong>{est.ratio}배</strong> <span className="muted">— 예상한 시간의 {Math.round(est.ratio * 100)}%가 실제로 걸렸어요{est.ratio > 1.15 ? '. 계획할 때 이만큼 곱해서 잡아 보세요.' : est.ratio < .85 ? '. 생각보다 빨리 끝내고 있어요.' : '. 예상이 정확한 편이에요.'}</span></p>
         <ul className="prows">{[...est.rows].sort((a, b) => b.actual / b.estimate - a.actual / a.estimate).slice(0, 5).map(r => <li key={r.id} className="prow"><span className="ptitle">{r.title}<span className="psub">{r.day}</span></span><span className="est">{r.estimate}분 → {r.actual}분 <b className={r.actual > r.estimate ? 'over' : 'under'}>{r.actual > r.estimate ? '+' : ''}{r.actual - r.estimate}</b></span></li>)}</ul></>}
     </section>
     <section className="part"><h3>최근 2주, 나는 어떤 페르소나로 살았나</h3>
-      {persona.rows.length === 0 ? <p className="muted small">설정에서 페르소나(예: 수험생, 직장인, 창작자)를 만들고 할 일에 붙이면 보여요.</p> : <>
+      {persona.rows.length === 0 ? <Tip id="insights-persona" block>설정에서 페르소나를 만들고 할 일에 붙이면 보여요.</Tip> : <>
         <div className="persona-bar">{persona.rows.filter(r => r.minutes > 0).map(r => <i key={r.id} style={{flex: r.minutes, background: r.color}} title={`${r.name} ${r.share}%`} />)}</div>
         <ul className="prows">{persona.rows.map(r => <li key={r.id} className="prow"><i className="dot" style={{background: r.color}} /><span className="ptitle">{r.name}</span><span className="muted small">할 일 {r.done}/{r.tasks}</span><strong>{hm(r.minutes)}</strong><span className="muted small">{r.share}%</span></li>)}</ul></>}
     </section>

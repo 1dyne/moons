@@ -111,7 +111,7 @@ function GoalForm({p, goals, levels, today}: {p: Planner; goals: LifeRecord<'goa
     if (await p.write(null, {kind: 'goal', body: {title: title.trim(), horizon, period: periods[horizon], parentGoalId: parent || null, target}})) { setTitle(''); setAmount(''); }
   };
   return <form className="add stack" onSubmit={e => { e.preventDefault(); void add(); }}>
-    <input value={title} onChange={e => setTitle(e.target.value)} placeholder="예: 이번 달 단어 600개" aria-label="기간 목표" />
+    <input value={title} onChange={e => setTitle(e.target.value)} placeholder="기간 목표" aria-label="기간 목표" />
     <div className="inline">
       <select value={horizon} onChange={e => setHorizon(e.target.value as Goal['horizon'])} aria-label="기간">{levels.filter(h => h !== 'milestone').map(h => <option key={h} value={h}>{horizonLabel(h)} ({periods[h as keyof typeof periods]})</option>)}</select>
       {parents.length > 0 && <select value={parent} onChange={e => setParent(e.target.value)} aria-label="위 목표"><option value="">위 목표 없음</option>{parents.map(g => <option key={g.id} value={g.id}>{horizonLabel(g.body.horizon)} · {g.body.title}</option>)}</select>}
@@ -152,7 +152,7 @@ function GoalDashboard({g, p, nav, today, back, open, weeklyMin}: {g: LifeRecord
     </section>}
     {g.body.horizon !== 'milestone' && <GoalPlanPanel p={p} goalId={g.id} today={today} weeklyMin={weeklyMin} />}
     <section className="part"><h3>이 목표로 이어진 하루들</h3>
-      {days.length === 0 && <p className="muted">아직 이어진 할 일이 없어요. 오늘 화면에서 할 일을 추가할 때 이 목표를 고르면 진행률이 올라가요.</p>}
+      {days.length === 0 && <Tip id="goal-no-tasks" block>아직 이어진 할 일이 없어요. 오늘 화면에서 할 일을 추가할 때 이 목표를 고르면 진행률이 올라가요.</Tip>}
       {days.map(d => <div key={d} className="history-day">
         <button className="link day-link" onClick={() => nav.setDay(d)}>{d ? label(d) : '날짜 없음'}</button>
         <ul className="rows">{tasks.filter(t => (t.logicalDay ?? '') === d).map(t => <li key={t.id} className={`row ${t.body.outcome.result}`}><span>{t.body.title}</span><span className="meta">{t.body.outcome.amount !== null ? `${t.body.outcome.amount}${t.body.outcome.unit ?? ''}` : t.body.plan.target ? `${t.body.plan.target.amount}${t.body.plan.target.unit}` : ''} {t.body.outcome.result === 'done' ? '✓' : ''}</span></li>)}</ul>

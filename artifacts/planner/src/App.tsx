@@ -1,7 +1,7 @@
 import {createContext, useContext, useEffect, useState} from 'react';
 import {useClerk} from '@clerk/react';
 import {logicalDay, type AnyRecord, type Settings} from '@workspace/life-contract';
-import {CHIP_COLORS, MOODS, dayBoundary, withMood, type PlannerSpec} from '@workspace/planner-spec';
+import {CHIP_COLORS, MOODS, dayBoundary, tabsOf, withMood, type PlannerSpec} from '@workspace/planner-spec';
 import {api, flushQueue, httpBackend, ofKind, usePlanner, type Planner} from './data.ts';
 import {onQueue, queued} from './offline.ts';
 import {authEnabled} from './runtime.ts';
@@ -10,8 +10,8 @@ import {Builder} from './screens/Builder.tsx';
 import {Editor} from './screens/Editor.tsx';
 import {ConnectPage} from './screens/Connect.tsx';
 import {skinProps} from './screens/Canvas.tsx';
-import {PlannerView} from './screens/PlannerView.tsx';
-import {Tip, reopenTips, useClosedTipCount} from './Tip.tsx';
+import {PlannerView, currentTab} from './screens/PlannerView.tsx';
+import {Tip, setTipsOn, useTipsOn} from './Tip.tsx';
 
 type Loaded = {settings: Settings & {configured: boolean}; planner: {version: number; spec: PlannerSpec} | null; records: AnyRecord[]};
 const PlannerCtx = createContext<Planner | null>(null);
@@ -60,8 +60,8 @@ function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Lo
       {!decorating && <button className="small" onClick={() => { setDecorating(true); setSettingsOpen(false); }}>꾸미기</button>}
       <button className="ghost small" onClick={() => setSettingsOpen(!settingsOpen)} aria-expanded={settingsOpen}>설정</button>
     </header>
-    <PlannerCtx.Provider value={p}>{decorating ? <Editor spec={spec} settings={loaded.settings} p={p} saveLabel="저장" onCancel={() => setDecorating(false)}
-      onSave={async next => { await api.putSpec(next); setDecorating(false); await reload(); }} hint="지금 기록 그대로 보면서 꾸며요. 저장하면 새 버전이 되고 기록은 그대로예요." /> : settingsOpen ? <SettingsPanel loaded={loaded} edit={edit} close={() => setSettingsOpen(false)} reload={reload} /> : <PlannerView spec={spec} settings={loaded.settings} p={p} />}</PlannerCtx.Provider>
+    <PlannerCtx.Provider value={p}>{decorating ? <Editor spec={spec} settings={loaded.settings} p={p} saveLabel="저장" onCancel={() => setDecorating(false)} pageId={tabsOf(spec).find(t => t.id === currentTab() && t.kind === 'page')?.id}
+      onSave={async next => { await api.putSpec(next); setDecorating(false); await reload(); }} hint="지금 기록 그대로 보면서 꾸며요. 저장하면 새 버전이 되고 기록은 그대로예요." /> : settingsOpen ? <SettingsPanel loaded={loaded} edit={edit} close={() => setSettingsOpen(false)} reload={reload} /> : <PlannerView spec={spec} settings={loaded.settings} p={p} saveSpec={async change => { await api.putSpec(change(spec)); await reload(); }} />}</PlannerCtx.Provider>
   </div>;
 }
 
@@ -124,13 +124,13 @@ function SettingsPanel({loaded, edit, close, reload}: {loaded: Loaded & {planner
     </section>
     <TipsReset />
     <section className="module"><h3>플래너</h3>
-      <p className="muted">버전 {loaded.planner.version} · 화면 구성을 바꿔도 기록은 그대로예요.</p>
+      <p className="muted">버전 {loaded.planner.version}</p>
       <button className="primary" onClick={edit}>플래너 고치기</button>
     </section>
     <section className="module"><h3>하루의 기준</h3>
       <label>시간대 <input value={tz} onChange={e => setTz(e.target.value)} /></label>
       <label>하루가 바뀌는 시각 <input type="time" value={boundary} onChange={e => setBoundary(e.target.value)} /></label>
-      <p className="muted small">새벽 {boundary} 전에 쓴 기록은 전날로 들어가요.</p>
+      <Tip id="settings-boundary" block>새벽 {boundary} 전에 쓴 기록은 전날로 들어가요.</Tip>
       <button onClick={save}>저장</button> {msg && <span className="muted">{msg}</span>}
     </section>
     <Personas />
@@ -161,7 +161,7 @@ function Personas() {
       <button className="ghost small" onClick={() => p.write(x.id, {kind: 'persona', body: {...x.body, active: !x.body.active}, baseRevision: x.revision})}>{x.body.active ? '쉬게 하기' : '다시 쓰기'}</button>
     </li>)}</ul>
     <form className="padd" onSubmit={async e => { e.preventDefault(); if (name.trim() && await p.write(null, {kind: 'persona', body: {name: name.trim(), color}})) setName(''); }}>
-      <input value={name} onChange={e => setName(e.target.value)} placeholder="예: 수험생, 직장인, 창작자, 운동하는 나" aria-label="페르소나 이름" />
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="역할 이름" aria-label="페르소나 이름" />
       <span className="swatches">{PERSONA_COLORS.map(c => <button type="button" key={c} className={`swatch ${c === color ? 'on' : ''}`} style={{background: c}} onClick={() => setColor(c)} aria-label={`색 ${c}`} />)}</span>
       <button className="small">추가</button>
     </form>
@@ -177,10 +177,8 @@ function Account() {
 }
 
 function TipsReset() {
-  const n = useClosedTipCount();
-  if (!n) return null;
+  const on = useTipsOn();
   return <section className="module"><h3>안내</h3>
-    <p className="muted small">닫은 안내 {n}개</p>
-    <button onClick={reopenTips}>닫은 안내 다시 보기</button>
+    <label className="small-label"><input type="checkbox" checked={on} onChange={e => setTipsOn(e.target.checked)} /> 사용 안내 보기</label>
   </section>;
 }

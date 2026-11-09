@@ -139,6 +139,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -211,6 +212,7 @@
     "routineId": "01FIXTURE00000000000000003",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -256,6 +258,7 @@
     "routineId": "01FIXTURE00000000000000004",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -303,6 +306,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -375,6 +379,7 @@
     "routineId": "01FIXTURE00000000000000003",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -420,6 +425,7 @@
     "routineId": "01FIXTURE00000000000000004",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -467,6 +473,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -539,6 +546,7 @@
     "routineId": "01FIXTURE00000000000000003",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -586,6 +594,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -658,6 +667,7 @@
     "routineId": "01FIXTURE00000000000000003",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -705,6 +715,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -777,6 +788,7 @@
     "routineId": "01FIXTURE00000000000000003",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -824,6 +836,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -896,6 +909,7 @@
     "routineId": "01FIXTURE00000000000000003",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -941,6 +955,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -989,6 +1004,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1037,6 +1053,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1109,6 +1126,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "planned",
      "due": null,
@@ -1305,6 +1323,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1377,6 +1396,7 @@
     "routineId": "01FIXTURE00000000000000003",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1422,6 +1442,7 @@
     "routineId": "01FIXTURE00000000000000004",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1469,6 +1490,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1541,6 +1563,7 @@
     "routineId": "01FIXTURE00000000000000003",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1586,6 +1609,7 @@
     "routineId": "01FIXTURE00000000000000004",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1633,6 +1657,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1705,6 +1730,7 @@
     "routineId": "01FIXTURE00000000000000003",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1752,6 +1778,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1824,6 +1851,7 @@
     "routineId": "01FIXTURE00000000000000003",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1871,6 +1899,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1943,6 +1972,7 @@
     "routineId": "01FIXTURE00000000000000003",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -1990,6 +2020,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -2062,6 +2093,7 @@
     "routineId": "01FIXTURE00000000000000003",
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -2107,6 +2139,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -2155,6 +2188,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -2203,6 +2237,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -2251,6 +2286,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -2299,6 +2335,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "committed",
      "due": null,
@@ -2371,6 +2408,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "planned",
      "due": null,
@@ -2416,6 +2454,7 @@
     "routineId": null,
     "personaIds": [],
     "highlight": null,
+    "props": {},
     "plan": {
      "state": "planned",
      "due": null,

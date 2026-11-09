@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {Skin, Widget} from './canvas.ts';
+import {PropDef, Skin, Widget} from './canvas.ts';
 
 // PlannerSpec (docs/PLANNER_SPEC_v1.md §4.1): what the planner looks like. Data lives in the life hub;
 // changing a spec never moves or rewrites records.
@@ -53,6 +53,15 @@ export const PlannerSpec = z.object({
   // mode absent = a page saved before 다꾸형 existed (정리형 units).
   canvas: z.object({day: z.array(Widget).max(80).optional(), mode: z.enum(['free', 'grid']).optional()}).default({}),
   skin: Skin.optional(),
+  // Tabs like Notion pages: built-in views or the user's own blank pages (their own widgets). Absent = the five built-ins.
+  tabs: z.array(z.object({
+    id: z.string().regex(/^[a-z0-9-]{1,40}$/),
+    name: z.string().trim().min(1).max(20),
+    kind: z.enum(['today', 'week', 'month', 'goals', 'insights', 'page']),
+    widgets: z.array(Widget).max(80).optional(),
+  })).min(1).max(20).optional(),
+  // Properties the user added to every task (과목, 난이도, 장소…), shown and edited on each task.
+  props: z.object({task: z.array(PropDef).max(20).default([])}).default({}),
   source: z.object({kind: z.enum(['chat', 'paper', 'notion', 'template']), ref: z.string().max(80).optional()}).optional(),
 }).superRefine((spec, ctx) => {
   const ids = spec.modules.map(m => m.id);
@@ -61,6 +70,9 @@ export const PlannerSpec = z.object({
 });
 export type PlannerSpec = z.infer<typeof PlannerSpec>;
 export type ModuleSpec = PlannerSpec['modules'][number];
+export type TabSpec = NonNullable<PlannerSpec['tabs']>[number];
+export const BUILTIN_TABS: TabSpec[] = [{id: 'today', name: '오늘', kind: 'today'}, {id: 'week', name: '주간', kind: 'week'}, {id: 'month', name: '월·년', kind: 'month'}, {id: 'goals', name: '목표', kind: 'goals'}, {id: 'insights', name: '분석', kind: 'insights'}];
+export const tabsOf = (spec: PlannerSpec): TabSpec[] => spec.tabs?.length ? spec.tabs : BUILTIN_TABS;
 
 export const modulesFor = (spec: PlannerSpec, period: ModuleSpec['period']) => spec.modules.filter(m => m.period === period).sort((a, b) => a.order - b.order);
 export const uses = (spec: PlannerSpec, type: ModuleType) => spec.modules.some(m => m.type === type);

@@ -1,26 +1,31 @@
 import {useSyncExternalStore} from 'react';
 
-// How-to notes ("체크 칸을 누를 때마다 …") the user can close once read.
-// Closed notes are remembered on this device; 설정 → "닫은 안내 다시 보기" brings them back.
-const KEY = 'lit.tips.closed';
+// How-to notes and explanations. They stay out of the way in daily use: hidden unless the user turns
+// "사용 안내 보기" on in 설정 (a later tutorial will show them). Each shown note closes with ×.
+const KEY = 'lit.tips.closed', ON = 'lit.tips.on';
 const listeners = new Set<() => void>();
-let closed: Set<string> = read();
-function read() { try { return new Set<string>(JSON.parse(localStorage.getItem(KEY) ?? '[]')); } catch { return new Set<string>(); } }
-function save(next: Set<string>) {
-  closed = next;
-  try { localStorage.setItem(KEY, JSON.stringify([...next])); } catch { /* private mode: closes for this visit only */ }
+type State = {on: boolean; closed: Set<string>};
+let state: State = read();
+function read(): State {
+  try { return {on: localStorage.getItem(ON) === '1', closed: new Set<string>(JSON.parse(localStorage.getItem(KEY) ?? '[]'))}; }
+  catch { return {on: false, closed: new Set<string>()}; }
+}
+function save(next: State) {
+  state = next;
+  try { localStorage.setItem(KEY, JSON.stringify([...next.closed])); localStorage.setItem(ON, next.on ? '1' : '0'); } catch { /* private mode: this visit only */ }
   listeners.forEach(f => f());
 }
 const subscribe = (f: () => void) => { listeners.add(f); return () => { listeners.delete(f); }; };
-const useClosed = () => useSyncExternalStore(subscribe, () => closed, () => closed);
+const useTips = () => useSyncExternalStore(subscribe, () => state, () => state);
 
-export const closeTip = (id: string) => save(new Set([...closed, id]));
-export const reopenTips = () => save(new Set());
-export const useClosedTipCount = () => useClosed().size;
+export const closeTip = (id: string) => save({...state, closed: new Set([...state.closed, id])});
+/** Turning notes on brings every closed one back. */
+export const setTipsOn = (on: boolean) => save({on, closed: on ? new Set() : state.closed});
+export const useTipsOn = () => useTips().on;
 
 export function Tip({id, children, block}: {id: string; children: React.ReactNode; block?: boolean}) {
-  const shut = useClosed();
-  if (shut.has(id)) return null;
+  const s = useTips();
+  if (!s.on || s.closed.has(id)) return null;
   const Tag = block ? 'p' : 'span';
   return <Tag className={`tip ${block ? 'block' : ''}`}>
     <span className="tip-text">{children}</span>

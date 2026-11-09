@@ -26,6 +26,8 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
   const editFrom = (spec: PlannerSpec, blank = false) => setEditing({...spec, canvas: {day: blank ? [] : canvasOf({...spec, canvas: {}}), mode: 'free'}});
   const setPreview = (_: null) => { setCands(null); setPick(null); };
   const input = useRef<HTMLTextAreaElement>(null);
+  // First run: a blank note the user builds, or an example planner to start from.
+  const [way, setWay] = useState<'ask' | 'examples'>(current ? 'examples' : 'ask');
 
   const start = (words: string, templateId?: string) => {
     const p = propose(words, templateId);
@@ -36,10 +38,18 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
   const use = async () => { if (!preview) return; setBusy(true); setError(''); try { await onUse(preview); } catch (e) { setError((e as Error).message); setBusy(false); } };
 
   if (editing) return <BuilderEditor spec={editing} tz={tz} onBack={() => setEditing(null)} onUse={onUse} blank={!editing.canvas.day?.length} />;
+  if (way === 'ask') return <div className="builder onboarding">
+    <p className="brand big">lit</p>
+    <div className="moon-say"><Moon size={72} /><Speech>어떻게 시작할까요?</Speech></div>
+    <div className="start-ways">
+      <button className="start-way primary-way" onClick={() => editFrom(TEMPLATES[0]!.spec, true)}><strong>빈 노트로 시작</strong><span>위젯을 직접 놓아 내 플래너 구조를 만들어요</span></button>
+      <button className="start-way" onClick={() => setWay('examples')}><strong>예시 플래너 받기</strong><span>만들어진 틀을 골라 고쳐 써요</span></button>
+    </div>
+  </div>;
   return <div className={`builder ${cands ? 'split' : ''}`}>
     <div className="chat">
       {current && onCancel && <button className="ghost small back" onClick={onCancel}>‹ 내 플래너로</button>}
-      {!current && <p className="brand big">lit <span className="muted small">대화로 만들고 마음대로 꾸미는 나만의 다이어리</span></p>}
+      {!current && <button className="ghost small back" onClick={() => setWay('ask')}>‹ 처음으로</button>}
       <div className="moon-say">
         <Moon size={proposal ? 48 : 96} />
         <Speech>{current ? '어떻게 고쳐 볼까요?' : '어떤 하루를 관리하고 싶어요?'}</Speech>
@@ -49,7 +59,7 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
         <form className="composer" onSubmit={e => { e.preventDefault(); if (text.trim()) start(text.trim()); }}>
           <textarea ref={input} rows={3} value={text} onChange={e => setText(e.target.value)} autoFocus
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (text.trim()) start(text.trim()); } }}
-            placeholder="예: 루틴 트래커가 필요해. 매일 하는 건 아니고 그날 할 것만 체크하고 싶어." aria-label="필요한 플래너 설명" />
+            placeholder="어떤 플래너가 필요해요?" aria-label="필요한 플래너 설명" />
           <div className="composer-bar">
             <span className="attach" title="다음 단계에서 열려요"><button type="button" disabled>종이 플래너 사진</button><button type="button" disabled>노션에서 가져오기</button></span>
             <button className="primary" disabled={!text.trim()}>보내기</button>
@@ -123,9 +133,10 @@ function Mockup({spec, tz, mini}: {spec: PlannerSpec; tz: string; mini?: boolean
 function BuilderEditor({spec, tz, onBack, onUse, blank}: {spec: PlannerSpec; tz: string; onBack: () => void; onUse: (spec: PlannerSpec) => Promise<void>; blank: boolean}) {
   const settings: Settings = {tz, dayBoundary: '04:00'};
   const backend = useMemo(() => memoryBackend(tz), [tz]);
-  const p = usePlanner(backend, useMemo(() => sampleRecords(spec, logicalDay(new Date(), settings), tz), [spec, tz]));
+  // A blank start stays blank: no example records in the user's own space.
+  const p = usePlanner(backend, useMemo(() => blank ? [] : sampleRecords(spec, logicalDay(new Date(), settings), tz), [spec, tz, blank]));
   return <div className="builder-edit">
-    <div className="moon-say small"><Moon size={40} /><Speech>{blank ? '빈 화면이에요. 쓰고 싶은 위젯을 골라 배치해 보세요.' : '마음대로 옮기고, 더하고, 꾸며 보세요. 예시 기록으로 미리 보여요.'}</Speech><button className="ghost small" onClick={onBack}>‹ 샘플로</button></div>
-    <Editor spec={spec} settings={settings} p={p} saveLabel="이대로 쓰기" onSave={onUse} hint="예시 기록이 들어 있어요. 쓰기 시작하면 빈 플래너로 바뀌어요." />
+    <div className="moon-say small"><Moon size={40} /><Speech>{blank ? '빈 노트예요.' : '예시 틀이에요. 마음대로 고쳐요.'}</Speech><button className="ghost small" onClick={onBack}>‹ 뒤로</button></div>
+    <Editor spec={spec} settings={settings} p={p} saveLabel="이대로 쓰기" onSave={onUse} hint={blank ? undefined : '예시 기록은 저장하면 빠져요.'} />
   </div>;
 }

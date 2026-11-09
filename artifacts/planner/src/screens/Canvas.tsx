@@ -10,6 +10,9 @@ import {BulletDay, HourlyDay, OnePageDay} from './DayLayouts.tsx';
 import {HabitGrid} from './Habits.tsx';
 import {useFontFamily} from '../fonts.ts';
 import {Gauge} from '../Gauge.tsx';
+import {LabelProvider} from '../labels.tsx';
+import {TableWidget} from './Table.tsx';
+import {Tip} from '../Tip.tsx';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
 /** A saved page keeps its placement; a page never arranged starts as 다꾸형 from the layout's starter. */
@@ -51,11 +54,11 @@ const SHAPES: Record<string, string> = {
 
 export type EditApi = {widgets: Widget[]; mode: CanvasMode; selected: string | null; select: (id: string | null) => void; change: (ws: Widget[], movedId?: string) => void};
 
-export function DayCanvas({spec, settings, p, today, day, nav, edit}: {spec: PlannerSpec; settings: Settings; p: Planner; today: string; day: string; nav: Ctx['nav']; edit?: EditApi}) {
-  const widgets = edit?.widgets ?? canvasOf(spec), mode = edit?.mode ?? modeOf(spec), M = METRICS[mode];
+export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveSpec}: {spec: PlannerSpec; settings: Settings; p: Planner; today: string; day: string; nav: Ctx['nav']; edit?: EditApi; page?: Widget[]; saveSpec?: Ctx['saveSpec']}) {
+  const widgets = edit?.widgets ?? page ?? canvasOf(spec), mode = edit?.mode ?? (page ? 'free' : modeOf(spec)), M = METRICS[mode];
   const timer = useTimer(p, settings), color = colors(p, day);
   const timed = widgets.some(w => ['focus', 'timetable', 'receipt', 'hourly'].includes(w.type));
-  const ctx: Ctx = {p, day, nav, now: () => new Date().toISOString(), timer: timed ? timer : null, color, settings};
+  const ctx: Ctx = {p, day, nav, now: () => new Date().toISOString(), timer: timed ? timer : null, color, settings, spec, saveSpec: edit ? undefined : saveSpec, preview: !!edit};
   const grid = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{id: string; mode: 'move' | 'size'; x0: number; y0: number; w: Widget; preview: Widget} | null>(null);
   const endHour = Number(settings.dayBoundary.slice(0, 2)) + 24;
@@ -92,14 +95,14 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit}: {spec: Pla
       const decor = isDecor(w.type), rot = Number(w.options.rotate ?? 0), dx = Number(w.options.dx ?? 0), dy = Number(w.options.dy ?? 0);
       return <section key={w.id} className={`wg ${decor ? 'wg-decor' : `wg-${w.style ?? spec.skin?.card ?? 'line'}`} wg-type-${w.type} ${sel ? 'selected' : ''} ${drag?.id === w.id ? 'dragging' : ''}`}
         style={{gridColumn: `${w.x + 1} / span ${w.w}`, gridRow: `${w.y + 1} / span ${w.h}`, order: w.y * M.cols + w.x, ...(w.color ? {'--accent': w.color} : {}),
-          ...(w.font ? {fontFamily: `var(--wfont-${w.id})`} : {}), ...(w.background ? {background: w.background} : {}), ...(w.ink ? {color: w.ink, '--ink': w.ink} : {}),
+          ...(w.font ? {fontFamily: `var(--wfont-${w.id})`} : {}), ...(w.background ? {background: w.background, '--wg-bg': w.background} : {}), ...(w.ink ? {color: w.ink, '--ink': w.ink, '--wg-ink': w.ink} : {}),
           ...(decor || rot ? {transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)`} : {}), ...(decor || mode === 'free' ? {zIndex: (decor ? 20 : 1) + Number(w.options.layer ?? 0)} : {})} as React.CSSProperties}
         onClick={edit ? e => { e.stopPropagation(); edit.select(w.id); } : undefined}>
         {edit && <div className="wg-handle" onPointerDown={e => begin(e, w, 'move')} title="끌어서 옮기기">⠿ {widgetInfo(w.type).label}</div>}
         {w.font && <FontVar id={w.id} font={w.font} />}
         {title && !OWN_TITLE.includes(w.type) && !decor && <h3 className="wg-title">{title}</h3>}
         <div className="wg-body" inert={edit ? true : undefined}>
-          <WidgetBody w={w} ctx={ctx} spec={spec} settings={settings} today={today} endHour={endHour} />
+          <LabelProvider value={(w.options.labels as Record<string, unknown> | undefined) ?? {}}><WidgetBody w={w} ctx={ctx} spec={spec} settings={settings} today={today} endHour={endHour} /></LabelProvider>
         </div>
         {edit && <span className="wg-resize" onPointerDown={e => begin(e, w, 'size')} title="끌어서 크기 바꾸기" />}
       </section>;
@@ -112,15 +115,16 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
   switch (w.type) {
     case 'focus': return ctx.timer ? <FocusBar p={p} day={today} timer={ctx.timer} color={colors(p, today)} /> : null;
     case 'tasks': return <Tasks m={asModule(w, 'tasks')} ctx={ctx} />;
+    case 'table': return <TableWidget w={w} ctx={ctx} />;
     case 'timetable': return <Timetable key={day} m={asModule(w, 'timer')} p={p} day={day} settings={settings} color={ctx.color} />;
     case 'receipt': return <Receipt p={p} day={day} routineRate={ofKind(p.records, 'routine').length ? routineRate(p.records, day) : null} />;
     case 'hourly': return <HourlyDay ctx={ctx} startHour={start} endHour={endHour} />;
     case 'bullet': return <BulletDay ctx={ctx} />;
     case 'page': return <OnePageDay key={day} ctx={ctx} startHour={start} endHour={endHour} />;
     case 'checkin': return <CheckIn m={asModule(w, 'checkin')} p={p} day={day} now={ctx.now} />;
-    case 'carry': return (day === today ? <CarryOver ctx={ctx} /> : null) ?? <p className="muted small">어제 못 끝낸 일이 없어요.</p>;
+    case 'carry': return (day === today ? <CarryOver ctx={ctx} /> : null) ?? <Tip id="carry-empty" block>어제 못 끝낸 일이 없어요.</Tip>;
     case 'routine': return <Routines m={asModule(w, 'routine')} ctx={ctx} />;
-    case 'habits': return ofKind(p.records, 'routine').some(r => r.body.active) ? <HabitGrid p={p} month={day.slice(0, 7)} today={today} /> : <p className="muted small">습관 격자 — 루틴을 추가하면 한 달 칸이 그려져요. (오늘의 루틴 위젯에서 추가)</p>;
+    case 'habits': return ofKind(p.records, 'routine').some(r => r.body.active) ? <HabitGrid p={p} month={day.slice(0, 7)} today={today} /> : <Tip id="habits-empty" block>루틴을 추가하면 한 달 칸이 그려져요.</Tip>;
     case 'goals': return <DayGoals ctx={ctx} />;
     case 'condition': return <ConditionDay key={day} p={p} day={day} now={ctx.now} />;
     case 'sleep': return <SleepBox key={day} ctx={ctx} />;
@@ -128,7 +132,7 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
     case 'personas': return <PersonaToday ctx={ctx} />;
     case 'progress': {
       const goals = ofKind(p.records, 'goal'), g = goals.find(x => x.id === w.options.goalId) ?? goals.find(x => !x.body.parentGoalId && x.body.status === 'active');
-      if (!g) return <p className="muted small">목표를 세우면 여기 크게 보여요. (편집에서 목표 고르기)</p>;
+      if (!g) return ctx.preview ? <div className="wg-progress"><span>예시 목표</span><Gauge pct={64} size="lg" /></div> : <Tip id="progress-empty" block>목표를 세우면 여기 크게 보여요.</Tip>;
       const gp = goalPercent(g.id, p.records);
       return <button className="wg-progress link" onClick={() => ctx.nav.openGoal(g.id)}><span>{g.body.title}</span><Gauge pct={gp.basis === 'none' ? null : gp.pct} size="lg" label={g.body.title} /></button>;
     }
@@ -140,7 +144,7 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
       const left = Math.ceil((target.getTime() - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
       return <div className="wg-dday"><strong>{left > 0 ? `D-${left}` : left === 0 ? 'D-day' : `D+${-left}`}</strong><span>{String(w.options.label ?? '') || g?.body.title || date}</span></div>;
     }
-    case 'text': return <p className={`wg-text size-${String(w.options.size ?? 'm')} align-${String(w.options.align ?? 'left')}`}>{String(w.options.text ?? '오늘의 다짐을 적어 보세요')}</p>;
+    case 'text': return <p className={`wg-text size-${String(w.options.size ?? 'm')} align-${String(w.options.align ?? 'left')}`}>{String(w.options.text ?? '')}</p>;
     case 'sticker': return <span className="wg-sticker" style={{fontSize: `${Number(w.options.size ?? 56)}px`}}>{String(w.options.glyph ?? '🌙')}</span>;
     case 'tape': { const c = String(w.options.color ?? '#f3cfe3'); return <span className="wg-tape" style={{background: (TAPE[String(w.options.pattern ?? 'stripe')] ?? TAPE.plain!)(c), opacity: Number(w.options.opacity ?? 0.85)}} />; }
     case 'image': return w.options.src ? <figure className={`wg-image frame-${String(w.options.frame ?? 'polaroid')}`}><img src={String(w.options.src)} alt={String(w.options.caption ?? '')} />{w.options.caption ? <figcaption>{String(w.options.caption)}</figcaption> : null}</figure>

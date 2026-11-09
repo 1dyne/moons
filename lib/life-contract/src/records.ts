@@ -44,6 +44,8 @@ export const TaskBody = z.object({
   personaIds: z.array(z.string()).max(10).default([]),
   // Highlighter pen the user put on this task (diary look only; no meaning for progress).
   highlight: z.enum(['yellow', 'pink', 'green', 'blue']).nullable().default(null),
+  // Values of properties the user added to tasks in the planner (spec.props.task): property id → value.
+  props: z.record(z.union([z.string().max(500), z.number().finite(), z.boolean(), z.null()])).default({}),
   plan: z.object({
     state: z.enum(['planned', 'committed', 'dropped']).default('planned'),
     due: when.nullable().default(null),
@@ -105,7 +107,10 @@ export const ReviewBody = z.object({
 // Free writing on a day: a bullet-journal note (–), an idea (!), or the whole free page of a one-page daily.
 export const NoteBody = z.object({
   text: text(5000),
-  signifier: z.enum(['note', 'idea', 'page']).default('note'),
+  signifier: z.enum(['note', 'idea', 'page', 'row']).default('note'),
+  // signifier 'row': one line of a user-made table (표 위젯). table = the widget id, cells = column id → value.
+  table: z.string().max(60).nullable().default(null),
+  cells: z.record(z.union([z.string().max(500), z.number().finite(), z.boolean(), z.null()])).default({}),
 });
 
 // A role the user lives in (학생, 직장인, 엄마, 창작자…). Tasks and sessions point to personas.

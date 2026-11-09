@@ -38,7 +38,7 @@ export function Feasibility({records, extra, focusId, weeklyMin, today}: {record
       <p className={`fz-verdict ${mine.lateDays ? 'late' : 'ok'}`}>{mine.lateDays
         ? <>마감보다 <b>{mine.lateDays}일</b> 늦어요. 주당 시간을 늘리거나, 마일스톤을 줄이거나, 마감을 {fmt(mine.projected)}로 옮기는 걸 생각해 보세요.</>
         : mine.deadline ? <>마감 {daysBetween(mine.projected, mine.deadline)}일 전에 끝낼 수 있어요.</> : <>마감을 정하면 늦는지 바로 알려 드려요.</>}</p>
-    </div> : <p className="muted small">마일스톤에 예상 시간을 넣으면 가능한 날짜를 계산해요.</p>}
+    </div> : <Tip id="goalplan-est" block>마일스톤에 예상 시간을 넣으면 가능한 날짜를 계산해요.</Tip>}
     {rows.length > 0 && <ol className="fz-rows">{rows.map(r => <li key={r.id} className={r.late ? 'late' : ''}>
       <span className="ptitle">{r.title}</span><span className="muted small">{hrs(r.remainingMin)}</span>
       <span className="small">끝낼 달 {fmt(r.due.slice(0, 7))} → 예상 {fmt(r.finish)}</span>{r.late && <b className="late small">늦음</b>}
@@ -87,17 +87,17 @@ export function NewGoal({p, today, weekly, onWeekly, onDone}: {p: Planner; today
     }
     setBusy(false);
   };
-  if (!open) return <button className="new-goal" onClick={() => setOpen(true)}>＋ 큰 목표 세우기 <span className="muted small">대충 적으면 MOONS가 물어보고, 구체화해서 마일스톤으로 쪼개 줘요</span></button>;
+  if (!open) return <button className="new-goal" onClick={() => setOpen(true)}>＋ 큰 목표 세우기 </button>;
   const round = qas.at(-1), waiting = !!round && !result;
   return <section className="part goal-maker">
     <h3>큰 목표 세우기</h3>
-    <input className="goal-in" value={goal} onChange={e => setGoal(e.target.value)} placeholder="예: 내년에 로스쿨 붙기, 올해 안에 책 한 권 쓰기" aria-label="큰 목표" autoFocus disabled={!!result} />
+    <input className="goal-in" value={goal} onChange={e => setGoal(e.target.value)} placeholder="큰 목표" aria-label="큰 목표" autoFocus disabled={!!result} />
     <div className="inline">
       <label className="muted small">원하는 마감 <input value={deadline} onChange={e => setDeadline(e.target.value)} placeholder="2027-03 또는 2027-03-15" className="num wide" aria-label="원하는 마감" /></label>
       <label className="muted small">일주일에 목표에 쓸 시간 <input className="num" inputMode="decimal" value={hours} onChange={e => setHours(e.target.value)} aria-label="주당 목표 시간" />시간</label>
       <span className="muted small">(최근 4주 실제 집중 기준 {hm(weeklyFocus(p.records, today))}/주)</span>
     </div>
-    {!result && qas.length === 0 && <textarea rows={2} value={context} onChange={e => setContext(e.target.value)} placeholder="(선택) 지금 상황, 이미 해 둔 것, 제약" aria-label="상황" />}
+    {!result && qas.length === 0 && <textarea rows={2} value={context} onChange={e => setContext(e.target.value)} placeholder="지금 상황 (선택)" aria-label="상황" />}
 
     {qas.map((r, ri) => <div key={ri} className="bubble moon qa">
       <p className="muted small">MOONS가 목표를 구체화하려고 물어봐요 ({ri + 1}/2)</p>
@@ -119,7 +119,7 @@ export function NewGoal({p, today, weekly, onWeekly, onDone}: {p: Planner; today
     {result && drafts && <div className="drafts">
       <div className="refined">
         <label>구체화된 목표 <input value={result.refined.title} onChange={e => setResult({...result, refined: {...result.refined, title: e.target.value}})} aria-label="구체화된 목표" /></label>
-        <label>끝났다고 볼 기준 <input value={result.refined.success} onChange={e => setResult({...result, refined: {...result.refined, success: e.target.value}})} placeholder="예: LEET 언어이해 표준점수 60" aria-label="성공 기준" /></label>
+        <label>끝났다고 볼 기준 <input value={result.refined.success} onChange={e => setResult({...result, refined: {...result.refined, success: e.target.value}})} placeholder="끝났다고 볼 기준" aria-label="성공 기준" /></label>
         {result.assumptions.length > 0 && <ul className="tips">{result.assumptions.map(a => <li key={a}>{a}</li>)}</ul>}
       </div>
       <ol className="ms-list">{drafts.map((d, i) => <li key={i} className={d.keep ? '' : 'off'}>

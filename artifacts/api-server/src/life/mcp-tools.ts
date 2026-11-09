@@ -1,6 +1,6 @@
 import {z} from 'zod';
 import {ALL_SCOPES, buildNow, goalSchedule, logicalDay, weeklyFocus, type AnyRecord} from '@workspace/life-contract';
-import {FONTS, GAUGES, PALETTE, SKIN_PRESETS, WIDGETS, buildSpec, uses, type PlannerSpec} from '@workspace/planner-spec';
+import {BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 import {allRecords, getSettings, getSpec, lastActivity, putSettings, saveSpec, writeRecord} from './store.ts';
 
@@ -25,12 +25,29 @@ const guide = () => `lit · 대화로 만들고 마음대로 꾸미는 나만의
 스킨: accent·background·surface·ink(#hex), paper("plain|grid|dot|lined"), font, card, heading("rule|pill|plain"), radius(0~28), gauge(진행률 모양: ${GAUGES.map(g => `${g.id}=${g.name}`).join(", ")}), check("box|circle"), done("red-strike|strike|fade|highlight"). 기본은 계기판(회색 판, 검정 선, 노랑 신호, 모서리 0). 프리셋: ${SKIN_PRESETS.map(p => p.id).join(', ')}.
 글꼴 id: ${FONTS.map(f => `${f.id}(${f.kind})`).join(', ')}.
 팔레트: ${PALETTE.join(' ')}.
+탭: 노션 페이지처럼 사용자가 추가·삭제·이름을 바꾼다. tabs로 보낼 수 있다: kind는 ${BUILTIN_TABS.map(t => `${t.kind}(${t.name})`).join(', ')}, page(빈 페이지 + 그 페이지의 widgets). 탭을 안 보내면 지금 탭 그대로.
+사용자가 이름 붙이는 속성: taskProps로 모든 할 일에 속성을 단다(이름, type ${PROP_TYPES.map(t => `${t.id}=${t.name}`).join('·')}, select면 options). tasks 위젯 options.groupBy에 select 속성 이름을 주면 그 선택지로 할 일을 나눈다.
+표 위젯(type "table"): options.columns=[{name,type,options}], options.firstName(첫 열 이름), options.scope("day" 그날 줄만 | "all" 모든 날). 줄은 add_items의 rows로 넣는다.
+버튼·칸 문구는 위젯 options.labels로 바꾼다: ${Object.entries(WIDGET_LABELS).map(([t, ls]) => `${t}{${ls!.map(l => l.key).join(',')}}`).join(' ')}. 예시 문장을 플레이스홀더로 넣지 않는다(개인 공간이다).
 기록 규칙: 하루는 logicalDay(YYYY-MM-DD, 사용자 하루 경계 기준). 목표는 연간 → 마일스톤(끝낼 달) → 할 일. 사용자가 말하지 않은 시험일·점수 등은 묻는다.`;
 
 const looseWidget = z.object({type: z.string(), x: z.number().int().optional(), y: z.number().int().optional(), w: z.number().int().optional(), h: z.number().int().optional(),
   title: z.string().max(40).optional(), font: z.string().max(40).optional(), color: z.string().optional(), background: z.string().optional(), ink: z.string().optional(),
   style: z.enum(['card', 'line', 'filled', 'plain']).optional(), options: z.record(z.unknown()).optional()});
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const cell = z.union([z.string().max(500), z.number().finite(), z.boolean(), z.null()]);
+const propIn = z.object({name: z.string().min(1).max(30), type: z.enum(['text', 'number', 'select', 'check', 'date']), options: z.array(z.string().min(1).max(30)).max(30).optional()});
+/** Properties by name: an existing one keeps its id (so values stay), new ones get an id. */
+function mergeProps(current: PropDef[], input: z.infer<typeof propIn>[]): PropDef[] {
+  return input.map(p => ({id: current.find(c => c.name === p.name)?.id ?? newPropId(), name: p.name, type: p.type, options: p.type === 'select' ? p.options ?? [] : []}));
+}
+/** A tasks widget may name its group property; store the property id. Table columns get ids too. */
+function fixGroupBy(spec: PlannerSpec) {
+  for (const w of [...(spec.canvas.day ?? []), ...(spec.tabs ?? []).flatMap(t => t.widgets ?? [])]) {
+    if (w.type === 'tasks' && typeof w.options.groupBy === 'string') { const d = spec.props.task.find(p => p.name === w.options.groupBy); if (d) w.options.groupBy = d.id; }
+    if (w.type === 'table' && Array.isArray(w.options.columns)) w.options.columns = (w.options.columns as {id?: string; name: string; type?: string; options?: string[]}[]).slice(0, 20).map(c => ({id: c.id && /^[a-z0-9]{1,24}$/.test(c.id) ? c.id : newPropId(), name: String(c.name).slice(0, 30), type: ['text', 'number', 'select', 'check', 'date'].includes(c.type ?? '') ? c.type : 'text', options: c.type === 'select' ? c.options ?? [] : []}));
+  }
+}
 const month = z.string().regex(/^\d{4}-\d{2}$/);
 
 async function ensureSettings(owner: string, tz?: string) {
@@ -46,20 +63,29 @@ export function registerPlannerTools(tool: Tool) {
     const planner = await getSpec(owner), settings = await getSettings(owner), records = await allRecords(owner);
     const count = (k: string) => records.filter(r => r.kind === k).length;
     return {url: plannerUrl(), exists: !!planner, version: planner?.version ?? null, name: planner?.spec.name ?? null,
-      widgets: planner?.spec.canvas?.day ?? null, skin: planner?.spec.skin ?? null, settings: settings.configured ? {tz: settings.tz, dayBoundary: settings.dayBoundary} : null,
+      widgets: planner?.spec.canvas?.day ?? null, skin: planner?.spec.skin ?? null,
+      tabs: planner ? tabsOf(planner.spec as PlannerSpec).map(t => ({name: t.name, kind: t.kind, widgets: t.widgets?.length ?? undefined})) : null, taskProps: (planner?.spec as PlannerSpec | undefined)?.props?.task ?? [],
+      tables: planner ? [...((planner.spec as PlannerSpec).canvas?.day ?? []), ...((planner.spec as PlannerSpec).tabs ?? []).flatMap(t => t.widgets ?? [])].filter(w => w.type === 'table').map(w => ({id: w.id, title: w.title ?? null, columns: w.options.columns ?? []})) : [], settings: settings.configured ? {tz: settings.tz, dayBoundary: settings.dayBoundary} : null,
       records: {goals: count('goal'), tasks: count('task'), routines: count('routine'), personas: count('persona')}};
   });
 
   tool('build_planner', '플래너를 만들거나 바꾼다(새 버전, 기록은 그대로). widgets는 위젯 배치(guide 참고), skin은 바꿀 스킨 값만. 사용자에게 계획을 보여 주고 OK를 받은 뒤에 부른다.',
     {name: z.string().max(40).optional(), widgets: z.array(looseWidget).min(1).max(80), skin: z.record(z.unknown()).optional(), skinPreset: z.string().optional(),
-      weekLayout: z.enum(['horizontal', 'vertical']).optional(), timezone: z.string().optional(), mode: z.enum(['free', 'grid']).optional()},
-    async ({name, widgets, skin, skinPreset, weekLayout, timezone, mode}, owner) => {
+      weekLayout: z.enum(['horizontal', 'vertical']).optional(), timezone: z.string().optional(), mode: z.enum(['free', 'grid']).optional(),
+      tabs: z.array(z.object({name: z.string().min(1).max(20), kind: z.enum(['today', 'week', 'month', 'goals', 'insights', 'page']), widgets: z.array(looseWidget).max(80).optional()})).min(1).max(20).optional(),
+      taskProps: z.array(propIn).max(20).optional()},
+    async ({name, widgets, skin, skinPreset, weekLayout, timezone, mode, tabs, taskProps}, owner) => {
       await ensureSettings(owner, timezone);
       const current = (await getSpec(owner))?.spec as PlannerSpec | undefined;
       const preset = SKIN_PRESETS.find(p => p.id === skinPreset)?.skin;
       const {spec, dropped} = buildSpec(current ?? null, {name, widgets, skin: {...(preset ?? {}), ...(skin ?? {})}, weekLayout, mode});
+      if (taskProps) spec.props = {task: mergeProps(current?.props?.task ?? [], taskProps)};
+      if (tabs) spec.tabs = tabs.map((t, i) => ({id: t.kind === 'page' ? `p-${i}-${Date.now().toString(36)}` : (tabs.findIndex(x => x.kind === t.kind) === i ? t.kind : `${t.kind}-${i}`), name: t.name, kind: t.kind,
+        ...(t.kind === 'page' ? {widgets: toFree(normalizeWidgets(t.widgets ?? []).widgets)} : {})}));
+      else if (current?.tabs) spec.tabs = current.tabs;
+      fixGroupBy(spec);
       const saved = await saveSpec(owner, spec);
-      return {url: plannerUrl(), version: saved.version, widgets: spec.canvas.day!.map(w => `${w.type}@${w.x},${w.y} ${w.w}×${w.h}`), ignored: dropped,
+      return {url: plannerUrl(), version: saved.version, widgets: spec.canvas.day!.map(w => `${w.id} ${w.type}@${w.x},${w.y} ${w.w}×${w.h}`), tabs: tabsOf(spec).map(t => t.name), taskProps: spec.props.task.map(p => p.name), ignored: dropped,
         note: '사용자에게 주소를 알려 주고, 화면에서 "꾸미기"로 직접 옮기고 꾸밀 수 있다고 말한다.'};
     });
 
@@ -82,23 +108,36 @@ export function registerPlannerTools(tool: Tool) {
         weeklyFocusMin: s.weeklyMin, bottlenecks: s.bottlenecks.map(b => ({month: b.month, needMin: b.demandMin, haveMin: b.capacityMin, goals: b.goals})), url: plannerUrl()};
     });
 
-  tool('add_items', '할 일·루틴·페르소나를 플래너에 넣는다. 할 일은 day(없으면 오늘), goalId로 목표에 이으면 체크가 진행률이 된다. fixedStart/fixedEnd(HH:MM)면 고정 일정.',
+  tool('add_items', '할 일·루틴·페르소나·표의 줄을 플래너에 넣는다. 할 일 props와 표 cells는 속성·열 이름으로 보낸다. 할 일은 day(없으면 오늘), goalId로 목표에 이으면 체크가 진행률이 된다. fixedStart/fixedEnd(HH:MM)면 고정 일정.',
     {tasks: z.array(z.object({title: z.string().min(1).max(200), day: day.optional(), category: z.enum(['must', 'want', 'leisure']).optional(), estimateMin: z.number().int().min(1).max(1440).optional(),
-      goalId: z.string().optional(), fixedStart: z.string().regex(/^\d{2}:\d{2}$/).optional(), fixedEnd: z.string().regex(/^\d{2}:\d{2}$/).optional()})).max(50).optional(),
+      goalId: z.string().optional(), fixedStart: z.string().regex(/^\d{2}:\d{2}$/).optional(), fixedEnd: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+      props: z.record(cell).optional()})).max(50).optional(),
+      rows: z.array(z.object({table: z.string().min(1).max(60), day: day.optional(), name: z.string().max(500).optional(), cells: z.record(cell).optional()})).max(100).optional(),
       routines: z.array(z.object({title: z.string().min(1).max(200), mode: z.enum(['pick_daily', 'fixed_all']).optional(), goalId: z.string().optional(), weekdays: z.array(z.number().int().min(0).max(6)).optional()})).max(30).optional(),
       personas: z.array(z.object({name: z.string().min(1).max(40), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional()})).max(10).optional()},
-    async ({tasks, routines, personas}, owner) => {
+    async ({tasks, routines, personas, rows}, owner) => {
       const settings = await ensureSettings(owner), today = logicalDay(new Date(), settings);
+      const spec = (await getSpec(owner))?.spec as PlannerSpec | undefined;
+      const defs = spec?.props?.task ?? [];
+      // Property and column values arrive by name; stored by id.
+      const byName = (list: PropDef[], values: Record<string, unknown> | undefined) => Object.fromEntries(Object.entries(values ?? {}).flatMap(([k, v]) => { const d = list.find(x => x.name === k || x.id === k); return d ? [[d.id, v]] : []; }));
       const src = {type: 'planner' as const, ref: 'claude', confirmed: true};
       const at = (d: string, hm: string) => new Date(`${d}T${hm}:00${offset(settings.tz, d)}`).toISOString();
       const made = {tasks: 0, routines: 0, personas: 0};
       for (const t of tasks ?? []) {
         const d = t.day ?? today, fixed = t.fixedStart && t.fixedEnd ? {fixed: true, start: {value: at(d, t.fixedStart), precision: 'minute'}, end: {value: at(d, t.fixedEnd), precision: 'minute'}} : {};
-        await writeRecord(owner, null, {kind: 'task', logicalDay: d, body: {title: t.title, category: t.category ?? null, goalIds: t.goalId ? [t.goalId] : [], plan: {state: 'committed', estimateMin: t.estimateMin ?? null, ...fixed}}, source: src}); made.tasks++;
+        await writeRecord(owner, null, {kind: 'task', logicalDay: d, body: {title: t.title, category: t.category ?? null, goalIds: t.goalId ? [t.goalId] : [], props: byName(defs, t.props), plan: {state: 'committed', estimateMin: t.estimateMin ?? null, ...fixed}}, source: src}); made.tasks++;
       }
       for (const r of routines ?? []) { await writeRecord(owner, null, {kind: 'routine', body: {title: r.title, mode: r.mode ?? 'pick_daily', goalIds: r.goalId ? [r.goalId] : [], recurrence: r.weekdays?.length ? {freq: 'weekly', byWeekday: r.weekdays} : {freq: 'daily'}}, source: src}); made.routines++; }
       for (const p of personas ?? []) { await writeRecord(owner, null, {kind: 'persona', body: {name: p.name, ...(p.color ? {color: p.color} : {})}, source: src}); made.personas++; }
-      return {...made, url: plannerUrl()};
+      const tables = [...(spec?.canvas?.day ?? []), ...(spec?.tabs ?? []).flatMap(t => t.widgets ?? [])].filter(w => w.type === 'table');
+      let rowsMade = 0;
+      for (const r of rows ?? []) {
+        const w = tables.find(x => x.id === r.table || (x.title ?? '') === r.table);
+        if (!w) throw new WorkspaceError(404, `표를 찾지 못했어요: ${r.table}. get_planner의 tables에서 id나 제목을 고른다.`);
+        await writeRecord(owner, null, {kind: 'note', logicalDay: r.day ?? today, body: {text: r.name ?? '', signifier: 'row', table: w.id, cells: byName((w.options.columns as PropDef[] | undefined) ?? [], r.cells)}, source: src}); rowsMade++;
+      }
+      return {...made, rows: rowsMade, url: plannerUrl()};
     });
 
   tool('get_today', '사용자의 오늘(또는 지금) 상태: 할 일과 결과, 목표 진행률, 지금 집중 중인 일, 컨디션·수면.', {}, async (_a, owner) => {

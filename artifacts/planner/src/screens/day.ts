@@ -1,10 +1,15 @@
 import type {LifeRecord, Settings, Task} from '@workspace/life-contract';
+import type {PlannerSpec} from '@workspace/planner-spec';
 import type {Planner} from '../data.ts';
 import type {Timer} from './Focus.tsx';
 
 // Shared by every day layout (no JSX, no imports back into the screens: keeps module init order safe).
 export type Nav = {day: string; setDay: (d: string) => void; openGoal: (id: string) => void};
-export type Ctx = {p: Planner; day: string; nav: Nav; now: () => string; timer: Timer | null; color: (k: string) => string; settings?: Settings};
+export type Ctx = {p: Planner; day: string; nav: Nav; now: () => string; timer: Timer | null; color: (k: string) => string; settings?: Settings;
+  // The page being shown and a way to change it in place (add a property, a table column…). Absent in read-only mockups.
+  spec?: PlannerSpec; saveSpec?: (change: (s: PlannerSpec) => PlannerSpec) => Promise<void>;
+  // The editor shows examples where real data is missing, so a style change is visible.
+  preview?: boolean};
 export const MARK: Record<string, string> = {done: '○', partial: '△', missed: '×', in_progress: '◐', postponed: '→', cancelled: '–', unknown: ''};
 export const NEXT: Record<string, Task['outcome']['result']> = {unknown: 'done', in_progress: 'done', done: 'partial', partial: 'missed', missed: 'unknown'};
 export const saveTask = (ctx: Ctx, t: LifeRecord<'task'>, patch: Partial<Task>) => ctx.p.write(t.id, {kind: 'task', logicalDay: t.logicalDay, body: {...t.body, ...patch}, baseRevision: t.revision});

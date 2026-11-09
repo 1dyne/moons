@@ -808,3 +808,72 @@ button.ghost:hover{background:color-mix(in srgb,var(--ink) 7%,transparent)}
 .tip-x{flex:none;width:18px;height:18px;padding:0;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:12px;line-height:1;display:grid;place-items:center}
 .tip-x:hover{border-color:var(--ink);color:var(--ink);background:transparent}
 h3 .tip{margin-left:6px}
+
+/* Editor: always three steady columns (widgets | page | settings), so nothing jumps when a widget is picked. */
+.ed-body,.ed-body:has(.ed-inspect),.ed-body:not(:has(.ed-inspect)){grid-template-columns:240px minmax(0,1fr) 250px}
+.ed-inspect.empty{min-height:80px;align-content:start}
+.ed-page{font-family:var(--mono);font-size:13px}
+.ed-labels{display:grid;gap:6px;border-top:1px solid var(--line);padding-top:6px}
+.ed-labels summary{cursor:pointer;font-size:13px}
+.ed-labels label{display:grid;gap:2px;font-size:12px;color:var(--muted)}
+@media (max-width:1100px){.ed-body,.ed-body:has(.ed-inspect),.ed-body:not(:has(.ed-inspect)){grid-template-columns:1fr}.ed-inspect.empty{display:none}}
+
+/* Focus timer follows the widget's own colours (위젯 바탕·글자); otherwise ink on surface, inverted. */
+.focus-bar{background:var(--wg-bg,var(--ink,#151515));color:var(--wg-ink,var(--surface,#f5f5f1))}
+.focus-bar .muted,.focus-bar .muted.small{color:currentColor;opacity:.7}
+.focus-bar .chip{color:inherit;border-color:currentColor;background:transparent}
+.label-in{color:inherit;border-color:currentColor;background:transparent}
+.label-in::placeholder{color:currentColor;opacity:.55}
+.focus-bar .stop{background:var(--signal,#f2c230);color:#151515}
+
+/* Tabs: Notion-like pages. */
+.tabs{display:flex;flex-wrap:wrap;width:auto;max-width:100%}
+.tabs .tab{position:relative;display:inline-flex;align-items:stretch}
+.tabs .tab+.tab{border-left:1px solid var(--ink)}
+.tabs button+button{border-left:0}
+.tabs .tab>button[role=tab]{border:0;padding:7px 16px;font-family:var(--mono);font-size:13px;background:none;color:var(--ink)}
+.tabs .tab.on{background:var(--ink)}
+.tabs .tab.on>button[role=tab],.tabs .tab.on>.tab-more{color:var(--bg)}
+.tabs .tab-more{border:0;background:none;padding:0 8px 0 0;font-size:13px}
+.tabs .tab form{display:flex}
+.tabs .tab input{width:110px;border:0;border-radius:0;padding:6px 10px;font-size:13px}
+.tabs .tab-add>button{border:0;background:none;padding:6px 12px;font-size:15px;color:var(--ink)}
+.tab-menu{position:absolute;top:100%;left:-1px;z-index:30;display:grid;min-width:140px;background:var(--surface,#f5f5f1);border:1px solid var(--ink);margin-top:1px}
+.tab-menu button{border:0;border-bottom:1px solid var(--line);text-align:left;padding:7px 12px;font-size:13px;font-family:inherit;color:var(--ink);background:none}
+.tab-menu button:last-child{border-bottom:0}
+.tab-menu button.danger{color:var(--red)}
+.tabs .tab[draggable=true]{cursor:grab}
+.page-empty{padding:24px 0}
+
+/* User-made properties and the table (DB) widget. */
+.prop-form{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 0}
+.prop-form input{min-width:0;flex:1 1 120px;padding:4px 8px;font-size:13px}
+.prop-form select{padding:4px 6px;font-size:13px}
+.props-bar{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding-top:6px;border-top:1px dashed var(--line);margin-top:6px}
+.prop-chip{border:1px solid var(--line)!important;font-size:12px}
+.prop-val{font-size:12px;font-family:var(--mono);border:1px solid var(--line);padding:0 6px}
+.prop-val em{font-style:normal;color:var(--muted)}
+.prop-edit select,.prop-edit input{padding:3px 6px;font-size:13px}
+.dbt{display:grid;gap:6px;min-width:0}
+.dbt-scroll{overflow-x:auto}
+.dbt table{width:100%;border-collapse:collapse;font-size:13px}
+.dbt th{text-align:left;font-weight:500;border-bottom:1.5px solid var(--ink);padding:4px 6px;white-space:nowrap;vertical-align:bottom}
+.dbt th .th{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.dbt th .th:disabled{opacity:1;cursor:default}
+.dbt td{border-bottom:1px solid var(--line);padding:2px 4px}
+.dbt td input:not([type=checkbox]),.dbt td select{width:100%;border:0;border-radius:0;background:transparent;padding:4px 2px;font-size:13px;min-width:70px}
+.dbt td input:focus{outline:1px solid var(--ink)}
+.dbt-add{width:1%}
+.dbt-new{justify-self:start}
+
+/* First run: blank note or an example planner. */
+.onboarding{display:grid;gap:22px;padding-top:40px;max-width:560px}
+.start-ways{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.start-way{display:grid;gap:6px;text-align:left;padding:18px;border:1px solid var(--ink);background:var(--surface,#f5f5f1)}
+.start-way strong{font-size:17px}
+.start-way span{font-size:13px;color:var(--muted)}
+.start-way.primary-way{background:var(--ink);color:var(--bg)}
+.start-way.primary-way span{color:inherit;opacity:.75}
+.gauge-pick .gauge:not(.g-number){flex-direction:column;align-items:flex-start;gap:6px}
+.gauge-pick .g-val{text-align:left;min-width:0}
+.tabs{width:max-content}

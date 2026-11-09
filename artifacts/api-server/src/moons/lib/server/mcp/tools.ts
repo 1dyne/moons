@@ -95,12 +95,22 @@ export function proposalData(a: Proposal) {
   return {title: a.title, why: a.why, subQuestions: a.subQuestions};
 }
 
-export function registerTools(server: McpServer) {
-  const tool = <S extends z.ZodRawShape>(name: string, description: string, shape: S, run: (args: z.infer<z.ZodObject<S>>, owner: string) => Promise<unknown>) =>
+/** Registers one tool on a server: the caller's account comes from the OAuth token, errors come back as tool errors. */
+export function bindTool(server: McpServer, failText = 'MOONS could not do this.') {
+  return <S extends z.ZodRawShape>(name: string, description: string, shape: S, run: (args: z.infer<z.ZodObject<S>>, owner: string) => Promise<unknown>) =>
     (server.registerTool.bind(server) as (n: string, c: unknown, cb: unknown) => unknown)(name, {description, inputSchema: shape}, (async (args: unknown, extra: unknown) => {
       try { return out(await run(args as z.infer<z.ZodObject<S>>, ownerOf(extra as {authInfo?: {extra?: Record<string, unknown>}}))); }
-      catch (e) { return {...out(e instanceof WorkspaceError ? e.message : 'MOONS could not do this.'), isError: true}; }
+      catch (e) { return {...out(e instanceof WorkspaceError ? e.message : failText), isError: true}; }
     }) as never) as unknown;
+}
+
+/** The lit connector: only the diary tools, under lit's own name. */
+export function registerLitTools(server: McpServer) {
+  registerPlannerTools(bindTool(server, 'lit could not do this.'));
+}
+
+export function registerTools(server: McpServer) {
+  const tool = bindTool(server);
 
   tool('moons_guide', 'MOONS 도구 규칙과 최신 버전. 다른 도구보다 먼저 한 번 호출한다.', {}, async () => guide());
   // The planner Satellite: Claude builds and fills the user's planner from the conversation.

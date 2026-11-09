@@ -36,3 +36,25 @@ test('Claude builds a planner from the conversation, then fills it; the guide li
   const rebuilt = await call('build_planner', {widgets: [{type: 'bullet'}]});
   assert.equal(rebuilt.version, 2); assert.equal((await allRecords(owner)).length, records.length, 'rebuilding keeps every record');
 });
+
+test('lit connector: tabs, named task properties and a table the user can fill from chat', async () => {
+  await call('build_planner', {widgets: [{type: 'tasks', options: {groupBy: '과목'}}], taskProps: [{name: '과목', type: 'select', options: ['언어', '추리']}],
+    tabs: [{name: '오늘', kind: 'today'}, {name: '공부 기록', kind: 'page', widgets: [{type: 'table', title: '기출', options: {firstName: '회차', scope: 'all', columns: [{name: '점수', type: 'number'}, {name: '오답', type: 'text'}]}}]}, {name: '목표', kind: 'goals'}]});
+  const spec = (await getSpec(owner))!.spec;
+  assert.deepEqual(spec.tabs!.map(t => t.name), ['오늘', '공부 기록', '목표']);
+  const subj = spec.props.task[0]!;
+  assert.equal(subj.name, '과목'); assert.equal(spec.canvas.day![0]!.options.groupBy, subj.id, 'groupBy by name becomes the property id');
+  const table = spec.tabs![1]!.widgets![0]!;
+  const got = await call('get_planner', {});
+  assert.equal((got.tables as {id: string}[])[0]!.id, table.id);
+  await call('add_items', {tasks: [{title: '2024 언어', props: {과목: '언어'}}], rows: [{table: '기출', name: '2024', cells: {점수: 62, 오답: '3, 17'}}]});
+  const records = await allRecords(owner);
+  const t = records.find(r => r.kind === 'task' && (r.body as {title: string}).title === '2024 언어')!;
+  assert.equal((t.body as {props: Record<string, unknown>}).props[subj.id], '언어');
+  const row = records.find(r => r.kind === 'note' && (r.body as {signifier: string}).signifier === 'row')!;
+  const cols = table.options.columns as {id: string; name: string}[];
+  assert.equal((row.body as {cells: Record<string, unknown>}).cells[cols.find(c => c.name === '점수')!.id], 62);
+  // Rebuilding the day page without tabs keeps the user's tabs.
+  await call('build_planner', {widgets: [{type: 'tasks'}]});
+  assert.equal((await getSpec(owner))!.spec.tabs!.length, 3);
+});

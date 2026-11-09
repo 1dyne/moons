@@ -4,6 +4,7 @@ import type {ModuleSpec} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
 import {hm} from './Focus.tsx';
 import {Scale} from './Scale.tsx';
+import {Tip} from '../Tip.tsx';
 export {Scale};
 
 // Morning ritual: energy on waking (1–10) and today's fixed appointments → how much the day can really hold.
@@ -31,7 +32,7 @@ export function CheckIn({m, p, day, now}: {m: ModuleSpec; p: Planner; day: strin
         <span className="ptitle">{t.body.title}</span><button className="ghost small" onClick={() => p.remove(t.id)} aria-label={`${t.body.title} 지우기`}>✕</button></li>)}</ul>
       <form className="padd" onSubmit={e => { e.preventDefault(); void addFixed(); }}>
         <input type="time" value={from} onChange={e => setFrom(e.target.value)} aria-label="시작" className="time-in" />–<input type="time" value={to} onChange={e => setTo(e.target.value)} aria-label="끝" className="time-in" />
-        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="수업, 회의, 약속…" aria-label="고정 일정" /><button className="small">추가</button>
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="고정 일정" aria-label="고정 일정" /><button className="small">추가</button>
       </form>
     </div>
     <div className="capacity" aria-label="오늘 가용 시간">
@@ -41,13 +42,14 @@ export function CheckIn({m, p, day, now}: {m: ModuleSpec; p: Planner; day: strin
         <i className="cap-plan" style={{left: `calc(${pct(cap.fixedMin)})`, width: pct(cap.planned)}} title={`계획 ${hm(cap.planned)}`} />
       </div>
       <p className="cap-text">
-        깨어 있는 {hm(cap.awake)} − 고정 {hm(cap.fixedMin)} = <strong>{hm(cap.free)}</strong>
-        {w ? <> · 에너지 {w.body.energy} → 현실적인 집중 <strong>{hm(cap.realistic)}</strong></> : <> · 에너지를 고르면 현실적인 양을 계산해요</>}
+        <span className="k">가용</span> <strong>{hm(cap.free)}</strong>
+        {w && <> · <span className="k">현실 집중</span> <strong>{hm(cap.realistic)}</strong></>}
+        <Tip id="checkin-math"> 깨어 있는 {hm(cap.awake)} − 고정 {hm(cap.fixedMin)}. 에너지를 고르면 현실적인 집중량을 계산해요.</Tip>
       </p>
       {w && <p className={`cap-verdict ${cap.over ? 'over' : 'ok'}`}>
-        {cap.over ? <>계획한 할 일 {hm(cap.planned)} — 오늘 할 수 있는 양보다 <strong>{hm(cap.over)}</strong> 많아요. 덜 급한 일을 내일로 옮겨 보세요.</>
+        {cap.over ? <>계획 {hm(cap.planned)} · <strong>{hm(cap.over)}</strong> 초과</>
           : <>계획 {hm(cap.planned)} · 여유 {hm(cap.realistic - cap.planned)}</>}
-        {cap.unestimated > 0 && <span className="muted"> (예상 시간이 없는 할 일 {cap.unestimated}개는 빠졌어요)</span>}
+        {cap.unestimated > 0 && <Tip id="checkin-unestimated"> 예상 시간이 없는 할 일 {cap.unestimated}개는 빠졌어요</Tip>}
       </p>}
     </div>
   </div>;

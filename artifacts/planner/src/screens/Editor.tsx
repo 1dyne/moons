@@ -1,6 +1,6 @@
 import {useMemo, useState} from 'react';
 import {logicalDay, type Settings} from '@workspace/life-contract';
-import {FONTS, METRICS, PALETTE, SKIN_PRESETS, Skin, WIDGETS, applyCanvas, fontInfo, isDecor, minSize, placeNew, settle, toFree, toGrid, widgetInfo, type CanvasMode, type PlannerSpec, type WidgetType, type Widget} from '@workspace/planner-spec';
+import {CHECKS, DONE_STYLES, FONTS, METRICS, PALETTE, SKIN_PRESETS, Skin, WIDGETS, applyCanvas, fontInfo, isDecor, minSize, placeNew, settle, toFree, toGrid, widgetInfo, type CanvasMode, type PlannerSpec, type WidgetType, type Widget} from '@workspace/planner-spec';
 import {useFontFamily} from '../fonts.ts';
 import {ofKind, type Planner} from '../data.ts';
 import {DayCanvas, canvasOf, modeOf, skinProps} from './Canvas.tsx';
@@ -150,6 +150,18 @@ function SkinPanel({skin, setSkin}: {skin: Skin; setSkin: (s: Skin) => void}) {
     <div className="sk-presets">{SKIN_PRESETS.map(pr => <button key={pr.id} className="sk-preset" onClick={() => setSkin(pr.skin)} style={{background: pr.skin.background, color: pr.skin.ink, borderColor: pr.skin.accent}}><i style={{background: pr.skin.accent}} />{pr.name}</button>)}</div>
     <span className="muted small">진행률 모양 <em className="sk-note">목표·월간·진행률 위젯이 모두 이 모양으로 보여요</em></span>
     <GaugePicker value={skin.gauge ?? 'segment'} onChange={g => set({gauge: g})} />
+    <span className="muted small">체크 모양</span>
+    <div className="style-pick" role="radiogroup" aria-label="체크 모양">
+      {CHECKS.map(c => <button key={c.id} type="button" role="radio" aria-checked={(skin.check ?? 'box') === c.id} className={`check-${c.id} ${(skin.check ?? 'box') === c.id ? 'on' : ''}`} onClick={() => set({check: c.id})}>
+        <span className="prow done"><span className="mark">○</span></span><span className="prow"><span className="mark" /></span><span>{c.name}</span>
+      </button>)}
+    </div>
+    <span className="muted small">완료한 일 표시</span>
+    <div className="style-pick" role="radiogroup" aria-label="완료한 일 표시">
+      {DONE_STYLES.map(d => <button key={d.id} type="button" role="radio" aria-checked={(skin.done ?? 'red-strike') === d.id} className={`done-${d.id} ${(skin.done ?? 'red-strike') === d.id ? 'on' : ''}`} onClick={() => set({done: d.id})}>
+        <span className="prow done"><span className="pname">단어 30개</span></span><span>{d.name}</span>
+      </button>)}
+    </div>
     <span className="muted small">강조 색 <em className="sk-note">계기판의 지금 채우는 칸·넘친 시간에 쓰여요</em></span>
     <div className="swatches">{SWATCHES.map(c => <button key={c} className={`swatch ${skin.accent === c ? 'on' : ''}`} style={{background: c}} onClick={() => set({accent: c})} aria-label={`강조 색 ${c}`} />)}</div>
     <div className="sk-colors">{color('accent', '강조')}{color('background', '바탕')}{color('surface', '위젯')}{color('ink', '글자')}</div>

@@ -42,6 +42,8 @@ export const TaskBody = z.object({
   projectId: z.string().nullable().default(null),
   routineId: z.string().nullable().default(null),
   personaIds: z.array(z.string()).max(10).default([]),
+  // Highlighter pen the user put on this task (diary look only; no meaning for progress).
+  highlight: z.enum(['yellow', 'pink', 'green', 'blue']).nullable().default(null),
   plan: z.object({
     state: z.enum(['planned', 'committed', 'dropped']).default('planned'),
     due: when.nullable().default(null),

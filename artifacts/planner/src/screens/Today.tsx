@@ -9,6 +9,7 @@ import {MARK, NEXT, moveTo, outcome, saveTask, type Ctx, type Nav} from './day.t
 export {MARK, NEXT, moveTo, outcome, saveTask, type Ctx, type Nav} from './day.ts';
 import {BulletDay, HourlyDay, OnePageDay} from './DayLayouts.tsx';
 import {Gauge} from '../Gauge.tsx';
+import {HIGHLIGHTS} from '@workspace/planner-spec';
 export {parseEntry, parseTarget} from '../parse.ts';
 
 const CATEGORY: Record<string, string> = {must: '꼭', want: '하고 싶은', leisure: '여가'};
@@ -50,7 +51,7 @@ export function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
   const groups = cats ? (['must', 'want', 'leisure', null] as const).map(c => [c, tasks.filter(t => t.body.category === c)] as const).filter(([, l]) => l.length) : [[null, tasks] as const];
   const done = tasks.filter(t => t.body.outcome.result === 'done').length, live = tasks.filter(t => !['cancelled', 'postponed'].includes(t.body.outcome.result)).length;
   return <>
-    {tasks.length > 0 && <p className="tally muted small">{done}/{live} 완료 · 동그라미를 누르면 ○ → △ → × 순서로 바뀌어요</p>}
+    {tasks.length > 0 && <p className="tally muted small">{done}/{live} 완료 · 체크 칸을 누를 때마다 완료 → 일부 → 못 함 → 처음으로</p>}
     {tasks.length === 0 && <p className="muted">아직 오늘 할 일이 없어요. 아래에 적어 보세요.</p>}
     {groups.map(([c, list]) => <div key={String(c)} className="task-group">
       {cats && c && <span className={`cat cat-${c}`}>{CATEGORY[c]}</span>}
@@ -82,7 +83,9 @@ function TaskRow({t, ctx}: {t: LifeRecord<'task'>; ctx: Ctx}) {
     ...(result === 'unknown' ? {completedAt: null, amount: null, unit: null, reason: null} : {}), ...extra,
   }));
   const fixed = ['postponed', 'cancelled'].includes(o.result);
-  return <li className={`prow ${o.result} ${running ? 'running' : ''}`} style={{'--c': color(t.id)} as React.CSSProperties}>
+  const hl = HIGHLIGHTS.find(h => h.id === t.body.highlight);
+  const pen = (id: Task['highlight']) => saveTask(ctx, t, {...t.body, highlight: id});
+  return <li className={`prow ${o.result} ${running ? 'running' : ''} ${hl ? 'hl' : ''}`} style={{'--c': color(t.id), ...(hl ? {'--hl': hl.color} : {})} as React.CSSProperties}>
     <button className="mark" disabled={fixed} onClick={() => set(NEXT[o.result] ?? 'unknown')} aria-label={`${t.body.title}: ${RESULT[o.result]}. 눌러서 바꾸기`}>{MARK[o.result]}</button>
     <span className="ptitle">
       <span className="pname">{t.body.title}</span>
@@ -108,6 +111,9 @@ function TaskRow({t, ctx}: {t: LifeRecord<'task'>; ctx: Ctx}) {
       <button className="small" onClick={() => moveTo(ctx, t, addDays(t.logicalDay!, 1))}>내일로 →</button>
       <button className="small" onClick={() => set('cancelled', {reason: reason.trim() || null})}>취소</button>
       {o.result !== 'unknown' && <button className="small" onClick={() => set('unknown')}>되돌리기</button>}
+      <span className="inline pens" role="group" aria-label="형광펜"><span className="muted small">형광펜</span>
+        {HIGHLIGHTS.map(h => <button key={h.id} className={`pen ${t.body.highlight === h.id ? 'on' : ''}`} style={{'--hl': h.color} as React.CSSProperties} aria-pressed={t.body.highlight === h.id} onClick={() => void pen(t.body.highlight === h.id ? null : h.id)} aria-label={`${h.name} 형광펜`} />)}
+        {t.body.highlight && <button className="small ghost" onClick={() => void pen(null)}>지우기</button>}</span>
       <button className="small danger" onClick={() => p.remove(t.id)}>지우기</button>
     </div>}
   </li>;

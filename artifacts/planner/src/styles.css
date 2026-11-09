@@ -760,3 +760,43 @@ button.ghost:hover{background:color-mix(in srgb,var(--ink) 7%,transparent)}
 .gauge-pick .g-ruler{width:72px}
 .gauge-pick .g-seg i{width:7px}
 .gauge-pick .gauge{flex-wrap:wrap;max-width:100%;row-gap:4px}
+
+/* Checkbox shapes (skin.check) — box is A안: a square box ticked in red pen. */
+.check-box .mark{border-radius:0;width:20px;height:20px;border:1.5px solid var(--ink);background:transparent;font-size:12px;position:relative;color:var(--ink)}
+.check-box .mark.static{border-style:dashed}
+.check-box .mark.mini{width:16px;height:16px}
+.check-box .prow.done .mark,.check-box .op-item.done .mark{color:transparent;border-color:var(--ink);background:transparent}
+.check-box .prow.done .mark:after,.check-box .op-item.done .mark:after{content:'';position:absolute;left:4px;top:-7px;width:7px;height:15px;border:solid var(--pen,#d0342c);border-width:0 2.6px 2.6px 0;transform:rotate(40deg);border-radius:0 0 2px 0}
+.check-box .prow.missed .mark{color:var(--pen,#d0342c);border-color:var(--ink);font-weight:700}
+.check-box .prow.partial .mark,.check-box .prow.in_progress .mark{background:linear-gradient(135deg,var(--ink) 0 50%,transparent 50%);color:transparent}
+.check-box .prow.in_progress .mark{background:linear-gradient(90deg,var(--signal,#f2c230) 0 50%,transparent 50%);border-color:var(--ink)}
+
+/* Finished words (skin.done). Each rule sets every property so nested samples (skin panel) stay true. */
+.done-red-strike .prow.done .pname,.done-red-strike .op-item.done,.done-red-strike .wk-task.done span,.style-pick button.done-red-strike .prow.done .pname{color:color-mix(in srgb,var(--ink) 70%,transparent);opacity:1;background:none;text-decoration:line-through;text-decoration-color:var(--pen,#d0342c);text-decoration-thickness:2px}
+.done-strike .prow.done .pname,.done-strike .op-item.done,.done-strike .wk-task.done span,.style-pick button.done-strike .prow.done .pname{color:var(--muted);opacity:1;background:none;text-decoration:line-through;text-decoration-color:var(--muted);text-decoration-thickness:1px}
+.done-fade .prow.done .pname,.done-fade .op-item.done,.done-fade .wk-task.done span,.style-pick button.done-fade .prow.done .pname{color:var(--ink);opacity:.38;background:none;text-decoration:none}
+.done-highlight .prow.done .pname,.done-highlight .op-item.done,.done-highlight .wk-task.done span,.style-pick button.done-highlight .prow.done .pname{color:var(--ink);opacity:1;text-decoration:none;background:linear-gradient(transparent 52%,color-mix(in srgb,var(--accent) 70%,transparent) 52% 92%,transparent 92%);padding:0 2px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+
+/* Highlighter pen the user puts on a task. */
+.prow.hl .pname{background:linear-gradient(transparent 45%,var(--hl) 45% 95%,transparent 95%);padding:0 3px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.done-highlight .prow.hl.done .pname{background:linear-gradient(transparent 45%,var(--hl) 45% 95%,transparent 95%)}
+.pens{gap:6px}
+.pen{width:22px;height:14px;padding:0;border:1px solid var(--ink);background:var(--hl);transform:skewX(-12deg)}
+.pen.on{outline:2px solid var(--ink);outline-offset:1px}
+
+.check-circle .mark,.style-pick button.check-circle .mark{border-radius:50%;width:28px;height:28px;font-size:17px;color:var(--ink);background:var(--surface,#f5f5f1)}
+.check-circle .prow.done .mark:after,.check-circle .op-item.done .mark:after,.style-pick button.check-circle .prow.done .mark:after{content:none}
+.check-circle .prow.done .mark,.style-pick button.check-circle .prow.done .mark{color:var(--ink)}
+.style-pick button.check-box .mark{border-radius:0;width:20px;height:20px;background:transparent}
+.style-pick button.check-box .prow.done .mark{color:transparent}
+.style-pick button.check-box .prow.done .mark:after{content:'';position:absolute;left:4px;top:-7px;width:7px;height:15px;border:solid var(--pen,#d0342c);border-width:0 2.6px 2.6px 0;transform:rotate(40deg)}
+.style-pick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.style-pick button{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px;border:1px solid var(--line);background:var(--surface,#f5f5f1);font-size:12px;text-align:left;min-width:0}
+.style-pick button.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink),inset 4px 0 0 var(--signal)}
+.style-pick .prow{display:inline-flex;padding:0;border:0;gap:0}
+.style-pick .mark{pointer-events:none}
+.style-pick .pname{font-size:13px}
+.prow.hl .pname,.done-highlight .prow.done .pname,.style-pick .pname{width:fit-content;justify-self:start}
+.gauge-pick .gauge{row-gap:9px}
+.prow.hl .pname{background:linear-gradient(transparent 45%,var(--hl) 45% 95%,transparent 95%)!important;padding:0 3px}
+.style-pick .pname{white-space:nowrap}

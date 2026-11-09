@@ -21,7 +21,7 @@ export function skinProps(skin: Skin | undefined) {
   if (!skin) return {className: '', style: {}};
   const font = useFontFamily(skin.font);
   return {
-    className: `skin paper-${skin.paper} heading-${skin.heading} font-${skin.font} ${isDark(skin.background) ? 'mood-night skin-dark' : ''}`,
+    className: `skin paper-${skin.paper} heading-${skin.heading} font-${skin.font} check-${skin.check ?? 'box'} done-${skin.done ?? 'red-strike'} ${isDark(skin.background) ? 'mood-night skin-dark' : ''}`,
     style: {'--accent': skin.accent, '--bg': skin.background, '--surface': skin.surface, '--ink': skin.ink, '--radius': `${skin.radius}px`, '--font': font, background: skin.background, color: skin.ink} as React.CSSProperties,
   };
 }

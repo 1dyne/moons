@@ -129,17 +129,24 @@ export const Skin = z.object({
   card: z.enum(['card', 'line', 'plain', 'filled']).default('line'),
   heading: z.enum(['rule', 'pill', 'plain']).default('rule'),
   gauge: z.enum(GAUGE_IDS).default('segment'),
+  check: z.enum(['box', 'circle']).default('box'),
+  done: z.enum(['red-strike', 'strike', 'fade', 'highlight']).default('red-strike'),
 });
+/** Checkbox shape: A안 square box with a red pen tick, or the ○△× circle. */
+export const CHECKS = [{id: 'box', name: '네모 상자 (빨간 펜 체크)'}, {id: 'circle', name: '동그라미 ○△×'}] as const;
+/** How a finished item's words look. */
+export const DONE_STYLES = [{id: 'red-strike', name: '빨간 취소선'}, {id: 'strike', name: '회색 취소선'}, {id: 'fade', name: '흐리게'}, {id: 'highlight', name: '형광펜'}] as const;
+export const HIGHLIGHTS = [{id: 'yellow', name: '노랑', color: '#ffe066'}, {id: 'pink', name: '분홍', color: '#ffb3c7'}, {id: 'green', name: '연두', color: '#b8e994'}, {id: 'blue', name: '하늘', color: '#a8d8ff'}] as const;
 export type Skin = z.infer<typeof Skin>;
 export const SKIN_PRESETS: {id: string; name: string; skin: Skin}[] = [
   {id: 'panel', name: '계기판', skin: Skin.parse({})},
   {id: 'panel-dark', name: '계기판 다크', skin: Skin.parse({background: '#151515', surface: '#1f1f1d', ink: '#ecece7'})},
-  {id: 'calm', name: '차분한 미니멀', skin: Skin.parse({accent: '#3a66b8', background: '#ffffff', surface: '#ffffff', ink: '#252720', font: 'pretendard', radius: 14})},
-  {id: 'ivory', name: '아이보리 종이', skin: Skin.parse({accent: '#a0784a', background: '#fbf6ea', surface: '#fffcf4', ink: '#3b342a', font: 'gowun-batang', radius: 6, card: 'line', gauge: 'bar'})},
-  {id: 'study', name: '스터디 모눈', skin: Skin.parse({accent: '#00838f', background: '#ffffff', surface: '#ffffff', ink: '#252720', font: 'pretendard', paper: 'grid', radius: 4, card: 'card', heading: 'rule'})},
-  {id: 'deco', name: '다꾸 감성', skin: Skin.parse({accent: '#d98a8a', background: '#fff8f6', surface: '#ffffff', ink: '#252720', gauge: 'pips', paper: 'dot', font: 'gaegu', radius: 22, card: 'filled', heading: 'pill'})},
-  {id: 'mint', name: '민트 노트', skin: Skin.parse({accent: '#2f9585', background: '#f3faf8', surface: '#ffffff', ink: '#252720', font: 'pretendard', gauge: 'ring', radius: 18, card: 'card', heading: 'pill'})},
-  {id: 'night', name: '다크', skin: Skin.parse({accent: '#8aaaf8', background: '#1d2025', surface: '#24282e', ink: '#e7e8e2', font: 'pretendard', radius: 14, card: 'card'})},
+  {id: 'calm', name: '차분한 미니멀', skin: Skin.parse({accent: '#3a66b8', background: '#ffffff', surface: '#ffffff', ink: '#252720', font: 'pretendard', radius: 14, check: 'circle', done: 'strike'})},
+  {id: 'ivory', name: '아이보리 종이', skin: Skin.parse({accent: '#a0784a', background: '#fbf6ea', surface: '#fffcf4', ink: '#3b342a', font: 'gowun-batang', radius: 6, card: 'line', gauge: 'bar', check: 'circle', done: 'strike'})},
+  {id: 'study', name: '스터디 모눈', skin: Skin.parse({accent: '#00838f', background: '#ffffff', surface: '#ffffff', ink: '#252720', font: 'pretendard', paper: 'grid', radius: 4, card: 'card', heading: 'rule', check: 'circle', done: 'strike'})},
+  {id: 'deco', name: '다꾸 감성', skin: Skin.parse({accent: '#d98a8a', background: '#fff8f6', surface: '#ffffff', ink: '#252720', gauge: 'pips', paper: 'dot', font: 'gaegu', radius: 22, card: 'filled', heading: 'pill', check: 'circle', done: 'strike'})},
+  {id: 'mint', name: '민트 노트', skin: Skin.parse({accent: '#2f9585', background: '#f3faf8', surface: '#ffffff', ink: '#252720', font: 'pretendard', gauge: 'ring', radius: 18, card: 'card', heading: 'pill', check: 'circle', done: 'strike'})},
+  {id: 'night', name: '다크', skin: Skin.parse({accent: '#8aaaf8', background: '#1d2025', surface: '#24282e', ink: '#e7e8e2', font: 'pretendard', radius: 14, card: 'card', check: 'circle', done: 'strike'})},
 ];
 /** Dark backgrounds get the night rules (inputs, borders) automatically. */
 export function isDark(hex: string) {

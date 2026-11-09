@@ -9,6 +9,7 @@ import {WorkspaceError, now, type Entry, type Store} from '../v5/types.ts';
 import {addFeedback, addInbox, applyItem, changeStore, findConcept, listInbox, listRecords, openBatch, revisionDraft, rotateIntake, intakeStatus, storeRecord, type Satellite} from '../satellites/store.ts';
 import {examplesOf, matcher, ownUses} from '@workspace/moons-sync/terms';
 import {publicBase} from './oauth.ts';
+import {registerPlannerTools} from '../../../../life/mcp-tools.ts';
 
 export const GUIDE_VERSION = '2026-10-29.1';
 const guide = () => `MOONS MCP · 도구 설명 버전 ${GUIDE_VERSION}
@@ -21,6 +22,7 @@ MOONS는 사용자의 "아는 것"의 지식 베이스다. 노트(스파크=사�
 5. Satellite(사용자를 위한 웹·연습장)를 만들 때는 satellite_guide 를 먼저 읽고, register_satellite 로 등록해 받은 토큰으로 기록을 MOONS에 보내게 만든다.
 6. 사용자가 Satellite에서 한 결과는 get_records 로 읽고, 대화로 진단한 뒤 post_feedback 으로 남긴다. 노트로 남길 것은 propose(kind:"note") 또는 Satellite의 "MOONS에 추가" 버튼으로.
 7. claude.ai 아티팩트처럼 외부 주소로 요청을 못 보내는 Satellite는 add_record 도구로 기록을 보낸다(토큰 필요 없음).
+8. 사용자가 플래너·다이어리를 원하면 planner_guide 를 읽고 대화로 정한 뒤 build_planner 로 바로 만든다. 목표·할 일은 add_goal_plan / add_items.
 단어(term) 개념
 - 이름은 원형 단어(defray). 구 자체가 한 의미 단위일 때만 구(pull over, be backed up, vice versa).
 - 필드: headword, pos(v./n./adj./adv./phr.), meaningKo(짧게), forms(불규칙형·변형: ran, runs), collocations(defray the cost, reimburse A for B), pitfall, autoLink(false면 본문 자동 링크 안 함; run처럼 흔한 단어).
@@ -101,6 +103,8 @@ export function registerTools(server: McpServer) {
     }) as never) as unknown;
 
   tool('moons_guide', 'MOONS 도구 규칙과 최신 버전. 다른 도구보다 먼저 한 번 호출한다.', {}, async () => guide());
+  // The planner Satellite: Claude builds and fills the user's planner from the conversation.
+  registerPlannerTools(tool);
 
   tool('search_notes', '노트 검색. 제목·본문 키워드, 종류(dump=스파크, media=자료, question, chat, record=활동 기록)로 좁힌다.',
     {query: z.string().optional(), kind: z.enum(['dump', 'media', 'question', 'chat', 'record']).optional(), limit: z.number().int().min(1).max(50).optional()},

@@ -34,7 +34,7 @@ export function mcpRouter() {
     const owner = (req as Request & {auth?: {extra?: {owner?: string}}}).auth?.extra?.owner ?? '';
     if (limited(`mcp:${owner}`, 120)) { res.status(429).json({jsonrpc: '2.0', error: {code: -32000, message: 'Too many requests. Wait a minute.'}, id: null}); return; }
     if (req.method !== 'POST') { res.status(405).set('Allow', 'POST').end(); return; }
-    const server = new McpServer({name: 'MOONS', version: GUIDE_VERSION}, {instructions: 'MOONS: the user\'s knowledge base. Call moons_guide first. Anything entering the user\'s knowledge goes to the MOONS inbox for approval.'});
+    const server = new McpServer({name: 'MOONS', version: GUIDE_VERSION}, {instructions: 'MOONS: the user\'s knowledge base and their planner. Call moons_guide first (planner_guide before building a planner). Anything entering the user\'s knowledge goes to the MOONS inbox for approval; planner tools write to the user\'s own planner after the user agrees in chat.'});
     registerTools(server);
     const transport = new StreamableHTTPServerTransport({sessionIdGenerator: undefined, enableJsonResponse: true});
     res.on('close', () => { void transport.close(); void server.close(); });

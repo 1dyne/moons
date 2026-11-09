@@ -1,6 +1,6 @@
 import {useMemo, useState} from 'react';
 import {logicalDay, type Settings} from '@workspace/life-contract';
-import {FONTS, PALETTE, PlannerSpec, SKIN_PRESETS, Skin, WIDGETS, defaultModule, fontInfo, isDecor, modulesOf, placeNew, settle, widgetInfo, type WidgetType, type Widget} from '@workspace/planner-spec';
+import {FONTS, PALETTE, SKIN_PRESETS, Skin, WIDGETS, applyCanvas, fontInfo, isDecor, placeNew, settle, widgetInfo, type PlannerSpec, type WidgetType, type Widget} from '@workspace/planner-spec';
 import {useFontFamily} from '../fonts.ts';
 import {ofKind, type Planner} from '../data.ts';
 import {DayCanvas, canvasOf, skinProps} from './Canvas.tsx';
@@ -10,13 +10,6 @@ import {DayCanvas, canvasOf, skinProps} from './Canvas.tsx';
 const SWATCHES = PALETTE;
 let seq = 0;
 const newId = (type: string) => `${type}-${Date.now().toString(36)}${(seq++).toString(36)}`.slice(0, 40);
-
-/** The spec after editing: canvas and skin saved, modules kept in step with the widgets used. */
-export function applyCanvas(spec: PlannerSpec, widgets: Widget[], skin: Skin): PlannerSpec {
-  const used = modulesOf(widgets), modules = [...spec.modules];
-  for (const m of used) if (!modules.some(x => x.type === m)) modules.push(defaultModule(m, modules.length));
-  return PlannerSpec.parse({...spec, canvas: {...spec.canvas, day: widgets}, skin, modules: modules.length ? modules : [defaultModule('tasks', 0)]});
-}
 
 export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {spec: PlannerSpec; settings: Settings; p: Planner; saveLabel: string; onSave: (spec: PlannerSpec) => Promise<void> | void; onCancel?: () => void; hint?: string}) {
   const today = logicalDay(new Date(), settings);

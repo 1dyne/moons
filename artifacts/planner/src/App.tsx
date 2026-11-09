@@ -8,6 +8,7 @@ import {authEnabled} from './runtime.ts';
 import {Moon} from './Moon.tsx';
 import {Builder} from './screens/Builder.tsx';
 import {Editor} from './screens/Editor.tsx';
+import {ConnectPage} from './screens/Connect.tsx';
 import {skinProps} from './screens/Canvas.tsx';
 import {PlannerView} from './screens/PlannerView.tsx';
 
@@ -17,6 +18,13 @@ const usePersonaPlanner = () => useContext(PlannerCtx);
 const browserTz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 export default function App() {
+  // An AI connector's OAuth step lands here: /connect/<request id>.
+  const connect = location.pathname.match(/^\/connect\/([\w-]+)$/)?.[1];
+  if (connect) return <ConnectPage id={connect} />;
+  return <Main />;
+}
+
+function Main() {
   const [state, setState] = useState<Loaded | null>(null), [error, setError] = useState(''), [editing, setEditing] = useState(false);
   const load = () => Promise.all([api.settings(), api.spec(), api.recordsWithQueue()]).then(([settings, planner, records]) => { setState({settings, planner, records}); setError(''); }).catch(e => setError((e as Error).message));
   useEffect(() => { void load(); }, []);

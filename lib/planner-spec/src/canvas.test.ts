@@ -25,3 +25,16 @@ test('specs accept a canvas and a skin; dark skins are detected', () => {
   assert.ok(spec.canvas.day!.length > 2);
   assert.ok(isDark(SKIN_PRESETS[5]!.skin.background) && !isDark('#fbf6ea'));
 });
+
+test('a loose widget list from an AI becomes a valid spec; unknown widgets are reported, overlaps settle', async () => {
+  const {buildSpec} = await import('./build.ts');
+  const {spec, dropped} = buildSpec(null, {name: '수험 다꾸', widgets: [{type: 'focus'}, {type: 'tasks', x: 0, y: 0, w: 7}, {type: 'timetable', x: 7, y: 3, w: 5}, {type: 'sticker', options: {glyph: '🐰'}}, {type: 'calendar-of-doom'}], skin: {font: 'gaegu', accent: '#e07a7a'}});
+  assert.deepEqual(dropped, ['calendar-of-doom']);
+  const ws = spec.canvas.day!;
+  assert.equal(ws.length, 4);
+  const tasks = ws.find(w => w.type === 'tasks')!, focus = ws.find(w => w.type === 'focus')!;
+  assert.equal(tasks.y, 0, 'a placed widget keeps its spot');
+  assert.ok(focus.y >= tasks.y + tasks.h || focus.x >= tasks.x + tasks.w, 'unplaced widgets go where nothing is');
+  assert.ok(spec.modules.some(m => m.type === 'timer'));
+  assert.equal(spec.skin!.font, 'gaegu'); assert.equal(spec.name, '수험 다꾸');
+});

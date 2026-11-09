@@ -5,6 +5,7 @@ import {useFontFamily} from '../fonts.ts';
 import {ofKind, type Planner} from '../data.ts';
 import {DayCanvas, canvasOf, modeOf, skinProps} from './Canvas.tsx';
 import {GaugePicker, GaugeProvider} from '../Gauge.tsx';
+import {Tip} from '../Tip.tsx';
 
 // DIY editor: add widgets, drag to place, drag the corner to size, style each one, and dress the page with a skin.
 // It edits the live page (real records in the planner, sample records in the builder), so what you see is what you use.
@@ -42,7 +43,7 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {
         <button role="radio" aria-checked={mode === 'free'} className={mode === 'free' ? 'on' : ''} onClick={() => switchMode('free')} title="겹치고 원하는 곳에 두기">다꾸형</button>
         <button role="radio" aria-checked={mode === 'grid'} className={mode === 'grid' ? 'on' : ''} onClick={() => switchMode('grid')} title="칸에 맞춰 가지런히">정리형</button>
       </div>
-      <span className="muted small ed-hint">{hint ?? '위젯 머리(⠿)를 끌어 옮기고, 오른쪽 아래 모서리를 끌어 크기를 바꿔요.'}</span>
+      <span className="muted small ed-hint"><Tip id={hint ? `editor-${hint.slice(0, 12)}` : 'editor-drag'}>{hint ?? '위젯 머리(⠿)를 끌어 옮기고, 오른쪽 아래 모서리를 끌어 크기를 바꿔요.'}</Tip></span>
       <button className="ghost small" onClick={undo} disabled={!history.length}>되돌리기</button>
       {onCancel && <button className="ghost small" onClick={onCancel}>취소</button>}
       <button className="primary" disabled={busy} onClick={save}>{busy ? '저장 중…' : saveLabel}</button>
@@ -148,7 +149,7 @@ function SkinPanel({skin, setSkin}: {skin: Skin; setSkin: (s: Skin) => void}) {
   return <div className="skin-panel">
     <span className="muted small">프리셋</span>
     <div className="sk-presets">{SKIN_PRESETS.map(pr => <button key={pr.id} className="sk-preset" onClick={() => setSkin(pr.skin)} style={{background: pr.skin.background, color: pr.skin.ink, borderColor: pr.skin.accent}}><i style={{background: pr.skin.accent}} />{pr.name}</button>)}</div>
-    <span className="muted small">진행률 모양 <em className="sk-note">목표·월간·진행률 위젯이 모두 이 모양으로 보여요</em></span>
+    <span className="muted small">진행률 모양 <Tip id="skin-gauge">목표·월간·진행률 위젯이 모두 이 모양으로 보여요</Tip></span>
     <GaugePicker value={skin.gauge ?? 'segment'} onChange={g => set({gauge: g})} />
     <span className="muted small">체크 모양</span>
     <div className="style-pick" role="radiogroup" aria-label="체크 모양">
@@ -162,7 +163,7 @@ function SkinPanel({skin, setSkin}: {skin: Skin; setSkin: (s: Skin) => void}) {
         <span className="prow done"><span className="pname">단어 30개</span></span><span>{d.name}</span>
       </button>)}
     </div>
-    <span className="muted small">강조 색 <em className="sk-note">계기판의 지금 채우는 칸·넘친 시간에 쓰여요</em></span>
+    <span className="muted small">강조 색 <Tip id="skin-accent">계기판의 지금 채우는 칸·넘친 시간에 쓰여요</Tip></span>
     <div className="swatches">{SWATCHES.map(c => <button key={c} className={`swatch ${skin.accent === c ? 'on' : ''}`} style={{background: c}} onClick={() => set({accent: c})} aria-label={`강조 색 ${c}`} />)}</div>
     <div className="sk-colors">{color('accent', '강조')}{color('background', '바탕')}{color('surface', '위젯')}{color('ink', '글자')}</div>
     <label>종이 <select value={skin.paper} onChange={e => set({paper: e.target.value as Skin['paper']})}><option value="plain">민무늬</option><option value="grid">모눈</option><option value="dot">도트</option><option value="lined">줄</option></select></label>

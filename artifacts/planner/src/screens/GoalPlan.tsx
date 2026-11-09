@@ -2,6 +2,7 @@ import {useMemo, useState} from 'react';
 import {goalSchedule, parseBody, weeklyFocus, type AnyRecord, type Kind} from '@workspace/life-contract';
 import {api, ofKind, type GoalPlanResult, type MilestoneDraft, type Planner} from '../data.ts';
 import {hm} from './Focus.tsx';
+import {Tip} from '../Tip.tsx';
 
 // Big goal → MOONS asks until it is concrete → goal + milestones with effort → wanted deadline vs feasible date,
 // bottlenecks with other goals → the user edits and approves. Only approval writes anything.
@@ -42,7 +43,7 @@ export function Feasibility({records, extra, focusId, weeklyMin, today}: {record
       <span className="ptitle">{r.title}</span><span className="muted small">{hrs(r.remainingMin)}</span>
       <span className="small">끝낼 달 {fmt(r.due.slice(0, 7))} → 예상 {fmt(r.finish)}</span>{r.late && <b className="late small">늦음</b>}
     </li>)}</ol>}
-    <p className="muted small">일주일 목표 집중 {hrs(weeklyMin)} 기준 · 모든 목표의 남은 마일스톤이 이 시간을 나눠 써요(끝낼 달이 이른 것부터).{after.unestimated ? ` 예상 시간이 없는 마일스톤 ${after.unestimated}개는 빠졌어요.` : ''}</p>
+    <p className="muted small">일주일 목표 집중 {hrs(weeklyMin)} 기준<Tip id="goalplan-share"> 모든 목표의 남은 마일스톤이 이 시간을 나눠 써요(끝낼 달이 이른 것부터).</Tip>{after.unestimated ? ` 예상 시간이 없는 마일스톤 ${after.unestimated}개는 빠졌어요.` : ''}</p>
     {(pushed.length > 0 || clashes.length > 0) && <div className="fz-clash">
       <strong>다른 목표와의 병목</strong>
       {pushed.map(({g, prev}) => <p key={g.id}>· <b>{g.title}</b>이(가) {fmt(prev!.projected)} → {fmt(g.projected)}로 {daysBetween(prev!.projected, g.projected)}일 밀려요{g.lateDays ? ` (마감보다 ${g.lateDays}일 늦음)` : ''}.</p>)}

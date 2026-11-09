@@ -6,6 +6,7 @@ import {GoalPlanPanel, NewGoal} from './GoalPlan.tsx';
 import {goalSchedule, suggestGoal, unlinkedDone, weeklyFocus} from '@workspace/life-contract';
 import {GoalBar, horizonLabel, label, type Nav} from './Today.tsx';
 import {Gauge} from '../Gauge.tsx';
+import {Tip} from '../Tip.tsx';
 
 // Long-term goals: write one naively, let MOONS split it into milestones, review, then live by the daily list.
 // Every task linked to a milestone moves the goal's overall percentage.
@@ -40,7 +41,7 @@ export function Goals({spec, p, nav, today, goalId, setGoalId}: {spec: PlannerSp
       <button role="tab" aria-selected={view === 'ladder'} className={view === 'ladder' ? 'on' : ''} onClick={() => setView('ladder')}>목표 사다리</button>
       <button role="tab" aria-selected={view === 'roadmap'} className={view === 'roadmap' ? 'on' : ''} onClick={() => setView('roadmap')}>연간 로드맵</button>
     </div>
-    {view === 'roadmap' ? <Roadmap p={p} today={today} open={setGoalId} /> : <section className="part"><h3>목표 사다리 <span className="muted small">퍼센트 = 이어진 할 일과 마일스톤으로 계산한 전체 진행률</span></h3>
+    {view === 'roadmap' ? <Roadmap p={p} today={today} open={setGoalId} /> : <section className="part"><h3>목표 사다리 <Tip id="goals-percent">퍼센트 = 이어진 할 일과 마일스톤으로 계산한 전체 진행률</Tip></h3>
       {roots.length ? <ul className="tree">{roots.map(g => tree(g, 0))}</ul> : <p className="muted">아직 목표가 없어요. 위에 큰 목표를 대충 적어 보세요.</p>}
     </section>}
     <details className="part manual"><summary>기간 목표 직접 추가 (연간·월간·주간)</summary><GoalForm p={p} goals={goals} levels={levels} today={today} /></details>
@@ -95,7 +96,7 @@ function Roadmap({p, today, open}: {p: Planner; today: string; open: (id: string
           </span>)];
       })}
     </div>}
-    <p className="muted small">◆ 초록 = 이룸 · 빨강 = 끝낼 달이 지났는데 아직 · 회색 = 남은 마일스톤</p>
+    <Tip id="roadmap-legend" block>◆ 초록 = 이룸 · 빨강 = 끝낼 달이 지났는데 아직 · 회색 = 남은 마일스톤</Tip>
   </section>;
 }
 

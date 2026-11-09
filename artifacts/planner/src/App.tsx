@@ -11,6 +11,7 @@ import {Editor} from './screens/Editor.tsx';
 import {ConnectPage} from './screens/Connect.tsx';
 import {skinProps} from './screens/Canvas.tsx';
 import {PlannerView} from './screens/PlannerView.tsx';
+import {Tip, reopenTips, useClosedTipCount} from './Tip.tsx';
 
 type Loaded = {settings: Settings & {configured: boolean}; planner: {version: number; spec: PlannerSpec} | null; records: AnyRecord[]};
 const PlannerCtx = createContext<Planner | null>(null);
@@ -113,7 +114,7 @@ function SettingsPanel({loaded, edit, close, reload}: {loaded: Loaded & {planner
   const saveLayout = async (patch: Partial<NonNullable<typeof spec.layout>>) => { await api.putSpec({...spec, layout: {...spec.layout, ...patch} as typeof spec.layout}); await reload(); };
   const saveWindow = async () => { await api.putSpec({...spec, modules: spec.modules.map(m => m.type === 'checkin' ? {...m, options: {...m.options, wake, sleep}} : m)}); await reload(); };
   return <div className="settings">
-    <section className="module"><h3>화면 구성 <span className="muted small">바꿔도 기록은 그대로예요</span></h3>
+    <section className="module"><h3>화면 구성 <Tip id="settings-layout">바꿔도 기록은 그대로예요</Tip></h3>
       <label>하루 페이지 <select value={spec.layout?.day ?? 'sheet'} onChange={e => saveLayout({day: e.target.value as 'sheet'})}>
         <option value="sheet">스터디 타임테이블 (할 일 + 10분 칸)</option><option value="hourly">시간대별 타임라인 (계획 vs 실제)</option>
         <option value="bullet">불렛저널 빠른 기록</option><option value="onepage">한 장 자유 데일리 (모눈)</option></select></label>
@@ -121,6 +122,7 @@ function SettingsPanel({loaded, edit, close, reload}: {loaded: Loaded & {planner
       <label>주간 페이지 <select value={spec.layout?.week ?? 'horizontal'} onChange={e => saveLayout({week: e.target.value as 'horizontal'})}>
         <option value="horizontal">가로형 (7일 칸, 끌어서 옮기기)</option><option value="vertical">세로형 (시간 눈금)</option></select></label>
     </section>
+    <TipsReset />
     <section className="module"><h3>플래너</h3>
       <p className="muted">버전 {loaded.planner.version} · 화면 구성을 바꿔도 기록은 그대로예요.</p>
       <button className="primary" onClick={edit}>플래너 고치기</button>
@@ -135,7 +137,7 @@ function SettingsPanel({loaded, edit, close, reload}: {loaded: Loaded & {planner
     {checkin && <section className="module"><h3>아침 점검 시간</h3>
       <label>보통 일어나는 시각 <input type="time" value={wake} onChange={e => setWake(e.target.value)} /></label>
       <label>보통 자는 시각 <input type="time" value={sleep} onChange={e => setSleep(e.target.value)} /></label>
-      <p className="muted small">깨어 있는 시간에서 고정 일정을 빼고, 아침 에너지로 오늘 현실적으로 집중할 수 있는 양을 계산해요.</p>
+      <Tip id="settings-capacity" block>깨어 있는 시간에서 고정 일정을 빼고, 아침 에너지로 오늘 현실적으로 집중할 수 있는 양을 계산해요.</Tip>
       <button onClick={saveWindow}>저장</button>
     </section>}
     <section className="module"><h3>계정</h3>{authEnabled ? <Account /> : <p className="muted">이 서버는 게스트 모드예요. 기록은 이 브라우저에 묶여 있어요.</p>}</section>
@@ -172,4 +174,13 @@ function Account() {
   return clerk.user
     ? <p>{clerk.user.primaryEmailAddress?.emailAddress ?? 'MOONS 계정'}으로 로그인했어요. <button className="ghost small" onClick={async () => { await clerk.signOut(); location.reload(); }}>로그아웃</button></p>
     : <><p className="muted">MOONS 계정(구글 가능)으로 로그인하면 다른 기기와 MOONS·모의 우주에서 같은 기록을 써요.</p><button className="primary" onClick={() => clerk.openSignIn({forceRedirectUrl: location.href})}>MOONS 계정으로 로그인</button></>;
+}
+
+function TipsReset() {
+  const n = useClosedTipCount();
+  if (!n) return null;
+  return <section className="module"><h3>안내</h3>
+    <p className="muted small">닫은 안내 {n}개</p>
+    <button onClick={reopenTips}>닫은 안내 다시 보기</button>
+  </section>;
 }

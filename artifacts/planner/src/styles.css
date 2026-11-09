@@ -800,3 +800,11 @@ button.ghost:hover{background:color-mix(in srgb,var(--ink) 7%,transparent)}
 .gauge-pick .gauge{row-gap:9px}
 .prow.hl .pname{background:linear-gradient(transparent 45%,var(--hl) 45% 95%,transparent 95%)!important;padding:0 3px}
 .style-pick .pname{white-space:nowrap}
+
+/* How-to notes, closable once read. */
+.tip{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);font-family:inherit;letter-spacing:0;font-weight:400;text-transform:none;max-width:100%}
+.tip.block{display:flex;margin:2px 0}
+.tip-text{min-width:0}
+.tip-x{flex:none;width:18px;height:18px;padding:0;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:12px;line-height:1;display:grid;place-items:center}
+.tip-x:hover{border-color:var(--ink);color:var(--ink);background:transparent}
+h3 .tip{margin-left:6px}

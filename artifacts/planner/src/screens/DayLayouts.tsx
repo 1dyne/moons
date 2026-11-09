@@ -4,6 +4,7 @@ import {ofKind} from '../data.ts';
 import {parseEntry} from '../parse.ts';
 import {MARK, moveTo, outcome, saveTask, type Ctx} from './day.ts';
 import {hm, sessionKey, useClock} from './Focus.tsx';
+import {Tip} from '../Tip.tsx';
 
 // Day layouts from the reference library. Same records, different pages: hourly timeline, bullet log, one free page.
 const PX = 52; // pixels per hour on timelines
@@ -45,7 +46,7 @@ export function HourlyDay({ctx, startHour, endHour}: {ctx: Ctx; startHour: numbe
       })}
       {nowTop >= 0 && nowTop <= hours.length * PX && <i className="hr-now" style={{top: nowTop}} />}
     </div>
-    {loose.length > 0 && <div className="hr-loose"><span className="muted small">아직 시간이 없는 할 일 — 시각을 고르고 배치하세요</span>
+    {loose.length > 0 && <div className="hr-loose"><span className="muted small">아직 시간이 없는 할 일</span> <Tip id="hourly-loose">시각을 고르면 타임라인에 배치돼요</Tip>
       <ul className="prows">{loose.map(t => <li key={t.id} className="prow">
         <span className="ptitle"><span className="pname">{t.body.title}</span><span className="psub">{t.body.plan.estimateMin ? `예상 ${t.body.plan.estimateMin}분` : '예상 60분으로 배치'}</span></span>
         <input type="time" className="time-in" value={at[t.id] ?? '09:00'} onChange={e => setAt({...at, [t.id]: e.target.value})} aria-label={`${t.body.title} 시작 시각`} />
@@ -73,7 +74,7 @@ export function BulletDay({ctx}: {ctx: Ctx}) {
   };
   const toggle = (t: LifeRecord<'task'>) => saveTask(ctx, t, outcome(t, t.body.outcome.result === 'done' ? {result: 'unknown', completedAt: null, reportedAt: null} : {result: 'done', completedAt: ctx.now(), reportedAt: ctx.now()}));
   return <div className="bullet">
-    <p className="muted small bj-legend">• 할 일 &nbsp;× 끝냄 &nbsp;&gt; 미룸 &nbsp;○ 일정 &nbsp;– 메모 &nbsp;! 아이디어 — 앞에 <code>-</code> <code>!</code> <code>o</code>를 붙여 쓰세요</p>
+    <Tip id="bullet-legend" block>• 할 일 &nbsp;× 끝냄 &nbsp;&gt; 미룸 &nbsp;○ 일정 &nbsp;– 메모 &nbsp;! 아이디어 — 앞에 <code>-</code> <code>!</code> <code>o</code>를 붙여 쓰세요</Tip>
     <ul className="bj-list">{rows.map(r => 'n' in r ? <li key={r.n.id} className="bj note">
       <span className="bj-sign">{r.n.body.signifier === 'idea' ? '!' : '–'}</span>
       {editing === r.n.id ? <form className="bj-edit" onSubmit={e => { e.preventDefault(); const n = r.n; setEditing(null); if (draft.trim() && draft !== n.body.text) void ctx.p.write(n.id, {kind: 'note', logicalDay: n.logicalDay, body: {...n.body, text: draft.trim()}, baseRevision: n.revision}); }}>

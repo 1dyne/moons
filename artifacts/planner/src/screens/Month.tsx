@@ -5,6 +5,7 @@ import {GoalBar, horizonLabel, type Nav} from './Today.tsx';
 import {hm} from './Focus.tsx';
 import {HabitGrid} from './Habits.tsx';
 import {Gauge} from '../Gauge.tsx';
+import {Tip} from '../Tip.tsx';
 
 // Month and year pages fill themselves from the daily page: nothing is entered here, it is all read from what was checked.
 export function Month({p, nav, month, setMonth, today}: {p: Planner; nav: Nav; month: string; setMonth: (m: string) => void; today: string}) {
@@ -46,7 +47,7 @@ const hrs = (min: number) => min >= 60 ? `${Math.floor(min / 60)}시간${min % 6
 function Summary({p, from, to, openGoal}: {p: Planner; from: string; to: string; openGoal: (id: string) => void}) {
   const s = periodSummary(p.records, from, to);
   const tile = (label: string, value: string, sub?: string, pct?: number | null) => <div className="sum-tile"><span className="k">{label}</span>{pct !== undefined ? <Gauge pct={pct} size="md" label={label} /> : <strong>{value}</strong>}{sub && <span className="muted small">{sub}</span>}</div>;
-  return <section className="part summary"><h3>이달 한눈에 <span className="muted small">데일리에서 체크한 것만으로 채워져요</span></h3>
+  return <section className="part summary"><h3>이달 한눈에 <Tip id="month-rollup">데일리에서 체크한 것만으로 채워져요</Tip></h3>
     <div className="sum-tiles">
       {tile('할 일 완료', s.tasks.rate === null ? '–' : `${s.tasks.rate}%`, `${s.tasks.done}/${s.tasks.planned}${s.tasks.missed ? ` · 못 함 ${s.tasks.missed}` : ''}`, s.tasks.rate)}
       {tile('루틴', s.routines.rate === null ? '–' : `${s.routines.rate}%`, `${s.routines.done}/${s.routines.picked} (고른 날 기준)`, s.routines.rate)}

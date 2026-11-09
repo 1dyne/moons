@@ -1,5 +1,6 @@
 import {addDays, routineDue, type LifeRecord} from '@workspace/life-contract';
 import {ofKind, type Planner} from '../data.ts';
+import {Tip} from '../Tip.tsx';
 
 // Monthly habit grid: routine × day. With "pick today's routines", only picked days open a cell;
 // a cell becomes × only when the user said "못 했어요". Tapping a past or today's cell cycles it.
@@ -20,7 +21,7 @@ export function HabitGrid({p, month, today}: {p: Planner; month: string; today: 
     else await p.write(t.id, {kind: 'task', logicalDay: d, body: {...t.body, outcome: {...t.body.outcome, result: 'done', completedAt: now, reportedAt: now}}, baseRevision: t.revision});
   };
   const streak = (r: LifeRecord<'routine'>) => { let s = 0; for (let d = today; ; d = addDays(d, -1)) { if (find(r, d)?.body.outcome.result === 'done') s++; else if (d !== today) break; if (s > 365) break; } return s; };
-  return <section className="part habits"><h3>습관 트래커 <span className="muted small">● 함 · × 못 함 · ○ 고름 · 칸을 누르면 바뀌어요</span></h3>
+  return <section className="part habits"><h3>습관 트래커 <Tip id="habits-legend">● 함 · × 못 함 · ○ 고름 · 칸을 누르면 바뀌어요</Tip></h3>
     <div className="hb-grid" style={{gridTemplateColumns: `minmax(90px,1.2fr) repeat(${n},minmax(14px,1fr)) auto`}}>
       <span />{days.map(d => <span key={d} className={`hb-d ${d === today ? 'today' : ''}`}>{Number(d.slice(8))}</span>)}<span className="hb-d">연속</span>
       {routines.map(r => {

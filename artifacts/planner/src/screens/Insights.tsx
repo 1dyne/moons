@@ -3,6 +3,7 @@ import {addDays, efficiency, estimateAccuracy, goalPercent, personaShare, type S
 import {ofKind, type Planner} from '../data.ts';
 import {hm} from './Focus.tsx';
 import {Gauge} from '../Gauge.tsx';
+import {Tip} from '../Tip.tsx';
 
 // Looking back: monthly condition, when focus goes well, how estimates compare, and which persona the days went to.
 export function Insights({p, settings, today}: {p: Planner; settings: Settings; today: string}) {
@@ -22,7 +23,7 @@ export function Insights({p, settings, today}: {p: Planner; settings: Settings; 
     </section>
 
     <div className="day-nav"><button onClick={() => shift(-1)} aria-label="전달">‹</button><h2>{Number(month.slice(5))}월 돌아보기</h2><button onClick={() => shift(1)} aria-label="다음 달">›</button></div>
-    <section className="part"><h3>날마다 컨디션과 집중 <span className="muted small">막대 = 집중 시간, 점 = 컨디션(1~10)</span></h3>
+    <section className="part"><h3>날마다 컨디션과 집중 <Tip id="insights-legend">막대 = 집중 시간, 점 = 컨디션(1~10)</Tip></h3>
       <div className="month-chart" role="img" aria-label="날짜별 컨디션과 집중 시간">
         {e.days.map(d => <div key={d.day} className="mc-col" title={`${d.day} · 집중 ${hm(d.focus)} · 컨디션 ${d.score ?? '–'}`}>
           <i className="mc-bar" style={{height: `${Math.round(d.focus / maxFocus * 100)}%`}} />

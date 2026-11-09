@@ -10,6 +10,7 @@ export {MARK, NEXT, moveTo, outcome, saveTask, type Ctx, type Nav} from './day.t
 import {BulletDay, HourlyDay, OnePageDay} from './DayLayouts.tsx';
 import {Gauge} from '../Gauge.tsx';
 import {HIGHLIGHTS} from '@workspace/planner-spec';
+import {Tip} from '../Tip.tsx';
 export {parseEntry, parseTarget} from '../parse.ts';
 
 const CATEGORY: Record<string, string> = {must: '꼭', want: '하고 싶은', leisure: '여가'};
@@ -51,7 +52,7 @@ export function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
   const groups = cats ? (['must', 'want', 'leisure', null] as const).map(c => [c, tasks.filter(t => t.body.category === c)] as const).filter(([, l]) => l.length) : [[null, tasks] as const];
   const done = tasks.filter(t => t.body.outcome.result === 'done').length, live = tasks.filter(t => !['cancelled', 'postponed'].includes(t.body.outcome.result)).length;
   return <>
-    {tasks.length > 0 && <p className="tally muted small">{done}/{live} 완료 · 체크 칸을 누를 때마다 완료 → 일부 → 못 함 → 처음으로</p>}
+    {tasks.length > 0 && <p className="tally muted small">{done}/{live} 완료 <Tip id="tasks-cycle">체크 칸을 누를 때마다 완료 → 일부 → 못 함 → 처음으로</Tip></p>}
     {tasks.length === 0 && <p className="muted">아직 오늘 할 일이 없어요. 아래에 적어 보세요.</p>}
     {groups.map(([c, list]) => <div key={String(c)} className="task-group">
       {cats && c && <span className={`cat cat-${c}`}>{CATEGORY[c]}</span>}
@@ -216,7 +217,7 @@ export function SleepBox({ctx}: {ctx: Ctx}) {
     {night ? <p className="sleep-night"><b>{clock(night.body.start!)} → {clock(night.body.end!)}</b> · {hm((Date.parse(night.body.end!) - Date.parse(night.body.start!)) / 60000)} 잤어요
       <button className="ghost small" onClick={() => setEdit(!edit)}>{edit ? '닫기' : '고치기'}</button>
       <button className="ghost small danger" onClick={() => ctx.p.remove(night.id)}>지우기</button></p>
-      : <p className="muted small">자기 전에 "잘게요", 일어나면 "일어났어요"를 누르세요.</p>}
+      : <Tip id="sleep-buttons" block>자기 전에 "잘게요", 일어나면 "일어났어요"를 누르세요.</Tip>}
     {edit && night && <div className="inline">
       <label>잠든 시각 <input type="datetime-local" defaultValue={local(night.body.start)} onBlur={e => save('start', e.target.value)} /></label>
       <label>일어난 시각 <input type="datetime-local" defaultValue={local(night.body.end)} onBlur={e => save('end', e.target.value)} /></label></div>}

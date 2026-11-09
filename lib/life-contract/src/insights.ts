@@ -1,5 +1,5 @@
 import type {AnyRecord, LifeRecord} from './records.ts';
-import {addDays} from './day.ts';
+import {addDays, periodContains} from './day.ts';
 import {goalProgress, linkedTasks} from './now.ts';
 
 // Deterministic views over the records: goal roll-up, condition, capacity, estimates, personas, efficiency.
@@ -174,4 +174,29 @@ export function goalSchedule(records: AnyRecord[], today: string, weeklyMin: num
   const monthCap = Math.round(weeklyMin * 4.35);
   const months = [...demand.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, d]) => ({month, demandMin: Math.round(d.min), capacityMin: monthCap, over: d.min > monthCap, goals: [...d.goals]}));
   return {weeklyMin, rows, goals: tops, months, bottlenecks: months.filter(m => m.over && m.goals.length > 1), overloaded: months.filter(m => m.over), unestimated: open.length - estimated.length};
+}
+
+const bigrams = (s: string) => { const t = s.toLowerCase().replace(/[^0-9a-z가-힣]+/g, ''); const out = new Set<string>(); for (let i = 0; i < t.length - 1; i++) out.add(t.slice(i, i + 2)); return out; };
+/** Which open goal a new task most likely serves, from shared words ("언어이해 1세트" → "언어이해 기출 1회독").
+ *  Milestones and the nearest calendar goals first. No AI; returns null when nothing clearly matches. */
+export function suggestGoal(records: AnyRecord[], day: string, title: string) {
+  const words = bigrams(title);
+  if (words.size < 2) return null;
+  const rank = {milestone: 0, week: 1, month: 2, quarter: 3, year: 4} as const;
+  const open = of(records, 'goal').filter(g => g.body.status === 'active' && (g.body.horizon === 'milestone' ? g.body.period >= day.slice(0, 7) : periodContains(g.body.period, day)));
+  let best: {goal: LifeRecord<'goal'>; score: number} | null = null;
+  for (const g of open) {
+    const gw = bigrams(g.body.title);
+    const shared = [...words].filter(w => gw.has(w)).length;
+    const score = shared - rank[g.body.horizon] * 0.1;
+    if (shared >= 2 && (!best || score > best.score)) best = {goal: g, score};
+  }
+  return best?.goal ?? null;
+}
+
+/** Recent finished tasks that move no goal: candidates to link so the work counts. */
+export function unlinkedDone(records: AnyRecord[], day: string, days = 14) {
+  const from = addDays(day, -(days - 1));
+  return of(records, 'task').filter(t => t.logicalDay && t.logicalDay >= from && t.logicalDay <= day && !t.body.goalIds.length && !t.body.plan.fixed && t.body.outcome.result === 'done' && !t.body.routineId)
+    .sort((a, b) => (b.logicalDay ?? '').localeCompare(a.logicalDay ?? ''));
 }

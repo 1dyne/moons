@@ -1,4 +1,5 @@
 import {z} from 'zod';
+import {Skin, Widget} from './canvas.ts';
 
 // PlannerSpec (docs/PLANNER_SPEC_v1.md §4.1): what the planner looks like. Data lives in the life hub;
 // changing a spec never moves or rewrites records.
@@ -48,6 +49,9 @@ export const PlannerSpec = z.object({
     week: z.enum(['horizontal', 'vertical']).default('horizontal'),
   }).default({}),
   mood: z.string().max(20).default('calm'),
+  // The DIY day page (widgets the user placed) and the skin. A spec without a canvas gets a starter one from its layout.
+  canvas: z.object({day: z.array(Widget).max(40).optional()}).default({}),
+  skin: Skin.optional(),
   source: z.object({kind: z.enum(['chat', 'paper', 'notion', 'template']), ref: z.string().max(80).optional()}).optional(),
 }).superRefine((spec, ctx) => {
   const ids = spec.modules.map(m => m.id);

@@ -507,3 +507,96 @@ table.eff th{font-size:12px;color:var(--muted);font-weight:600}
 .sync.up{background:#8aaaf822;color:var(--accent)}
 .install{position:relative}
 .install-hint{position:absolute;right:0;top:34px;z-index:20;width:220px;font-size:12px;padding:8px 10px;border-radius:10px;background:#2d2f2a;color:#fff}
+
+/* DIY canvas: 12 columns, 30px rows. Each widget scrolls inside its own box. */
+.canvas{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:10px;position:relative;min-height:120px}
+.canvas.editing{background-image:linear-gradient(90deg,color-mix(in srgb,var(--accent) 7%,transparent) 1px,transparent 1px);background-size:calc((100% + 10px)/12) 100%;outline:1px dashed color-mix(in srgb,var(--accent) 35%,transparent);outline-offset:6px;border-radius:6px;padding-bottom:40px}
+.canvas-empty{grid-column:1/-1;grid-row:2/4;align-self:center;text-align:center;color:var(--muted)}
+.wg{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;border-radius:var(--radius,14px);background:var(--surface,#fff);overflow:hidden}
+.wg-line{border:1px solid var(--line)}
+.wg-card{box-shadow:0 2px 14px #2527201a;border:1px solid #0000000a}
+.wg-filled{background:color-mix(in srgb,var(--accent) 12%,var(--surface,#fff))}
+.wg-plain{background:transparent}
+.wg-title{font-size:13px;font-weight:700;color:var(--ink,#3d4038);margin:10px 12px 0;padding-bottom:6px;border-bottom:2px solid currentColor;flex-shrink:0}
+.heading-pill .wg-title{border:0;align-self:flex-start;padding:2px 12px;border-radius:999px;background:color-mix(in srgb,var(--accent) 20%,transparent);color:var(--ink,#2d2f2a)}
+.heading-plain .wg-title{border:0;padding-bottom:0}
+.wg-body{flex:1;min-height:0;overflow:auto;padding:8px 12px 12px}
+.wg-type-focus .wg-body,.wg-type-text .wg-body{padding:0;display:flex;align-items:stretch}
+.wg-type-focus .focus-bar{flex:1;position:static;border-radius:var(--radius,14px)}
+.wg-type-receipt .wg-body{padding:8px}
+.wg-body .part{gap:6px}
+.wg-body .receipt{margin:0}
+.wg-text{margin:auto 12px;width:100%;font-weight:700;line-height:1.35;color:var(--ink,#2d2f2a)}
+.wg-text.size-s{font-size:14px;font-weight:500}.wg-text.size-m{font-size:18px}.wg-text.size-l{font-size:26px}.wg-text.size-xl{font-size:36px;letter-spacing:-.03em}
+.wg-progress{display:grid;gap:6px;width:100%;text-align:left;position:relative;padding:4px 0}
+.wg-progress strong{font-size:40px;line-height:1;color:var(--accent)}
+.wg-progress i{display:block;height:8px;border-radius:999px;background:var(--accent)}
+.wg-dday{display:grid;place-content:center;text-align:center;height:100%}
+.wg-dday strong{font-size:34px;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+.wg-dday span{font-size:13px;color:var(--muted)}
+/* editing */
+.editing .wg{cursor:pointer;outline:1px solid transparent;transition:outline-color .12s}
+.editing .wg:hover{outline-color:color-mix(in srgb,var(--accent) 50%,transparent)}
+.editing .wg.selected{outline:2px solid var(--accent);z-index:3}
+.editing .wg.dragging{opacity:.85;z-index:5;box-shadow:0 12px 30px #25272033}
+.editing .wg-body{pointer-events:none;user-select:none}
+.wg-handle{flex-shrink:0;cursor:grab;touch-action:none;font-size:11px;padding:3px 10px;background:color-mix(in srgb,var(--accent) 14%,var(--surface,#fff));color:var(--ink,#3d4038);user-select:none}
+.wg-handle:active{cursor:grabbing}
+.wg-resize{position:absolute;right:0;bottom:0;width:22px;height:22px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 50%,var(--accent) 50%);border-bottom-right-radius:var(--radius,14px);z-index:2}
+/* skin */
+.skin{font-family:var(--font)}
+.skin .muted{color:color-mix(in srgb,var(--ink,#252720) 55%,transparent)}
+.paper-grid .canvas:not(.editing){background-image:linear-gradient(color-mix(in srgb,var(--ink) 7%,transparent) 1px,transparent 1px),linear-gradient(90deg,color-mix(in srgb,var(--ink) 7%,transparent) 1px,transparent 1px);background-size:16px 16px}
+.paper-dot .canvas:not(.editing){background-image:radial-gradient(color-mix(in srgb,var(--ink) 18%,transparent) 1px,transparent 1.4px);background-size:16px 16px}
+.paper-lined .canvas:not(.editing){background-image:linear-gradient(transparent 31px,color-mix(in srgb,var(--ink) 9%,transparent) 32px);background-size:100% 32px}
+.font-hand .pname{font-size:17px}
+.skin-dark .wg-line{border-color:#353941}
+.skin-dark .wg-handle{color:var(--ink)}
+/* editor */
+.app.wide{max-width:1500px}
+.editor{display:grid;gap:10px}
+.ed-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:10;padding:8px 10px;border-radius:12px;background:var(--surface,#fff);box-shadow:0 2px 12px #2527201a}
+.ed-hint{flex:1;min-width:160px}
+.ed-body{display:grid;grid-template-columns:240px minmax(0,1fr) 250px;gap:14px;align-items:start}
+.ed-body:has(.ed-inspect){grid-template-columns:240px minmax(0,1fr) 250px}
+.ed-body:not(:has(.ed-inspect)){grid-template-columns:240px minmax(0,1fr)}
+.ed-side,.ed-inspect{position:sticky;top:64px;max-height:calc(100dvh - 80px);overflow:auto;display:grid;gap:8px;padding:10px;border-radius:12px;background:var(--surface,#fff);border:1px solid var(--line);color:#252720;font-family:Pretendard,-apple-system,sans-serif}
+.skin-dark .ed-side,.skin-dark .ed-inspect{color:var(--ink)}
+.ed-group{display:grid;gap:4px}
+.ed-widget{display:grid;gap:1px;text-align:left;padding:7px 10px;border-radius:10px;position:relative}
+.ed-widget span{font-size:11px;color:var(--muted)}
+.ed-widget em{position:absolute;right:8px;top:7px;font-style:normal;font-size:10px;color:var(--accent)}
+.ed-canvas{padding:14px;border-radius:14px;min-height:60vh}
+.ed-inspect label{display:grid;gap:3px;font-size:13px}
+.ed-inspect .row-check,.skin-panel .row-check{display:flex;align-items:center;gap:6px}
+.ed-inspect-head{display:flex;justify-content:space-between;align-items:center}
+.ed-inspect input[type=color]{width:30px;height:24px;padding:0;border:0;background:none}
+.skin-panel{display:grid;gap:8px}
+.skin-panel label{display:grid;gap:3px;font-size:13px}
+.sk-presets{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.sk-preset{display:flex;gap:6px;align-items:center;font-size:12px;padding:8px;border-width:1.5px}
+.sk-preset i{width:12px;height:12px;border-radius:50%}
+.sk-colors{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.sk-color{display:flex!important;align-items:center;justify-content:space-between}
+.sk-color input{width:34px;height:26px;padding:0;border:0;background:none}
+.builder-edit{display:grid;gap:12px;padding-top:12px}
+.moon-say.small{gap:10px}
+.chip.blank{border:1.5px dashed #9c998c;background:#fff}
+@media (max-width:1100px){
+  .ed-body,.ed-body:has(.ed-inspect),.ed-body:not(:has(.ed-inspect)){grid-template-columns:1fr}
+  .ed-side,.ed-inspect{position:static;max-height:none}
+  .ed-side{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .ed-side .ed-group{display:contents}
+  .ed-side .ed-group>span{grid-column:1/-1}
+}
+/* Phones: one column in reading order (top to bottom, left to right); boxes grow with their content. */
+@media (max-width:700px){
+  .canvas:not(.editing){display:flex;flex-direction:column;grid-template-rows:none!important}
+  .canvas:not(.editing) .wg{min-height:0}
+  .canvas:not(.editing) .wg-body{overflow:visible}
+  .canvas:not(.editing) .wg-type-timetable .wg-body,.canvas:not(.editing) .wg-type-hourly .wg-body{max-height:none}
+}
+.swatches{flex-wrap:wrap}
+.ed-side,.ed-inspect{overflow-x:hidden}
+.ed-inspect input:not([type=checkbox]):not([type=color]),.ed-inspect select,.ed-inspect textarea,.skin-panel select{width:100%}
+.ed-inspect .num{width:72px}

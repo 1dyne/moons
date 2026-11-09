@@ -2,7 +2,8 @@ import {useState} from 'react';
 import {logicalDay, type Settings} from '@workspace/life-contract';
 import type {PlannerSpec} from '@workspace/planner-spec';
 import type {Planner} from '../data.ts';
-import {Today, type Nav} from './Today.tsx';
+import {DayPage} from './DayPage.tsx';
+import type {Nav} from './day.ts';
 import {Goals} from './Goals.tsx';
 import {Month} from './Month.tsx';
 import {Insights} from './Insights.tsx';
@@ -22,7 +23,7 @@ export function PlannerView({spec, settings, p, extraTabs}: {spec: PlannerSpec; 
       {extraTabs}
     </nav>
     {p.error && <p className="error" role="alert">{p.error}</p>}
-    {tab === 'today' && <Today spec={spec} settings={settings} p={p} nav={nav} today={today} />}
+    {tab === 'today' && <DayPage spec={spec} settings={settings} p={p} nav={nav} today={today} />}
     {tab === 'week' && <Week spec={spec} settings={settings} p={p} nav={nav} today={today} />}
     {tab === 'goals' && <Goals spec={spec} p={p} nav={nav} today={today} goalId={goalId} setGoalId={setGoalId} />}
     {tab === 'month' && <Month p={p} nav={nav} month={month} setMonth={setMonth} today={today} />}

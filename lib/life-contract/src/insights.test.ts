@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {parseBody, type AnyRecord, type Kind} from './records.ts';
-import {capacity, dayCondition, efficiency, estimateAccuracy, goalChain, goalPercent, goalSchedule, personaShare, weeklyFocus} from './insights.ts';
+import {capacity, dayCondition, efficiency, estimateAccuracy, goalChain, goalPercent, goalSchedule, personaShare, suggestGoal, unlinkedDone, weeklyFocus} from './insights.ts';
 import {addDays} from './day.ts';
 
 let rev = 0;
@@ -66,4 +66,18 @@ test('schedule: milestones from all goals share one weekly budget; late goals an
   assert.ok(s.goals.find(g => g.id === 'B')!.projected > '2026-12-31');
   assert.ok(s.bottlenecks.length > 0 && s.bottlenecks[0]!.goals.length === 2);
   assert.equal(weeklyFocus(rs, day), 600);
+});
+
+test('a new task suggests the goal it shares words with; finished unlinked tasks are listed', () => {
+  const day = '2026-11-09';
+  const rs = [
+    rec('goal', 'Y', {title: '로스쿨 합격', horizon: 'year', period: '2027'}),
+    rec('goal', 'M1', {title: '언어이해 기출 5개년 1회독', horizon: 'milestone', period: '2026-12', parentGoalId: 'Y'}),
+    rec('goal', 'M2', {title: '추리논증 기출 1회독', horizon: 'milestone', period: '2027-01', parentGoalId: 'Y'}),
+    rec('task', 'T1', {title: '보고서', plan: {state: 'committed'}, outcome: {result: 'done'}}, day),
+  ];
+  assert.equal(suggestGoal(rs, day, '언어이해 2024 1세트')?.id, 'M1');
+  assert.equal(suggestGoal(rs, day, '추리논증 오답 정리')?.id, 'M2');
+  assert.equal(suggestGoal(rs, day, '장보기'), null);
+  assert.deepEqual(unlinkedDone(rs, day).map(t => t.id), ['T1']);
 });

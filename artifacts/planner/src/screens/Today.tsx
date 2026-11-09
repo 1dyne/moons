@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {addDays, goalPercent, goalProgress, periodContains, personaShare, routineDue, routineRate, type AnyRecord, type LifeRecord, type Settings, type Task} from '@workspace/life-contract';
+import {addDays, goalPercent, goalProgress, periodContains, personaShare, suggestGoal, routineDue, routineRate, type AnyRecord, type LifeRecord, type Settings, type Task} from '@workspace/life-contract';
 import {modulesFor, uses, type ModuleSpec, type PlannerSpec} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
 import {FocusBar, Receipt, Timetable, colors, hm, useTimer, type Timer} from './Focus.tsx';
@@ -17,58 +17,7 @@ export const label = (day: string) => new Intl.DateTimeFormat('ko-KR', {month: '
 
 /** Goals a day's task can move: calendar goals that contain the day and open milestones. */
 export const linkableGoals = (records: AnyRecord[], day: string) => ofKind(records, 'goal').filter(g => g.body.status === 'active' && (g.body.horizon === 'milestone' ? g.body.period >= day.slice(0, 7) : periodContains(g.body.period, day)));
-export function Today({spec, settings, p, nav, today}: {spec: PlannerSpec; settings: Settings; p: Planner; nav: Nav; today: string}) {
-  const timerModule = spec.modules.find(m => m.type === 'timer');
-  const timer = useTimer(p, settings), color = colors(p, nav.day);
-  const ctx: Ctx = {p, day: nav.day, nav, now: () => new Date().toISOString(), timer: timerModule ? timer : null, color};
-  const layout = spec.layout?.day ?? 'sheet';
-  // Non-sheet layouts draw the day's tasks themselves; the timetable gives way to the hourly view's own "actual" column.
-  const parts = modulesFor(spec, 'day').filter(m => m.type !== 'timer' && !(layout !== 'sheet' && m.type === 'tasks'));
-  const checkin = spec.modules.find(m => m.type === 'checkin');
-  const startHour = Number(String(checkin?.options.wake ?? '').slice(0, 2)) || Number(timerModule?.options.startHour ?? 6);
-  const endHour = Number(settings.dayBoundary.slice(0, 2)) + 24;
-  const page = layout === 'hourly' ? <HourlyDay ctx={ctx} startHour={startHour} endHour={endHour} /> : layout === 'bullet' ? <BulletDay ctx={ctx} /> : layout === 'onepage' ? <OnePageDay ctx={ctx} startHour={startHour} endHour={endHour} /> : null;
-  return <div className="sheet">
-    <div className="day-nav">
-      <button onClick={() => nav.setDay(addDays(nav.day, -1))} aria-label="전날">‹</button>
-      <h2>{label(nav.day)}</h2>
-      <button onClick={() => nav.setDay(addDays(nav.day, 1))} aria-label="다음 날">›</button>
-      {nav.day !== today && <button className="ghost small" onClick={() => nav.setDay(today)}>오늘로</button>}
-    </div>
-    {timerModule && <FocusBar p={p} day={today} timer={timer} color={colors(p, today)} />}
-    <div className={timerModule ? 'sheet-cols' : 'sheet-one'}>
-      <div className="col-main">
-        {nav.day === today && <CarryOver ctx={ctx} />}
-        {page && <section key={`layout:${nav.day}`} className={`part part-tasks layout-${layout}`}>{page}</section>}
-        {parts.map(m => <section key={`${m.id}:${nav.day}`} className={`part part-${m.type}`}>
-          <h3>{m.label}</h3>
-          <ModuleBody m={m} ctx={ctx} />
-        </section>)}
-      </div>
-      {timerModule && <div className="col-side">
-        {layout !== 'hourly' && <section className="part part-timer"><h3>{timerModule.label} <span className="muted small">10분 = 한 칸</span></h3>
-          <Timetable key={nav.day} m={timerModule} p={p} day={nav.day} settings={settings} color={color} /></section>}
-        <Receipt p={p} day={nav.day} routineRate={uses(spec, 'routine') ? routineRate(p.records, nav.day) : null} />
-      </div>}
-    </div>
-  </div>;
-}
-
-function ModuleBody({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
-  switch (m.type) {
-    case 'tasks': return <Tasks m={m} ctx={ctx} />;
-    case 'routine': return <Routines m={m} ctx={ctx} />;
-    case 'goals': return <DayGoals ctx={ctx} />;
-    case 'checkin': return <CheckIn m={m} p={ctx.p} day={ctx.day} now={ctx.now} />;
-    case 'condition': return <ConditionDay p={ctx.p} day={ctx.day} now={ctx.now} />;
-    case 'personas': return <PersonaToday ctx={ctx} />;
-    case 'sleep': return <SleepBox ctx={ctx} />;
-    case 'review': return <ReviewBox ctx={ctx} />;
-    default: return <p className="muted">이 모듈은 곧 그려져요. 기록 형식은 이미 정해져 있어요.</p>;
-  }
-}
-
-function CarryOver({ctx}: {ctx: Ctx}) {
+export function CarryOver({ctx}: {ctx: Ctx}) {
   const left = ofKind(ctx.p.records, 'task').filter(t => t.logicalDay === addDays(ctx.day, -1) && !t.body.routineId && ['unknown', 'in_progress', 'partial', 'missed'].includes(t.body.outcome.result) && t.body.plan.state !== 'dropped');
   if (!left.length) return null;
   return <section className="part carry">
@@ -81,17 +30,21 @@ function CarryOver({ctx}: {ctx: Ctx}) {
   </section>;
 }
 
-function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
+export function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
   const {p, day} = ctx;
   const cats = m.options.categories !== false;
   const goals = linkableGoals(p.records, day), personas = ofKind(p.records, 'persona').filter(x => x.body.active);
   const tasks = ofKind(p.records, 'task').filter(t => t.logicalDay === day && !t.body.routineId && !t.body.plan.fixed).sort((a, b) => (a.body.priority ?? 9) - (b.body.priority ?? 9) || a.createdAt.localeCompare(b.createdAt));
   const [title, setTitle] = useState(''), [cat, setCat] = useState('must'), [goal, setGoal] = useState(''), [persona, setPersona] = useState('');
   const parsed = parseEntry(title, day), target = parsed.target;
+  // Until the user picks a goal, the one the title points to is preselected, so a check moves it without extra taps.
+  const [picked, setPicked] = useState(false);
+  const auto = !picked && title.trim() ? suggestGoal(p.records, day, title) : null;
+  const goalId = picked ? goal : auto?.id ?? '';
   const add = async () => {
     if (!title.trim()) return;
-    if (await p.write(null, {kind: 'task', logicalDay: day, body: {title: parsed.title, category: cats && !parsed.fixed ? cat : null, goalIds: goal ? [goal] : [], personaIds: persona ? [persona] : [],
-      plan: {state: 'committed', target, estimateMin: parsed.estimateMin, ...(parsed.fixed ? {fixed: true, ...parsed.fixed} : {})}}})) setTitle('');
+    if (await p.write(null, {kind: 'task', logicalDay: day, body: {title: parsed.title, category: cats && !parsed.fixed ? cat : null, goalIds: goalId ? [goalId] : [], personaIds: persona ? [persona] : [],
+      plan: {state: 'committed', target, estimateMin: parsed.estimateMin, ...(parsed.fixed ? {fixed: true, ...parsed.fixed} : {})}}})) { setTitle(''); setPicked(false); setGoal(''); }
   };
   const groups = cats ? (['must', 'want', 'leisure', null] as const).map(c => [c, tasks.filter(t => t.body.category === c)] as const).filter(([, l]) => l.length) : [[null, tasks] as const];
   const done = tasks.filter(t => t.body.outcome.result === 'done').length, live = tasks.filter(t => !['cancelled', 'postponed'].includes(t.body.outcome.result)).length;
@@ -107,7 +60,8 @@ function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
       <input value={title} onChange={e => setTitle(e.target.value)} placeholder="할 일 · 예) 수학 20문제, 보고서 90분, 14:00-15:00 회의" aria-label="할 일" />
       {parsed.fixed ? <span className="parsed" title="고정 일정으로 읽었어요">고정 일정</span> : parsed.estimateMin ? <span className="parsed" title="예상 시간으로 읽었어요">예상 {parsed.estimateMin}분</span> : target && <span className="parsed" title="분량으로 읽었어요">{target.amount}{target.unit}</span>}
       {cats && <select value={cat} onChange={e => setCat(e.target.value)} aria-label="분류">{Object.entries(CATEGORY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>}
-      {goals.length > 0 && <select value={goal} onChange={e => setGoal(e.target.value)} aria-label="이어질 목표"><option value="">목표 없음</option>{goals.map(g => <option key={g.id} value={g.id}>{g.body.horizon === 'milestone' ? '◆ ' : ''}{g.body.title}</option>)}</select>}
+      {auto && <span className="parsed auto-goal" title="제목으로 고른 목표예요. 바꾸려면 옆에서 고르세요">→ {auto.body.title}</span>}
+      {goals.length > 0 && <select value={goalId} onChange={e => { setGoal(e.target.value); setPicked(true); }} aria-label="이어질 목표"><option value="">목표 없음</option>{goals.map(g => <option key={g.id} value={g.id}>{g.body.horizon === 'milestone' ? '◆ ' : ''}{g.body.title}</option>)}</select>}
       {personas.length > 0 && <select value={persona} onChange={e => setPersona(e.target.value)} aria-label="페르소나"><option value="">페르소나</option>{personas.map(x => <option key={x.id} value={x.id}>{x.body.name}</option>)}</select>}
       <button className="primary small">추가</button>
     </form>
@@ -158,7 +112,7 @@ function TaskRow({t, ctx}: {t: LifeRecord<'task'>; ctx: Ctx}) {
   </li>;
 }
 
-function Routines({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
+export function Routines({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
   const {p, day, timer} = ctx;
   const pick = m.options.mode !== 'fixed_all', askReason = m.options.askReason === true;
   const routines = ofKind(p.records, 'routine').filter(r => r.body.active);
@@ -215,7 +169,7 @@ export function GoalBar({g, records}: {g: LifeRecord<'goal'>; records: AnyRecord
 const HORIZON: Record<string, string> = {year: '연간', quarter: '분기', month: '월간', week: '주간', milestone: '마일스톤'};
 export const horizonLabel = (h: string) => HORIZON[h] ?? h;
 
-function DayGoals({ctx}: {ctx: Ctx}) {
+export function DayGoals({ctx}: {ctx: Ctx}) {
   const order = ['week', 'milestone', 'month', 'quarter', 'year'];
   const goals = linkableGoals(ctx.p.records, ctx.day).sort((a, b) => order.indexOf(a.body.horizon) - order.indexOf(b.body.horizon) || a.body.period.localeCompare(b.body.period)).slice(0, 8);
   if (!goals.length) return <p className="muted">이 날에 걸린 목표가 없어요. 목표 탭에서 연간·월간·주간 목표를 세워 보세요.</p>;
@@ -225,7 +179,7 @@ function DayGoals({ctx}: {ctx: Ctx}) {
   </li>)}</ul>;
 }
 
-function PersonaToday({ctx}: {ctx: Ctx}) {
+export function PersonaToday({ctx}: {ctx: Ctx}) {
   const share = personaShare(ctx.p.records, ctx.day, 1), recent = personaShare(ctx.p.records, ctx.day, 14);
   if (!share.rows.length) return <p className="muted small">설정 → 페르소나에서 나의 역할(예: 수험생, 직장인, 창작자)을 만들면 할 일에 붙일 수 있어요.</p>;
   return <div className="persona-today">
@@ -234,7 +188,7 @@ function PersonaToday({ctx}: {ctx: Ctx}) {
   </div>;
 }
 
-function SleepBox({ctx}: {ctx: Ctx}) {
+export function SleepBox({ctx}: {ctx: Ctx}) {
   const s = ofKind(ctx.p.records, 'sleep').find(r => r.logicalDay === ctx.day);
   const local = (iso: string | null | undefined) => iso ? new Date(new Date(iso).getTime() - new Date(iso).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
   const save = (key: 'start' | 'end', v: string) => ctx.p.write(s?.id ?? null, {kind: 'sleep', logicalDay: ctx.day, body: {...(s?.body ?? {}), [key]: v ? new Date(v).toISOString() : null}, ...(s ? {baseRevision: s.revision} : {})});
@@ -244,7 +198,7 @@ function SleepBox({ctx}: {ctx: Ctx}) {
   </div>;
 }
 
-function ReviewBox({ctx}: {ctx: Ctx}) {
+export function ReviewBox({ctx}: {ctx: Ctx}) {
   const r = ofKind(ctx.p.records, 'review').find(x => x.logicalDay === ctx.day && x.body.horizon === 'day');
   const [text, setText] = useState<string | null>(null);
   const priv = r?.privateFields?.includes('text') ?? false;

@@ -5,6 +5,8 @@ import {memoryBackend, usePlanner} from '../data.ts';
 import {sampleRecords} from '../sample.ts';
 import {Moon, Speech} from '../Moon.tsx';
 import {PlannerView} from './PlannerView.tsx';
+import {Editor} from './Editor.tsx';
+import {canvasOf} from './Canvas.tsx';
 
 const moduleName = (m: ModuleType) => entry(m)?.label ?? m;
 
@@ -18,6 +20,9 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
   // Samples: two or three planners from the reference library; the picked one gets a mood, then becomes real.
   const [cands, setCands] = useState<{reference: Reference; spec: PlannerSpec}[] | null>(null), [pick, setPick] = useState<number | null>(null), [mood, setMood] = useState('calm');
   const preview = cands && pick !== null ? withMood(cands[pick]!.spec, mood) : null;
+  // The DIY step: the chosen sample (or a blank page) opens in the widget editor on sample records.
+  const [editing, setEditing] = useState<PlannerSpec | null>(null);
+  const editFrom = (spec: PlannerSpec, blank = false) => setEditing({...spec, canvas: {day: blank ? [] : canvasOf(spec)}});
   const setPreview = (_: null) => { setCands(null); setPick(null); };
   const input = useRef<HTMLTextAreaElement>(null);
 
@@ -29,6 +34,7 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
   const show = () => { if (!proposal) return; try { setError(''); setCands(candidates(proposal, said ?? '', accepted, answers, name)); setPick(null); } catch (e) { setError((e as Error).message); } };
   const use = async () => { if (!preview) return; setBusy(true); setError(''); try { await onUse(preview); } catch (e) { setError((e as Error).message); setBusy(false); } };
 
+  if (editing) return <BuilderEditor spec={editing} tz={tz} onBack={() => setEditing(null)} onUse={onUse} blank={!editing.canvas.day?.length} />;
   return <div className={`builder ${cands ? 'split' : ''}`}>
     <div className="chat">
       {current && onCancel && <button className="ghost small back" onClick={onCancel}>‹ 내 플래너로</button>}
@@ -50,6 +56,7 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
         <div className="chips">
           <span className="muted">이렇게 시작해도 돼요</span>
           {TEMPLATES.map(t => <button key={t.id} className="chip" onClick={() => start('', t.id)} title={t.summary}>{t.name}</button>)}
+          <button className="chip blank" onClick={() => editFrom(TEMPLATES[0]!.spec, true)}>□ 빈 화면에서 직접 만들기</button>
           {CATALOG.filter(c => !['tasks'].includes(c.module)).map(c => <button key={c.module} className="chip ghost" onClick={() => setText(v => `${v}${v ? ', ' : ''}${c.label}`)}>+ {c.label}</button>)}
         </div>
       </>}
@@ -80,7 +87,7 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
             <button className="ghost" onClick={restart}>처음부터 다시 말하기</button>
           </div>
         </div>
-        {cands && !preview && <div className="bubble moon"><p>같은 기능으로 <strong>{cands.length}가지</strong> 플래너를 그려 봤어요. 오른쪽에서 마음에 드는 걸 고르세요.</p></div>}
+        {cands && !preview && <div className="bubble moon"><p>같은 기능으로 <strong>{cands.length}가지</strong> 플래너를 그려 봤어요. 하나를 고르면 위젯을 옮기고, 더하고, 색과 스킨을 바꿀 수 있어요. 아니면 <button className="link" onClick={() => editFrom(cands[0]!.spec, true)}>빈 화면에서 직접</button> 만들어도 돼요.</p></div>}
         {preview && <div className="bubble moon">
           <p><strong>{cands![pick!]!.reference.name}</strong>로 골랐어요. 무드를 고르고, 예시 기록을 눌러 본 뒤 마음에 들면 이대로 쓰세요.</p>
           <div className="moods" role="radiogroup" aria-label="무드">{MOODS.map(m => <button key={m.id} role="radio" aria-checked={mood === m.id} className={`mood-chip mood-${m.id} ${mood === m.id ? 'on' : ''}`} onClick={() => setMood(m.id)} title={m.feel}><i />{m.name}</button>)}</div>
@@ -91,11 +98,11 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
         {error && <p className="error" role="alert">{error}</p>}
       </div>}
     </div>
-    {cands && !preview && <aside className="samples" aria-label="샘플">{cands.map((c, i) => <button key={c.reference.id + i} className="sample" onClick={() => setPick(i)}>
+    {cands && !preview && <aside className="samples" aria-label="샘플">{cands.map((c, i) => <button key={c.reference.id + i} className="sample" onClick={() => editFrom(c.spec)}>
       <div className="sample-head"><strong>{c.reference.name}</strong><span className="muted small">{c.reference.inspiredBy}</span></div>
       <ul className="sample-pattern">{c.reference.pattern.map(x => <li key={x}>{x}</li>)}</ul>
       <div className="sample-mini" aria-hidden="true"><Mockup spec={c.spec} tz={tz} mini /></div>
-      <span className="sample-pick">이걸로 볼래요 →</span>
+      <span className="sample-pick">이걸로 꾸미기 →</span>
     </button>)}</aside>}
     {preview && <Mockup key={JSON.stringify(preview)} spec={preview} tz={tz} />}
   </div>;
@@ -109,4 +116,14 @@ function Mockup({spec, tz, mini}: {spec: PlannerSpec; tz: string; mini?: boolean
     <div className="mockup-head"><Moon size={28} /><strong>{spec.name}</strong><span className="tag">목업 · 예시 데이터</span></div>
     <PlannerView spec={spec} settings={settings} p={p} />
   </aside>;
+}
+
+function BuilderEditor({spec, tz, onBack, onUse, blank}: {spec: PlannerSpec; tz: string; onBack: () => void; onUse: (spec: PlannerSpec) => Promise<void>; blank: boolean}) {
+  const settings: Settings = {tz, dayBoundary: '04:00'};
+  const backend = useMemo(() => memoryBackend(tz), [tz]);
+  const p = usePlanner(backend, useMemo(() => sampleRecords(spec, logicalDay(new Date(), settings), tz), [spec, tz]));
+  return <div className="builder-edit">
+    <div className="moon-say small"><Moon size={40} /><Speech>{blank ? '빈 화면이에요. 쓰고 싶은 위젯을 골라 배치해 보세요.' : '마음대로 옮기고, 더하고, 꾸며 보세요. 예시 기록으로 미리 보여요.'}</Speech><button className="ghost small" onClick={onBack}>‹ 샘플로</button></div>
+    <Editor spec={spec} settings={settings} p={p} saveLabel="이대로 쓰기" onSave={onUse} hint="예시 기록이 들어 있어요. 쓰기 시작하면 빈 플래너로 바뀌어요." />
+  </div>;
 }

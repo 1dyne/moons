@@ -1,0 +1,124 @@
+import {useMemo, useState} from 'react';
+import {logicalDay, type Settings} from '@workspace/life-contract';
+import {PlannerSpec, SKIN_PRESETS, Skin, WIDGETS, defaultModule, modulesOf, placeNew, settle, widgetInfo, type WidgetType, type Widget} from '@workspace/planner-spec';
+import {ofKind, type Planner} from '../data.ts';
+import {DayCanvas, canvasOf, skinProps} from './Canvas.tsx';
+
+// DIY editor: add widgets, drag to place, drag the corner to size, style each one, and dress the page with a skin.
+// It edits the live page (real records in the planner, sample records in the builder), so what you see is what you use.
+const SWATCHES = ['#3a66b8', '#8aaaf8', '#00838f', '#2f9585', '#e9b949', '#d98a8a', '#b05a57', '#a0784a', '#6b5b95', '#2d2f2a'];
+let seq = 0;
+const newId = (type: string) => `${type}-${Date.now().toString(36)}${(seq++).toString(36)}`.slice(0, 40);
+
+/** The spec after editing: canvas and skin saved, modules kept in step with the widgets used. */
+export function applyCanvas(spec: PlannerSpec, widgets: Widget[], skin: Skin): PlannerSpec {
+  const used = modulesOf(widgets), modules = [...spec.modules];
+  for (const m of used) if (!modules.some(x => x.type === m)) modules.push(defaultModule(m, modules.length));
+  return PlannerSpec.parse({...spec, canvas: {...spec.canvas, day: widgets}, skin, modules: modules.length ? modules : [defaultModule('tasks', 0)]});
+}
+
+export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {spec: PlannerSpec; settings: Settings; p: Planner; saveLabel: string; onSave: (spec: PlannerSpec) => Promise<void> | void; onCancel?: () => void; hint?: string}) {
+  const today = logicalDay(new Date(), settings);
+  const [widgets, setWidgets] = useState<Widget[]>(() => canvasOf(spec));
+  const [skin, setSkin] = useState<Skin>(() => spec.skin ?? Skin.parse({}));
+  const [selected, setSelected] = useState<string | null>(null), [panel, setPanel] = useState<'widgets' | 'skin'>(widgets.length ? 'skin' : 'widgets');
+  const [history, setHistory] = useState<Widget[][]>([]), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const change = (ws: Widget[]) => { setHistory(h => [...h.slice(-30), widgets]); setWidgets(ws); };
+  const undo = () => { const prev = history.at(-1); if (prev) { setWidgets(prev); setHistory(h => h.slice(0, -1)); } };
+  const add = (type: WidgetType) => { const w = placeNew(widgets, type, newId(type)); change([...widgets, w]); setSelected(w.id); };
+  const sel = widgets.find(w => w.id === selected);
+  const patch = (id: string, patch: Partial<Widget>) => change(settle(widgets.map(w => w.id === id ? {...w, ...patch} : w), id));
+  const opt = (id: string, key: string, value: unknown) => change(widgets.map(w => w.id === id ? {...w, options: {...w.options, [key]: value}} : w));
+  const nav = useMemo(() => ({day: today, setDay: () => {}, openGoal: () => {}}), [today]);
+  const sp = skinProps(skin);
+  const save = async () => { setBusy(true); setError(''); try { await onSave(applyCanvas(spec, widgets, skin)); } catch (e) { setError((e as Error).message); setBusy(false); } };
+  const goals = ofKind(p.records, 'goal');
+
+  return <div className="editor">
+    <div className="ed-bar">
+      <div className="seg" role="tablist">
+        <button role="tab" aria-selected={panel === 'widgets'} className={panel === 'widgets' ? 'on' : ''} onClick={() => setPanel('widgets')}>＋ 위젯</button>
+        <button role="tab" aria-selected={panel === 'skin'} className={panel === 'skin' ? 'on' : ''} onClick={() => setPanel('skin')}>스킨</button>
+      </div>
+      <span className="muted small ed-hint">{hint ?? '위젯 머리(⠿)를 끌어 옮기고, 오른쪽 아래 모서리를 끌어 크기를 바꿔요.'}</span>
+      <button className="ghost small" onClick={undo} disabled={!history.length}>되돌리기</button>
+      {onCancel && <button className="ghost small" onClick={onCancel}>취소</button>}
+      <button className="primary" disabled={busy} onClick={save}>{busy ? '저장 중…' : saveLabel}</button>
+    </div>
+    {error && <p className="error">{error}</p>}
+    <div className="ed-body">
+      <aside className="ed-side" aria-label={panel === 'widgets' ? '위젯 고르기' : '스킨'}>
+        {panel === 'widgets' ? <>
+          {(['기록', '시간', '목표', '나', '꾸미기'] as const).map(g => <div key={g} className="ed-group"><span className="muted small">{g}</span>
+            {WIDGETS.filter(w => w.group === g).map(w => <button key={w.type} className="ed-widget" onClick={() => add(w.type)}>
+              <strong>＋ {w.label}</strong><span>{w.desc}</span>{widgets.some(x => x.type === w.type) && <em>사용 중</em>}
+            </button>)}
+          </div>)}
+        </> : <SkinPanel skin={skin} setSkin={setSkin} />}
+      </aside>
+      <div className={`ed-canvas ${sp.className}`} style={sp.style}>
+        <DayCanvas spec={{...spec, skin}} settings={settings} p={p} today={today} day={today} nav={nav}
+          edit={{widgets, selected, select: setSelected, change: ws => change(ws)}} />
+      </div>
+      {sel && <aside className="ed-inspect" aria-label="위젯 설정">
+        <div className="ed-inspect-head"><strong>{widgetInfo(sel.type).label}</strong><button className="ghost small" onClick={() => setSelected(null)} aria-label="닫기">✕</button></div>
+        <label>제목 <input value={sel.title ?? widgetInfo(sel.type).label} onChange={e => patch(sel.id, {title: e.target.value})} /></label>
+        <label className="row-check"><input type="checkbox" checked={sel.title === ''} onChange={e => patch(sel.id, {title: e.target.checked ? '' : undefined})} /> 제목 숨기기</label>
+        <span className="muted small">색</span>
+        <div className="swatches">{SWATCHES.map(c => <button key={c} className={`swatch ${sel.color === c ? 'on' : ''}`} style={{background: c}} onClick={() => patch(sel.id, {color: c})} aria-label={`색 ${c}`} />)}
+          <input type="color" value={sel.color ?? skin.accent} onChange={e => patch(sel.id, {color: e.target.value})} aria-label="직접 고르기" />
+          {sel.color && <button className="ghost small" onClick={() => patch(sel.id, {color: undefined})}>스킨 색</button>}</div>
+        <label>모양 <select value={sel.style ?? ''} onChange={e => patch(sel.id, {style: (e.target.value || undefined) as Widget['style']})}>
+          <option value="">스킨 따라가기</option><option value="card">카드(그림자)</option><option value="line">선</option><option value="filled">색 채움</option><option value="plain">테두리 없음</option></select></label>
+        <div className="inline"><label>너비 <input type="number" min={widgetInfo(sel.type).minW} max={12} value={sel.w} onChange={e => patch(sel.id, {w: Number(e.target.value)})} className="num" /></label>
+          <label>높이 <input type="number" min={widgetInfo(sel.type).minH} max={60} value={sel.h} onChange={e => patch(sel.id, {h: Number(e.target.value)})} className="num" /></label></div>
+        <WidgetOptions w={sel} opt={(k, v) => opt(sel.id, k, v)} goals={goals.map(g => ({id: g.id, title: g.body.title}))} />
+        <div className="inline">
+          <button className="small" onClick={() => { const c = {...sel, id: newId(sel.type), y: sel.y + sel.h}; change(settle([...widgets, c], c.id)); setSelected(c.id); }}>복제</button>
+          <button className="small danger" onClick={() => { change(widgets.filter(w => w.id !== sel.id)); setSelected(null); }}>지우기</button>
+        </div>
+      </aside>}
+    </div>
+  </div>;
+}
+
+function WidgetOptions({w, opt, goals}: {w: Widget; opt: (k: string, v: unknown) => void; goals: {id: string; title: string}[]}) {
+  const o = w.options;
+  switch (w.type) {
+    case 'text': return <>
+      <label>문구 <textarea rows={3} value={String(o.text ?? '')} onChange={e => opt('text', e.target.value)} placeholder="좌우명, 오늘의 다짐…" /></label>
+      <label>글자 크기 <select value={String(o.size ?? 'm')} onChange={e => opt('size', e.target.value)}><option value="s">작게</option><option value="m">보통</option><option value="l">크게</option><option value="xl">아주 크게</option></select></label></>;
+    case 'progress': case 'dday': return <>
+      <label>목표 <select value={String(o.goalId ?? '')} onChange={e => opt('goalId', e.target.value || undefined)}><option value="">자동(첫 큰 목표)</option>{goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>
+      {w.type === 'dday' && <><label>날짜(목표 대신) <input type="date" value={String(o.date ?? '')} onChange={e => opt('date', e.target.value || undefined)} /></label>
+        <label>이름 <input value={String(o.label ?? '')} onChange={e => opt('label', e.target.value)} placeholder="예: LEET 시험" /></label></>}</>;
+    case 'timetable': case 'hourly': case 'page': return <label>시작 시각 <select value={String(o.startHour ?? 6)} onChange={e => opt('startHour', Number(e.target.value))}>{[4, 5, 6, 7, 8, 9, 10].map(h => <option key={h} value={h}>{h}시</option>)}</select></label>;
+    case 'tasks': return <>
+      <label className="row-check"><input type="checkbox" checked={o.categories !== false} onChange={e => opt('categories', e.target.checked)} /> 꼭·하고 싶은·여가로 나누기</label>
+      <label className="row-check"><input type="checkbox" checked={o.amounts !== false} onChange={e => opt('amounts', e.target.checked)} /> 분량 적기</label></>;
+    case 'routine': return <>
+      <label>세는 방식 <select value={String(o.mode ?? 'pick_daily')} onChange={e => opt('mode', e.target.value)}><option value="pick_daily">그날 고른 것만</option><option value="fixed_all">정해 둔 것 전부</option></select></label>
+      <label className="row-check"><input type="checkbox" checked={o.askReason === true} onChange={e => opt('askReason', e.target.checked)} /> 못 한 이유 남기기</label></>;
+    case 'checkin': return <div className="inline">
+      <label>기상 <input type="time" value={String(o.wake ?? '07:00')} onChange={e => opt('wake', e.target.value)} /></label>
+      <label>취침 <input type="time" value={String(o.sleep ?? '00:00')} onChange={e => opt('sleep', e.target.value)} /></label></div>;
+    default: return null;
+  }
+}
+
+function SkinPanel({skin, setSkin}: {skin: Skin; setSkin: (s: Skin) => void}) {
+  const set = (p: Partial<Skin>) => setSkin({...skin, ...p});
+  const color = (key: 'accent' | 'background' | 'surface' | 'ink', label: string) => <label className="sk-color">{label}<input type="color" value={skin[key]} onChange={e => set({[key]: e.target.value})} /></label>;
+  return <div className="skin-panel">
+    <span className="muted small">프리셋</span>
+    <div className="sk-presets">{SKIN_PRESETS.map(pr => <button key={pr.id} className="sk-preset" onClick={() => setSkin(pr.skin)} style={{background: pr.skin.background, color: pr.skin.ink, borderColor: pr.skin.accent}}><i style={{background: pr.skin.accent}} />{pr.name}</button>)}</div>
+    <span className="muted small">강조 색</span>
+    <div className="swatches">{SWATCHES.map(c => <button key={c} className={`swatch ${skin.accent === c ? 'on' : ''}`} style={{background: c}} onClick={() => set({accent: c})} aria-label={`강조 색 ${c}`} />)}</div>
+    <div className="sk-colors">{color('accent', '강조')}{color('background', '바탕')}{color('surface', '위젯')}{color('ink', '글자')}</div>
+    <label>종이 <select value={skin.paper} onChange={e => set({paper: e.target.value as Skin['paper']})}><option value="plain">민무늬</option><option value="grid">모눈</option><option value="dot">도트</option><option value="lined">줄</option></select></label>
+    <label>글꼴 <select value={skin.font} onChange={e => set({font: e.target.value as Skin['font']})}><option value="sans">고딕</option><option value="serif">명조</option><option value="hand">손글씨풍</option><option value="mono">고정폭</option></select></label>
+    <label>위젯 모양 <select value={skin.card} onChange={e => set({card: e.target.value as Skin['card']})}><option value="line">선</option><option value="card">카드(그림자)</option><option value="filled">색 채움</option><option value="plain">테두리 없음</option></select></label>
+    <label>제목 모양 <select value={skin.heading} onChange={e => set({heading: e.target.value as Skin['heading']})}><option value="rule">밑줄</option><option value="pill">알약</option><option value="plain">글자만</option></select></label>
+    <label>모서리 <input type="range" min={0} max={28} value={skin.radius} onChange={e => set({radius: Number(e.target.value)})} /> {skin.radius}px</label>
+  </div>;
+}

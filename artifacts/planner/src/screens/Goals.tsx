@@ -3,7 +3,7 @@ import {goalPercent, linkedTasks, periodsOf, type Goal, type LifeRecord} from '@
 import type {PlannerSpec} from '@workspace/planner-spec';
 import {api, ofKind, type Planner} from '../data.ts';
 import {GoalPlanPanel, NewGoal} from './GoalPlan.tsx';
-import {goalSchedule, weeklyFocus} from '@workspace/life-contract';
+import {goalSchedule, suggestGoal, unlinkedDone, weeklyFocus} from '@workspace/life-contract';
 import {GoalBar, horizonLabel, label, type Nav} from './Today.tsx';
 
 // Long-term goals: write one naively, let MOONS split it into milestones, review, then live by the daily list.
@@ -34,6 +34,7 @@ export function Goals({spec, p, nav, today, goalId, setGoalId}: {spec: PlannerSp
   return <div className="goals">
     <NewGoal p={p} today={today} weekly={weekly} onWeekly={saveWeekly} onDone={setGoalId} />
     <Bottlenecks p={p} today={today} weeklyMin={weeklyMin} open={setGoalId} />
+    <Unlinked p={p} today={today} />
     <div className="seg" role="tablist">
       <button role="tab" aria-selected={view === 'ladder'} className={view === 'ladder' ? 'on' : ''} onClick={() => setView('ladder')}>목표 사다리</button>
       <button role="tab" aria-selected={view === 'roadmap'} className={view === 'roadmap' ? 'on' : ''} onClick={() => setView('roadmap')}>연간 로드맵</button>
@@ -43,6 +44,21 @@ export function Goals({spec, p, nav, today, goalId, setGoalId}: {spec: PlannerSp
     </section>}
     <details className="part manual"><summary>기간 목표 직접 추가 (연간·월간·주간)</summary><GoalForm p={p} goals={goals} levels={levels} today={today} /></details>
   </div>;
+}
+
+/** Finished work that moves no goal yet: link it in one tap so it counts. */
+function Unlinked({p, today}: {p: Planner; today: string}) {
+  const tasks = unlinkedDone(p.records, today);
+  const goals = ofKind(p.records, 'goal').filter(g => g.body.status === 'active');
+  if (!tasks.length || !goals.length) return null;
+  return <details className="part unlinked"><summary>목표에 안 이어진 끝낸 일 {tasks.length}개 — 이으면 진행률에 들어가요</summary>
+    <ul className="prows">{tasks.slice(0, 20).map(t => { const s = suggestGoal(p.records, today, t.body.title); return <li key={t.id} className="prow">
+      <span className="ptitle"><span className="pname">{t.body.title}</span><span className="psub">{t.logicalDay}</span></span>
+      <select defaultValue={s?.id ?? ''} aria-label={`${t.body.title} 이을 목표`} onChange={e => e.target.value && p.write(t.id, {kind: 'task', logicalDay: t.logicalDay, body: {...t.body, goalIds: [e.target.value]}, baseRevision: t.revision})}>
+        <option value="">목표 고르기</option>{goals.map(g => <option key={g.id} value={g.id}>{g.body.horizon === 'milestone' ? '◆ ' : ''}{g.body.title}</option>)}</select>
+      {s && <button className="small" onClick={() => p.write(t.id, {kind: 'task', logicalDay: t.logicalDay, body: {...t.body, goalIds: [s.id]}, baseRevision: t.revision})}>→ {s.body.title}</button>}
+    </li>; })}</ul>
+  </details>;
 }
 
 /** A standing warning on the goals page: goals that will miss their deadline and months where goals collide. */

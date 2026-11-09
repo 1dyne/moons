@@ -8,6 +8,7 @@ import {parseEntry} from '../parse.ts';
 import {MARK, NEXT, moveTo, outcome, saveTask, type Ctx, type Nav} from './day.ts';
 export {MARK, NEXT, moveTo, outcome, saveTask, type Ctx, type Nav} from './day.ts';
 import {BulletDay, HourlyDay, OnePageDay} from './DayLayouts.tsx';
+import {Gauge} from '../Gauge.tsx';
 export {parseEntry, parseTarget} from '../parse.ts';
 
 const CATEGORY: Record<string, string> = {must: '꼭', want: '하고 싶은', leisure: '여가'};
@@ -164,7 +165,7 @@ export function GoalBar({g, records}: {g: LifeRecord<'goal'>; records: AnyRecord
   const gp = goalPercent(g.id, records), pr = g.body.target ? goalProgress(g, records, '') : null;
   const detail = pr && g.body.target ? ` · ${pr.amount}/${pr.unit === '%' ? 100 : g.body.target.amount}${pr.unit}` : '';
   const how = {achieved: '이룸', target: '목표량 기준', children: '아래 목표·마일스톤 기준', tasks: '이어진 할 일 기준(이룸 표시 전 최대 90%)', none: '아직 이어진 일이 없어요'}[gp.basis];
-  return <span className="bar" title={`${gp.pct}% · ${how}`}><i style={{width: `${gp.pct}%`}} /><em>{gp.pct}%{detail}</em></span>;
+  return <span className="goal-gauge" title={`${gp.pct}% · ${how}`}><Gauge pct={gp.basis === 'none' ? null : gp.pct} size="sm" label={g.body.title} />{detail && <em className="g-detail">{detail.slice(3)}</em>}</span>;
 }
 const HORIZON: Record<string, string> = {year: '연간', quarter: '분기', month: '월간', week: '주간', milestone: '마일스톤'};
 export const horizonLabel = (h: string) => HORIZON[h] ?? h;

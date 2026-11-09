@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {SKIN_PRESETS, isDark, modulesOf, placeNew, settle, starterCanvas, type Widget} from './canvas.ts';
+import {SKIN_PRESETS, Skin, isDark, modulesOf, placeNew, settle, starterCanvas, type Widget} from './canvas.ts';
 import {PlannerSpec, TEMPLATES} from './index.ts';
 
 test('starter canvases cover the modules and never overlap', () => {
@@ -21,9 +21,9 @@ test('moving a widget onto others pushes them down; new widgets go below', () =>
 });
 
 test('specs accept a canvas and a skin; dark skins are detected', () => {
-  const spec = PlannerSpec.parse({...TEMPLATES[0]!.spec, canvas: {day: starterCanvas('sheet', ['tasks', 'timer'])}, skin: SKIN_PRESETS[5]!.skin});
+  const spec = PlannerSpec.parse({...TEMPLATES[0]!.spec, canvas: {day: starterCanvas('sheet', ['tasks', 'timer'])}, skin: SKIN_PRESETS.find(p => p.id === 'night')!.skin});
   assert.ok(spec.canvas.day!.length > 2);
-  assert.ok(isDark(SKIN_PRESETS[5]!.skin.background) && !isDark('#fbf6ea'));
+  assert.ok(isDark(SKIN_PRESETS.find(p => p.id === 'night')!.skin.background) && !isDark('#fbf6ea') && isDark(SKIN_PRESETS.find(p => p.id === 'panel-dark')!.skin.background) && Skin.parse({}).gauge === 'segment');
 });
 
 test('a loose widget list from an AI becomes a valid spec; unknown widgets are reported, overlaps settle', async () => {

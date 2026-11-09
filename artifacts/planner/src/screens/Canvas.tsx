@@ -9,6 +9,7 @@ import {CheckIn, ConditionDay} from './CheckIn.tsx';
 import {BulletDay, HourlyDay, OnePageDay} from './DayLayouts.tsx';
 import {HabitGrid} from './Habits.tsx';
 import {useFontFamily} from '../fonts.ts';
+import {Gauge} from '../Gauge.tsx';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
 /** A saved page keeps its placement; a page never arranged starts as 다꾸형 from the layout's starter. */
@@ -128,8 +129,8 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
     case 'progress': {
       const goals = ofKind(p.records, 'goal'), g = goals.find(x => x.id === w.options.goalId) ?? goals.find(x => !x.body.parentGoalId && x.body.status === 'active');
       if (!g) return <p className="muted small">목표를 세우면 여기 크게 보여요. (편집에서 목표 고르기)</p>;
-      const pct = goalPercent(g.id, p.records).pct;
-      return <button className="wg-progress link" onClick={() => ctx.nav.openGoal(g.id)}><span>{g.body.title}</span><strong>{pct}%</strong><i style={{width: `${pct}%`}} /></button>;
+      const gp = goalPercent(g.id, p.records);
+      return <button className="wg-progress link" onClick={() => ctx.nav.openGoal(g.id)}><span>{g.body.title}</span><Gauge pct={gp.basis === 'none' ? null : gp.pct} size="lg" label={g.body.title} /></button>;
     }
     case 'dday': {
       const goals = ofKind(p.records, 'goal'), g = goals.find(x => x.id === w.options.goalId) ?? goals.find(x => x.body.deadline && x.body.status === 'active');

@@ -4,6 +4,7 @@ import {FONTS, METRICS, PALETTE, SKIN_PRESETS, Skin, WIDGETS, applyCanvas, fontI
 import {useFontFamily} from '../fonts.ts';
 import {ofKind, type Planner} from '../data.ts';
 import {DayCanvas, canvasOf, modeOf, skinProps} from './Canvas.tsx';
+import {GaugePicker, GaugeProvider} from '../Gauge.tsx';
 
 // DIY editor: add widgets, drag to place, drag the corner to size, style each one, and dress the page with a skin.
 // It edits the live page (real records in the planner, sample records in the builder), so what you see is what you use.
@@ -57,10 +58,10 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {
           </div>)}
         </> : <SkinPanel skin={skin} setSkin={setSkin} />}
       </aside>
-      <div className={`ed-canvas ${sp.className}`} style={sp.style}>
+      <div className={`ed-canvas ${sp.className}`} style={sp.style}><GaugeProvider value={skin.gauge ?? 'segment'}>
         <DayCanvas spec={{...spec, skin}} settings={settings} p={p} today={today} day={today} nav={nav}
           edit={{widgets, mode, selected, select: setSelected, change: ws => change(ws)}} />
-      </div>
+      </GaugeProvider></div>
       {sel && <aside className="ed-inspect" aria-label="위젯 설정">
         <div className="ed-inspect-head"><strong>{widgetInfo(sel.type).label}</strong><button className="ghost small" onClick={() => setSelected(null)} aria-label="닫기">✕</button></div>
         <label>제목 <input value={sel.title ?? widgetInfo(sel.type).label} onChange={e => patch(sel.id, {title: e.target.value})} /></label>
@@ -147,13 +148,15 @@ function SkinPanel({skin, setSkin}: {skin: Skin; setSkin: (s: Skin) => void}) {
   return <div className="skin-panel">
     <span className="muted small">프리셋</span>
     <div className="sk-presets">{SKIN_PRESETS.map(pr => <button key={pr.id} className="sk-preset" onClick={() => setSkin(pr.skin)} style={{background: pr.skin.background, color: pr.skin.ink, borderColor: pr.skin.accent}}><i style={{background: pr.skin.accent}} />{pr.name}</button>)}</div>
-    <span className="muted small">강조 색</span>
+    <span className="muted small">진행률 모양 <em className="sk-note">목표·월간·진행률 위젯이 모두 이 모양으로 보여요</em></span>
+    <GaugePicker value={skin.gauge ?? 'segment'} onChange={g => set({gauge: g})} />
+    <span className="muted small">강조 색 <em className="sk-note">계기판의 지금 채우는 칸·넘친 시간에 쓰여요</em></span>
     <div className="swatches">{SWATCHES.map(c => <button key={c} className={`swatch ${skin.accent === c ? 'on' : ''}`} style={{background: c}} onClick={() => set({accent: c})} aria-label={`강조 색 ${c}`} />)}</div>
     <div className="sk-colors">{color('accent', '강조')}{color('background', '바탕')}{color('surface', '위젯')}{color('ink', '글자')}</div>
     <label>종이 <select value={skin.paper} onChange={e => set({paper: e.target.value as Skin['paper']})}><option value="plain">민무늬</option><option value="grid">모눈</option><option value="dot">도트</option><option value="lined">줄</option></select></label>
     <FontSelect label="글꼴 (전체)" value={skin.font} onChange={f => set({font: f ?? 'pretendard'})} />
     <label>위젯 모양 <select value={skin.card} onChange={e => set({card: e.target.value as Skin['card']})}><option value="line">선</option><option value="card">카드(그림자)</option><option value="filled">색 채움</option><option value="plain">테두리 없음</option></select></label>
-    <label>제목 모양 <select value={skin.heading} onChange={e => set({heading: e.target.value as Skin['heading']})}><option value="rule">밑줄</option><option value="pill">알약</option><option value="plain">글자만</option></select></label>
+    <label>제목 모양 <select value={skin.heading} onChange={e => set({heading: e.target.value as Skin['heading']})}><option value="rule">밑줄</option><option value="pill">태그</option><option value="plain">글자만</option></select></label>
     <label>모서리 <input type="range" min={0} max={28} value={skin.radius} onChange={e => set({radius: Number(e.target.value)})} /> {skin.radius}px</label>
   </div>;
 }

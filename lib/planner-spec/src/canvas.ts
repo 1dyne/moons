@@ -106,25 +106,40 @@ export const Widget = z.object({
 });
 export type Widget = z.infer<typeof Widget>;
 
+/** How progress (%) is drawn everywhere: goal bars, month summary, progress widgets. All monochrome; the accent marks the live edge. */
+export const GAUGES = [
+  {id: 'segment', name: '칸 막대', hint: '10칸을 채워 가요. 지금 채우는 칸만 강조색.'},
+  {id: 'bar', name: '눈금 막대', hint: '얇은 막대에 25·50·75 눈금.'},
+  {id: 'ring', name: '링', hint: '숫자를 가는 링이 감싸요. 좁은 칸에 좋아요.'},
+  {id: 'arc', name: '바늘 계기', hint: '반원 눈금과 바늘. 큰 목표 하나에 어울려요.'},
+  {id: 'pips', name: '점 10개', hint: '점 하나가 10%. 여러 목표를 나란히 볼 때.'},
+  {id: 'number', name: '숫자 + 자', hint: '큰 숫자 아래 자 눈금에 위치 표시.'},
+] as const;
+export type GaugeKind = typeof GAUGES[number]['id'];
+const GAUGE_IDS = GAUGES.map(g => g.id) as [GaugeKind, ...GaugeKind[]];
+
 export const Skin = z.object({
-  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#3a66b8'),
-  background: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#ffffff'),
-  surface: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#ffffff'),
-  ink: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#252720'),
+  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#f2c230'),
+  background: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#e6e6e1'),
+  surface: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#f5f5f1'),
+  ink: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#151515'),
   paper: z.enum(['plain', 'grid', 'dot', 'lined']).default('plain'),
-  font: z.string().max(40).default('pretendard'),
-  radius: z.number().int().min(0).max(28).default(14),
+  font: z.string().max(40).default('ibm-plex'),
+  radius: z.number().int().min(0).max(28).default(0),
   card: z.enum(['card', 'line', 'plain', 'filled']).default('line'),
   heading: z.enum(['rule', 'pill', 'plain']).default('rule'),
+  gauge: z.enum(GAUGE_IDS).default('segment'),
 });
 export type Skin = z.infer<typeof Skin>;
 export const SKIN_PRESETS: {id: string; name: string; skin: Skin}[] = [
-  {id: 'calm', name: '차분한 미니멀', skin: Skin.parse({})},
-  {id: 'ivory', name: '아이보리 종이', skin: Skin.parse({accent: '#a0784a', background: '#fbf6ea', surface: '#fffcf4', ink: '#3b342a', font: 'gowun-batang', radius: 6, card: 'line'})},
-  {id: 'study', name: '스터디 모눈', skin: Skin.parse({accent: '#00838f', paper: 'grid', radius: 4, card: 'card', heading: 'rule'})},
-  {id: 'deco', name: '다꾸 감성', skin: Skin.parse({accent: '#d98a8a', background: '#fff8f6', paper: 'dot', font: 'gaegu', radius: 22, card: 'filled', heading: 'pill'})},
-  {id: 'mint', name: '민트 노트', skin: Skin.parse({accent: '#2f9585', background: '#f3faf8', surface: '#ffffff', radius: 18, card: 'card', heading: 'pill'})},
-  {id: 'night', name: '다크', skin: Skin.parse({accent: '#8aaaf8', background: '#1d2025', surface: '#24282e', ink: '#e7e8e2', radius: 14, card: 'card'})},
+  {id: 'panel', name: '계기판', skin: Skin.parse({})},
+  {id: 'panel-dark', name: '계기판 다크', skin: Skin.parse({background: '#151515', surface: '#1f1f1d', ink: '#ecece7'})},
+  {id: 'calm', name: '차분한 미니멀', skin: Skin.parse({accent: '#3a66b8', background: '#ffffff', surface: '#ffffff', ink: '#252720', font: 'pretendard', radius: 14})},
+  {id: 'ivory', name: '아이보리 종이', skin: Skin.parse({accent: '#a0784a', background: '#fbf6ea', surface: '#fffcf4', ink: '#3b342a', font: 'gowun-batang', radius: 6, card: 'line', gauge: 'bar'})},
+  {id: 'study', name: '스터디 모눈', skin: Skin.parse({accent: '#00838f', background: '#ffffff', surface: '#ffffff', ink: '#252720', font: 'pretendard', paper: 'grid', radius: 4, card: 'card', heading: 'rule'})},
+  {id: 'deco', name: '다꾸 감성', skin: Skin.parse({accent: '#d98a8a', background: '#fff8f6', surface: '#ffffff', ink: '#252720', gauge: 'pips', paper: 'dot', font: 'gaegu', radius: 22, card: 'filled', heading: 'pill'})},
+  {id: 'mint', name: '민트 노트', skin: Skin.parse({accent: '#2f9585', background: '#f3faf8', surface: '#ffffff', ink: '#252720', font: 'pretendard', gauge: 'ring', radius: 18, card: 'card', heading: 'pill'})},
+  {id: 'night', name: '다크', skin: Skin.parse({accent: '#8aaaf8', background: '#1d2025', surface: '#24282e', ink: '#e7e8e2', font: 'pretendard', radius: 14, card: 'card'})},
 ];
 /** Dark backgrounds get the night rules (inputs, borders) automatically. */
 export function isDark(hex: string) {

@@ -1,6 +1,6 @@
 import {z} from 'zod';
 import {ALL_SCOPES, buildNow, goalSchedule, logicalDay, weeklyFocus, type AnyRecord} from '@workspace/life-contract';
-import {FONTS, PALETTE, SKIN_PRESETS, WIDGETS, buildSpec, uses, type PlannerSpec} from '@workspace/planner-spec';
+import {FONTS, GAUGES, PALETTE, SKIN_PRESETS, WIDGETS, buildSpec, uses, type PlannerSpec} from '@workspace/planner-spec';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 import {allRecords, getSettings, getSpec, lastActivity, putSettings, saveSpec, writeRecord} from './store.ts';
 
@@ -22,7 +22,7 @@ const guide = () => `lit · 대화로 만들고 마음대로 꾸미는 나만의
 위젯: ${WIDGETS.map(w => `${w.type}(${w.label}, 기본 ${w.w}×${w.h}: ${w.desc})`).join('; ')}.
 위젯 옵션 예: tasks{categories,amounts} routine{mode:"pick_daily"|"fixed_all",askReason} timetable/hourly/page{startHour} checkin{wake:"07:00",sleep:"00:00"} text{text,size:"s|m|l|xl",align} progress/dday{goalId|date,label} sticker{glyph,size} tape{pattern:"plain|stripe|dot|check|grid",color,opacity} image{src(https),frame:"polaroid|round|circle|none",caption} shape{shape:"heart|star|cloud|circle|label|flower",color,text}.
 위젯 꾸밈: title(""이면 숨김), font, color(강조), background, ink(글자색), style("card|line|filled|plain").
-스킨: accent·background·surface·ink(#hex), paper("plain|grid|dot|lined"), font, card, heading("rule|pill|plain"), radius(0~28). 프리셋: ${SKIN_PRESETS.map(p => p.id).join(', ')}.
+스킨: accent·background·surface·ink(#hex), paper("plain|grid|dot|lined"), font, card, heading("rule|pill|plain"), radius(0~28), gauge(진행률 모양: ${GAUGES.map(g => `${g.id}=${g.name}`).join(", ")}). 기본은 계기판(회색 판, 검정 선, 노랑 신호, 모서리 0). 프리셋: ${SKIN_PRESETS.map(p => p.id).join(', ')}.
 글꼴 id: ${FONTS.map(f => `${f.id}(${f.kind})`).join(', ')}.
 팔레트: ${PALETTE.join(' ')}.
 기록 규칙: 하루는 logicalDay(YYYY-MM-DD, 사용자 하루 경계 기준). 목표는 연간 → 마일스톤(끝낼 달) → 할 일. 사용자가 말하지 않은 시험일·점수 등은 묻는다.`;

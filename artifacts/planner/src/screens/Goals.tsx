@@ -5,6 +5,7 @@ import {api, ofKind, type Planner} from '../data.ts';
 import {GoalPlanPanel, NewGoal} from './GoalPlan.tsx';
 import {goalSchedule, suggestGoal, unlinkedDone, weeklyFocus} from '@workspace/life-contract';
 import {GoalBar, horizonLabel, label, type Nav} from './Today.tsx';
+import {Gauge} from '../Gauge.tsx';
 
 // Long-term goals: write one naively, let MOONS split it into milestones, review, then live by the daily list.
 // Every task linked to a milestone moves the goal's overall percentage.
@@ -85,7 +86,7 @@ function Roadmap({p, today, open}: {p: Planner; today: string; open: (id: string
       <span className="rm-head" />{months.map(m => <span key={m} className={`rm-head ${m === now ? 'now' : ''}`}>{Number(m.slice(5))}</span>)}
       {tops.map(g => {
         const items = descendants(g.id).filter(c => c.body.horizon === 'milestone' || c.body.horizon === 'month');
-        return [<button key={g.id} className="rm-goal link" onClick={() => open(g.id)}>{g.body.title}<em>{goalPercent(g.id, p.records).pct}%</em></button>,
+        return [<button key={g.id} className="rm-goal link" onClick={() => open(g.id)}>{g.body.title}<Gauge pct={goalPercent(g.id, p.records).pct} size="sm" label={g.body.title} /></button>,
           ...months.map(m => <span key={`${g.id}-${m}`} className={`rm-cell ${m === now ? 'now' : ''}`}>
             {items.filter(c => c.body.period === m).map(c => {
               const pct = goalPercent(c.id, p.records).pct, state = c.body.status === 'achieved' ? 'done' : m < now ? 'late' : 'open';
@@ -134,7 +135,7 @@ function GoalDashboard({g, p, nav, today, back, open, weeklyMin}: {g: LifeRecord
   return <div className="dashboard">
     <button className="ghost small" onClick={back}>‹ 목표</button>
     <h2><span className="horizon">{g.body.horizon === 'milestone' ? `마일스톤 · ~${g.body.period}` : `${horizonLabel(g.body.horizon)} · ${g.body.period}`}</span>{g.body.title}</h2>
-    <div className="big-pct"><span className="pct big"><i style={{width: `${gp.pct}%`}} /><em>{gp.pct}%</em></span>
+    <div className="big-pct"><Gauge pct={gp.basis === 'none' ? null : gp.pct} size="lg" label={g.body.title} />
       <span className="muted small">{{achieved: '이룬 목표', target: '목표량 대비', children: '마일스톤·아래 목표의 무게로 계산', tasks: '이어진 할 일 중 끝낸 비율 · "이뤘어요"를 누르기 전엔 최대 90%', none: '아직 이어진 일이 없어요'}[gp.basis]}</span></div>
     {g.body.criterion && <p className="muted">{g.body.criterion}</p>}
     {parent && <p className="muted">위 목표: <button className="link" onClick={() => open(parent.id)}>{parent.body.title}</button> ({goalPercent(parent.id, p.records).pct}%)</p>}

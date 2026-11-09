@@ -2,6 +2,7 @@ import {useState} from 'react';
 import {addDays, efficiency, estimateAccuracy, goalPercent, personaShare, type Settings} from '@workspace/life-contract';
 import {ofKind, type Planner} from '../data.ts';
 import {hm} from './Focus.tsx';
+import {Gauge} from '../Gauge.tsx';
 
 // Looking back: monthly condition, when focus goes well, how estimates compare, and which persona the days went to.
 export function Insights({p, settings, today}: {p: Planner; settings: Settings; today: string}) {
@@ -17,7 +18,7 @@ export function Insights({p, settings, today}: {p: Planner; settings: Settings; 
   return <div className="insights">
     <section className="part"><h3>큰 목표 진행률</h3>
       {goals.length === 0 ? <p className="muted">목표 탭에서 중장기 목표를 세우면 여기서 전체 진행률을 봐요.</p>
-        : <ul className="prows">{goals.map(g => { const gp = goalPercent(g.id, p.records); return <li key={g.id} className="prow"><span className="ptitle">{g.body.title}</span><span className="pct"><i style={{width: `${gp.pct}%`}} /><em>{gp.pct}%</em></span></li>; })}</ul>}
+        : <ul className="prows">{goals.map(g => { const gp = goalPercent(g.id, p.records); return <li key={g.id} className="prow"><span className="ptitle">{g.body.title}</span><Gauge pct={gp.basis === 'none' ? null : gp.pct} size="sm" label={g.body.title} /></li>; })}</ul>}
     </section>
 
     <div className="day-nav"><button onClick={() => shift(-1)} aria-label="전달">‹</button><h2>{Number(month.slice(5))}월 돌아보기</h2><button onClick={() => shift(1)} aria-label="다음 달">›</button></div>

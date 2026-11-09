@@ -14,7 +14,9 @@ import {allRecords, changesSince, deleteRecord, getSettings, getSpec, lastActivi
 // OAuth scopes (모의 우주, 에너지긴축모드) uses the same handlers once P3 adds the grant check.
 export function lifeRouter(checkOrigin: (req: Request) => void) {
   const router = Router();
-  router.use(body({limit: '200kb'}));
+  // A planner spec can carry small photos (decorations); everything else stays small.
+  const small = body({limit: '200kb'}), large = body({limit: '3mb'});
+  router.use((req, res, next) => (req.path === '/spec' ? large : small)(req, res, next));
   const route = (fn: (req: Request, res: Response, owner: string) => Promise<unknown>) => async (req: Request, res: Response) => {
     try {
       res.set('Cache-Control', 'no-store');

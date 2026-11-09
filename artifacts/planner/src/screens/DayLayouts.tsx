@@ -57,7 +57,7 @@ export function HourlyDay({ctx, startHour, endHour}: {ctx: Ctx; startHour: numbe
 /** Bullet journal rapid log: one line per entry, signifiers in front, migrate with ›. */
 const SIGN: Record<string, string> = {...MARK, unknown: '•', done: '×', postponed: '>', in_progress: '•'};
 export function BulletDay({ctx}: {ctx: Ctx}) {
-  const [text, setText] = useState('');
+  const [text, setText] = useState(''), [editing, setEditing] = useState<string | null>(null), [draft, setDraft] = useState('');
   const tasks = dayTasks(ctx), notes = ofKind(ctx.p.records, 'note').filter(n => n.logicalDay === ctx.day && n.body.signifier !== 'page');
   const rows = [...tasks.map(t => ({at: t.createdAt, t})), ...notes.map(n => ({at: n.createdAt, n}))].sort((a, b) => a.at.localeCompare(b.at));
   const add = async () => {
@@ -75,7 +75,10 @@ export function BulletDay({ctx}: {ctx: Ctx}) {
   return <div className="bullet">
     <p className="muted small bj-legend">• 할 일 &nbsp;× 끝냄 &nbsp;&gt; 미룸 &nbsp;○ 일정 &nbsp;– 메모 &nbsp;! 아이디어 — 앞에 <code>-</code> <code>!</code> <code>o</code>를 붙여 쓰세요</p>
     <ul className="bj-list">{rows.map(r => 'n' in r ? <li key={r.n.id} className="bj note">
-      <span className="bj-sign">{r.n.body.signifier === 'idea' ? '!' : '–'}</span><span className="bj-text">{r.n.body.text}</span>
+      <span className="bj-sign">{r.n.body.signifier === 'idea' ? '!' : '–'}</span>
+      {editing === r.n.id ? <form className="bj-edit" onSubmit={e => { e.preventDefault(); const n = r.n; setEditing(null); if (draft.trim() && draft !== n.body.text) void ctx.p.write(n.id, {kind: 'note', logicalDay: n.logicalDay, body: {...n.body, text: draft.trim()}, baseRevision: n.revision}); }}>
+        <input autoFocus value={draft} onChange={e => setDraft(e.target.value)} onBlur={e => e.currentTarget.form?.requestSubmit()} aria-label="메모 고치기" /></form>
+        : <button className="bj-text link" onClick={() => { setEditing(r.n.id); setDraft(r.n.body.text); }} title="눌러서 고치기">{r.n.body.text}</button>}
       <button className="ghost small" onClick={() => ctx.p.remove(r.n.id)} aria-label="메모 지우기">✕</button>
     </li> : <BulletTask key={r.t.id} t={r.t} ctx={ctx} toggle={toggle} />)}</ul>
     <form className="bj-add" onSubmit={e => { e.preventDefault(); void add(); }}>
@@ -110,6 +113,7 @@ export function OnePageDay({ctx, startHour, endHour}: {ctx: Ctx; startHour: numb
     })}</div>
     <div className="op-paper">
       <textarea className="op-page" value={text ?? page?.body.text ?? ''} onChange={e => setText(e.target.value)} onBlur={save} placeholder="오늘의 페이지 — 무엇이든 자유롭게. 생각, 그림 대신 단어, 붙여 둘 메모." aria-label="오늘의 페이지" />
+      {page && <button className="ghost small danger op-clear" onClick={async () => { await ctx.p.remove(page.id); setText(''); }}>페이지 지우기</button>}
       <div className="op-check">
         <span className="muted small">체크</span>
         {tasks.map(t => <label key={t.id} className={`op-item ${t.body.outcome.result}`}><button className="mark" onClick={() => cycle(t)} aria-label={`${t.body.title} 바꾸기`}>{MARK[t.body.outcome.result]}</button>{t.body.title}</label>)}

@@ -5,7 +5,7 @@ import type {ModuleType} from './spec.ts';
 // Widgets only decide how records are shown; every widget reads and writes the same life records.
 export const COLS = 12;
 export const WIDGET_TYPES = ['focus', 'tasks', 'timetable', 'receipt', 'hourly', 'bullet', 'page', 'checkin', 'carry', 'routine', 'habits',
-  'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'text'] as const;
+  'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'text', 'sticker', 'tape', 'image', 'shape'] as const;
 export type WidgetType = (typeof WIDGET_TYPES)[number];
 
 export type WidgetInfo = {type: WidgetType; label: string; desc: string; group: '기록' | '시간' | '목표' | '나' | '꾸미기'; w: number; h: number; minW: number; minH: number; module?: ModuleType};
@@ -29,8 +29,60 @@ export const WIDGETS: WidgetInfo[] = [
   {type: 'progress', label: '목표 진행률', desc: '고른 목표 하나를 크게', group: '목표', w: 4, h: 4, minW: 3, minH: 3, module: 'goals'},
   {type: 'dday', label: 'D-day', desc: '목표 마감까지 남은 날', group: '목표', w: 3, h: 3, minW: 2, minH: 2, module: 'goals'},
   {type: 'text', label: '문구', desc: '좌우명, 오늘의 다짐, 제목', group: '꾸미기', w: 6, h: 3, minW: 2, minH: 1},
+  {type: 'sticker', label: '스티커', desc: '이모지·글자 스티커, 돌리고 겹치기', group: '꾸미기', w: 2, h: 3, minW: 1, minH: 1},
+  {type: 'tape', label: '마스킹테이프', desc: '무늬·색·기울기를 고르는 테이프', group: '꾸미기', w: 4, h: 1, minW: 1, minH: 1},
+  {type: 'image', label: '사진', desc: '사진을 붙이고 폴라로이드 틀', group: '꾸미기', w: 3, h: 6, minW: 1, minH: 1},
+  {type: 'shape', label: '도형·라벨', desc: '하트·별·구름·라벨 위에 글자', group: '꾸미기', w: 3, h: 3, minW: 1, minH: 1},
 ];
 export const widgetInfo = (t: WidgetType) => WIDGETS.find(w => w.type === t)!;
+/** Decorations float: they may overlap anything, rotate, and never push other widgets. */
+export const DECOR: WidgetType[] = ['sticker', 'tape', 'image', 'shape'];
+export const isDecor = (t: WidgetType) => DECOR.includes(t);
+
+// Korean web fonts (Google Fonts, OFL). Loaded only when a skin or widget uses them.
+export type FontInfo = {id: string; name: string; family: string; css: string; kind: '고딕' | '명조' | '손글씨' | '디스플레이' | '고정폭'};
+const F = (id: string, name: string, family: string, kind: FontInfo['kind'], css?: string): FontInfo => ({id, name, family, kind, css: css ?? family.replace(/ /g, '+')});
+export const FONTS: FontInfo[] = [
+  F('pretendard', '기본 고딕', 'Pretendard', '고딕', ''),
+  F('noto-sans', '본고딕 (Noto Sans KR)', 'Noto Sans KR', '고딕', 'Noto+Sans+KR:wght@400;700'),
+  F('gothic-a1', '고딕 A1', 'Gothic A1', '고딕', 'Gothic+A1:wght@400;700'),
+  F('ibm-plex', 'IBM Plex Sans KR', 'IBM Plex Sans KR', '고딕', 'IBM+Plex+Sans+KR:wght@400;700'),
+  F('nanum-gothic', '나눔고딕', 'Nanum Gothic', '고딕', 'Nanum+Gothic:wght@400;700'),
+  F('gowun-dodum', '고운돋움', 'Gowun Dodum', '고딕'),
+  F('orbit', '오르빗', 'Orbit', '고딕'),
+  F('noto-serif', '본명조 (Noto Serif KR)', 'Noto Serif KR', '명조', 'Noto+Serif+KR:wght@400;700'),
+  F('nanum-myeongjo', '나눔명조', 'Nanum Myeongjo', '명조', 'Nanum+Myeongjo:wght@400;700'),
+  F('gowun-batang', '고운바탕', 'Gowun Batang', '명조', 'Gowun+Batang:wght@400;700'),
+  F('hahmlet', '함렛', 'Hahmlet', '명조', 'Hahmlet:wght@400;700'),
+  F('song-myung', '송명', 'Song Myung', '명조'),
+  F('diphylleia', '디필레이아', 'Diphylleia', '명조'),
+  F('nanum-pen', '나눔손글씨 펜', 'Nanum Pen Script', '손글씨'),
+  F('nanum-brush', '나눔손글씨 붓', 'Nanum Brush Script', '손글씨'),
+  F('gaegu', '개구', 'Gaegu', '손글씨', 'Gaegu:wght@400;700'),
+  F('hi-melody', '하이멜로디', 'Hi Melody', '손글씨'),
+  F('gamja-flower', '감자꽃', 'Gamja Flower', '손글씨'),
+  F('poor-story', '푸어스토리', 'Poor Story', '손글씨'),
+  F('single-day', '싱글데이', 'Single Day', '손글씨'),
+  F('cute-font', '귀여운 글씨', 'Cute Font', '손글씨'),
+  F('east-sea-dokdo', '동해 독도', 'East Sea Dokdo', '손글씨'),
+  F('dokdo', '독도', 'Dokdo', '손글씨'),
+  F('kirang', '기랑해랑', 'Kirang Haerang', '손글씨'),
+  F('yeon-sung', '연성', 'Yeon Sung', '손글씨'),
+  F('jua', '주아', 'Jua', '디스플레이'),
+  F('do-hyeon', '도현', 'Do Hyeon', '디스플레이'),
+  F('dongle', '동글', 'Dongle', '디스플레이', 'Dongle:wght@400;700'),
+  F('sunflower', '해바라기', 'Sunflower', '디스플레이', 'Sunflower:wght@300;500;700'),
+  F('black-han-sans', '검은고딕', 'Black Han Sans', '디스플레이'),
+  F('stylish', '스타일리시', 'Stylish', '디스플레이'),
+  F('gugi', '구기', 'Gugi', '디스플레이'),
+  F('nanum-coding', '나눔고딕코딩', 'Nanum Gothic Coding', '고정폭', 'Nanum+Gothic+Coding:wght@400;700'),
+];
+const LEGACY_FONT: Record<string, string> = {sans: 'pretendard', serif: 'gowun-batang', hand: 'gaegu', mono: 'nanum-coding'};
+export const fontInfo = (id: string | undefined) => FONTS.find(f => f.id === (id && LEGACY_FONT[id] ? LEGACY_FONT[id] : id)) ?? FONTS[0]!;
+/** Palettes: pastels for 다꾸, deep tones for 정리형, and neutrals. */
+export const PALETTE = ['#f8c8c8', '#fbd9b4', '#fbe4b0', '#d7ecc4', '#c7e6e0', '#c9dcf6', '#d9cff2', '#f3cfe3',
+  '#e07a7a', '#e9a25c', '#e9b949', '#7cb26a', '#2f9585', '#3a66b8', '#7b6bc4', '#c4689a',
+  '#8b3a3a', '#a0784a', '#5b6b2e', '#00838f', '#1f3d73', '#3d2c6b', '#2d2f2a', '#ffffff'];
 
 export const Widget = z.object({
   id: z.string().regex(/^[a-z0-9-]{1,40}$/),
@@ -38,6 +90,9 @@ export const Widget = z.object({
   x: z.number().int().min(0).max(COLS - 1), y: z.number().int().min(0).max(400),
   w: z.number().int().min(1).max(COLS), h: z.number().int().min(1).max(60),
   title: z.string().max(40).optional(),          // empty string hides the title
+  font: z.string().max(40).optional(),
+  background: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  ink: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   style: z.enum(['card', 'line', 'plain', 'filled']).optional(),
   options: z.record(z.unknown()).default({}),
@@ -50,7 +105,7 @@ export const Skin = z.object({
   surface: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#ffffff'),
   ink: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#252720'),
   paper: z.enum(['plain', 'grid', 'dot', 'lined']).default('plain'),
-  font: z.enum(['sans', 'serif', 'hand', 'mono']).default('sans'),
+  font: z.string().max(40).default('pretendard'),
   radius: z.number().int().min(0).max(28).default(14),
   card: z.enum(['card', 'line', 'plain', 'filled']).default('line'),
   heading: z.enum(['rule', 'pill', 'plain']).default('rule'),
@@ -58,9 +113,9 @@ export const Skin = z.object({
 export type Skin = z.infer<typeof Skin>;
 export const SKIN_PRESETS: {id: string; name: string; skin: Skin}[] = [
   {id: 'calm', name: '차분한 미니멀', skin: Skin.parse({})},
-  {id: 'ivory', name: '아이보리 종이', skin: Skin.parse({accent: '#a0784a', background: '#fbf6ea', surface: '#fffcf4', ink: '#3b342a', font: 'serif', radius: 6, card: 'line'})},
+  {id: 'ivory', name: '아이보리 종이', skin: Skin.parse({accent: '#a0784a', background: '#fbf6ea', surface: '#fffcf4', ink: '#3b342a', font: 'gowun-batang', radius: 6, card: 'line'})},
   {id: 'study', name: '스터디 모눈', skin: Skin.parse({accent: '#00838f', paper: 'grid', radius: 4, card: 'card', heading: 'rule'})},
-  {id: 'deco', name: '다꾸 감성', skin: Skin.parse({accent: '#d98a8a', background: '#fff8f6', paper: 'dot', font: 'hand', radius: 22, card: 'filled', heading: 'pill'})},
+  {id: 'deco', name: '다꾸 감성', skin: Skin.parse({accent: '#d98a8a', background: '#fff8f6', paper: 'dot', font: 'gaegu', radius: 22, card: 'filled', heading: 'pill'})},
   {id: 'mint', name: '민트 노트', skin: Skin.parse({accent: '#2f9585', background: '#f3faf8', surface: '#ffffff', radius: 18, card: 'card', heading: 'pill'})},
   {id: 'night', name: '다크', skin: Skin.parse({accent: '#8aaaf8', background: '#1d2025', surface: '#24282e', ink: '#e7e8e2', radius: 14, card: 'card'})},
 ];
@@ -104,11 +159,13 @@ export function modulesOf(widgets: Widget[]): ModuleType[] {
   return [...new Set(widgets.map(w => widgetInfo(w.type).module).filter((m): m is ModuleType => !!m))];
 }
 
-const overlaps = (a: Widget, b: Widget) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const overlaps = (a: Widget, b: Widget) => !isDecor(a.type) && !isDecor(b.type) && a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 /** After a move or resize, widgets the moved one now covers are pushed down (cascading), so nothing overlaps. */
 export function settle(widgets: Widget[], movedId: string): Widget[] {
   const out = widgets.map(w => ({...w, x: Math.max(0, Math.min(COLS - Math.min(w.w, COLS), w.x)), w: Math.min(COLS, w.w)}));
-  const queue = [out.find(w => w.id === movedId)!];
+  const moved = out.find(w => w.id === movedId)!;
+  if (isDecor(moved.type)) return out;
+  const queue = [moved];
   for (let guard = 0; queue.length && guard < 500; guard++) {
     const a = queue.shift()!;
     for (const b of out) if (b.id !== a.id && overlaps(a, b)) { b.y = a.y + a.h; queue.push(b); }
@@ -118,6 +175,12 @@ export function settle(widgets: Widget[], movedId: string): Widget[] {
 /** Where a new widget fits: the first row below everything in the columns it needs. */
 export function placeNew(widgets: Widget[], type: WidgetType, id: string): Widget {
   const info = widgetInfo(type), bottom = widgets.reduce((m, w) => Math.max(m, w.y + w.h), 0);
+  // Decorations start near the top so they can be dropped onto the page.
+  if (isDecor(type)) {
+    // Each new one steps down and left of the last, so a pile of stickers never hides itself.
+    const n = widgets.filter(w => isDecor(w.type)).length;
+    return {id, type, x: Math.max(0, COLS - info.w - 1 - (n % 4) * 2), y: (n * 3) % 18, w: info.w, h: info.h, options: {}};
+  }
   // A quote reads better without a heading; the user can add one.
   return {id, type, x: 0, y: bottom, w: info.w, h: info.h, options: {}, ...(type === 'text' ? {title: ''} : {})};
 }

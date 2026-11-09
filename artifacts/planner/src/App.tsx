@@ -1,6 +1,6 @@
 import {createContext, useContext, useEffect, useState} from 'react';
 import {useClerk} from '@clerk/react';
-import type {AnyRecord, Settings} from '@workspace/life-contract';
+import {logicalDay, type AnyRecord, type Settings} from '@workspace/life-contract';
 import {CHIP_COLORS, MOODS, dayBoundary, withMood, type PlannerSpec} from '@workspace/planner-spec';
 import {api, flushQueue, httpBackend, ofKind, usePlanner, type Planner} from './data.ts';
 import {onQueue, queued} from './offline.ts';
@@ -46,12 +46,21 @@ function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Lo
       <h1>{spec.name}</h1>
       {(!sync.online || sync.waiting > 0) && <span className={`sync ${sync.online ? 'up' : 'off'}`} role="status">{sync.online ? `올리는 중 · ${sync.waiting}` : `오프라인${sync.waiting ? ` · 기록 ${sync.waiting}개 대기` : ''}`}</span>}
       <InstallButton />
+      <SleepingBadge p={p} settings={loaded.settings} />
       {!decorating && <button className="small" onClick={() => { setDecorating(true); setSettingsOpen(false); }}>꾸미기</button>}
       <button className="ghost small" onClick={() => setSettingsOpen(!settingsOpen)} aria-expanded={settingsOpen}>설정</button>
     </header>
     <PlannerCtx.Provider value={p}>{decorating ? <Editor spec={spec} settings={loaded.settings} p={p} saveLabel="저장" onCancel={() => setDecorating(false)}
       onSave={async next => { await api.putSpec(next); setDecorating(false); await reload(); }} hint="지금 기록 그대로 보면서 꾸며요. 저장하면 새 버전이 되고 기록은 그대로예요." /> : settingsOpen ? <SettingsPanel loaded={loaded} edit={edit} close={() => setSettingsOpen(false)} reload={reload} /> : <PlannerView spec={spec} settings={loaded.settings} p={p} />}</PlannerCtx.Provider>
   </div>;
+}
+
+/** While a sleep is running, the header offers "일어났어요" from any screen. */
+function SleepingBadge({p, settings}: {p: Planner; settings: Settings}) {
+  const running = ofKind(p.records, 'sleep').find(r => r.body.start && !r.body.end);
+  if (!running) return null;
+  const wake = () => { const at = new Date().toISOString(); return p.write(running.id, {kind: 'sleep', logicalDay: logicalDay(at, settings), body: {...running.body, end: at}, baseRevision: running.revision}); };
+  return <button className="sleeping" onClick={wake}>☾ 자는 중 · 일어났어요</button>;
 }
 
 /** Offline queue status; flushes when the connection returns (and every 30s while writes wait). */

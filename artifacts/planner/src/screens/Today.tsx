@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {addDays, goalPercent, goalProgress, periodContains, personaShare, suggestGoal, routineDue, routineRate, type AnyRecord, type LifeRecord, type Settings, type Task} from '@workspace/life-contract';
+import {addDays, goalPercent, goalProgress, logicalDay, periodContains, personaShare, suggestGoal, routineDue, routineRate, type AnyRecord, type LifeRecord, type Settings, type Task} from '@workspace/life-contract';
 import {modulesFor, uses, type ModuleSpec, type PlannerSpec} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
 import {FocusBar, Receipt, Timetable, colors, hm, useTimer, type Timer} from './Focus.tsx';
@@ -188,13 +188,32 @@ export function PersonaToday({ctx}: {ctx: Ctx}) {
   </div>;
 }
 
+/** Sleep by two taps: "잘게요" starts it, "일어났어요" ends it. The night belongs to the day you wake into. */
 export function SleepBox({ctx}: {ctx: Ctx}) {
-  const s = ofKind(ctx.p.records, 'sleep').find(r => r.logicalDay === ctx.day);
+  const settings = ctx.settings ?? {tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', dayBoundary: '04:00'};
+  const sleeps = ofKind(ctx.p.records, 'sleep');
+  const running = sleeps.find(r => r.body.start && !r.body.end);
+  const night = sleeps.filter(r => r.logicalDay === ctx.day && r.body.end).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  const [edit, setEdit] = useState(false);
   const local = (iso: string | null | undefined) => iso ? new Date(new Date(iso).getTime() - new Date(iso).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
-  const save = (key: 'start' | 'end', v: string) => ctx.p.write(s?.id ?? null, {kind: 'sleep', logicalDay: ctx.day, body: {...(s?.body ?? {}), [key]: v ? new Date(v).toISOString() : null}, ...(s ? {baseRevision: s.revision} : {})});
+  const clock = (iso: string) => new Date(iso).toTimeString().slice(0, 5);
+  const start = () => { const at = ctx.now(); return ctx.p.write(null, {kind: 'sleep', logicalDay: logicalDay(at, settings), body: {start: at}}); };
+  const wake = () => { if (!running) return; const at = ctx.now(); return ctx.p.write(running.id, {kind: 'sleep', logicalDay: logicalDay(at, settings), body: {...running.body, end: at}, baseRevision: running.revision}); };
+  const save = (key: 'start' | 'end', v: string) => night && ctx.p.write(night.id, {kind: 'sleep', logicalDay: night.logicalDay, body: {...night.body, [key]: v ? new Date(v).toISOString() : null}, baseRevision: night.revision});
+  if (running) return <div className="sleep running">
+    <span className="sleep-moon" aria-hidden="true">☾</span><span>{clock(running.body.start!)}부터 자는 중 · {hm((Date.now() - Date.parse(running.body.start!)) / 60000)}</span>
+    <button className="primary" onClick={wake}>일어났어요</button>
+    <button className="ghost small" onClick={() => ctx.p.remove(running.id)}>취소</button>
+  </div>;
   return <div className="sleep">
-    <label>잠든 시각 <input type="datetime-local" defaultValue={local(s?.body.start)} onBlur={e => save('start', e.target.value)} /></label>
-    <label>일어난 시각 <input type="datetime-local" defaultValue={local(s?.body.end)} onBlur={e => save('end', e.target.value)} /></label>
+    {night ? <p className="sleep-night"><b>{clock(night.body.start!)} → {clock(night.body.end!)}</b> · {hm((Date.parse(night.body.end!) - Date.parse(night.body.start!)) / 60000)} 잤어요
+      <button className="ghost small" onClick={() => setEdit(!edit)}>{edit ? '닫기' : '고치기'}</button>
+      <button className="ghost small danger" onClick={() => ctx.p.remove(night.id)}>지우기</button></p>
+      : <p className="muted small">자기 전에 "잘게요", 일어나면 "일어났어요"를 누르세요.</p>}
+    {edit && night && <div className="inline">
+      <label>잠든 시각 <input type="datetime-local" defaultValue={local(night.body.start)} onBlur={e => save('start', e.target.value)} /></label>
+      <label>일어난 시각 <input type="datetime-local" defaultValue={local(night.body.end)} onBlur={e => save('end', e.target.value)} /></label></div>}
+    <button className="small" onClick={start}>☾ 잘게요</button>
   </div>;
 }
 
@@ -206,5 +225,6 @@ export function ReviewBox({ctx}: {ctx: Ctx}) {
   return <div className="review">
     <textarea rows={3} value={text ?? r?.body.text ?? ''} onChange={e => setText(e.target.value)} onBlur={() => text !== null && text !== (r?.body.text ?? '') && save(text)} placeholder="오늘은 어땠나요? 한 줄이면 충분해요." aria-label="하루 돌아보기" />
     <label className="muted small-label"><input type="checkbox" checked={priv} onChange={e => save(text ?? r?.body.text ?? '', e.target.checked)} /> 나만 보기 (다른 서비스에 보내지 않아요)</label>
+    {r && <button className="ghost small danger" onClick={async () => { await ctx.p.remove(r.id); setText(''); }}>지우기</button>}
   </div>;
 }

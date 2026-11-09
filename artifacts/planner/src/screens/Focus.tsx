@@ -140,6 +140,7 @@ export function Timetable({m, p, day, settings, color}: {m: ModuleSpec; p: Plann
       <div className="tt-pop-head"><strong>{clock(cellStart(day, pick.at).toISOString())}–{clock(cellStart(day, pick.at + 10).toISOString())}</strong><button className="ghost small" onClick={() => setPick(null)} aria-label="닫기">✕</button></div>
       {pick.session ? <>
         <p>{pick.session.body.label} <span className="muted">{clock(pick.session.body.start)}–{pick.session.body.end ? clock(pick.session.body.end) : '지금'} · {pick.session.body.source === 'timer' ? '스톱워치' : '직접 칠함'}</span></p>
+        <SessionNote s={pick.session} p={p} />
         <button className="small danger" onClick={async () => { await p.remove(pick.session!.id); setPick(null); }}>이 기록 지우기</button>
       </> : <>
         <p className="muted small">이 10분을 무엇에 썼나요?</p>
@@ -178,4 +179,16 @@ export function Receipt({p, day, routineRate}: {p: Planner; day: string; routine
     <hr />
     <p className="r-foot">{f.todayMinutes >= 1 ? '오늘도 수고했어요' : '첫 집중을 시작해 보세요'}</p>
   </figure>;
+}
+
+/** The note and condition left when a timer stopped: editable and removable later. */
+function SessionNote({s, p}: {s: LifeRecord<'session'>; p: Planner}) {
+  const [note, setNote] = useState(s.body.note ?? '');
+  const save = (patch: Partial<LifeRecord<'session'>['body']>) => p.write(s.id, {kind: 'session', logicalDay: s.logicalDay, body: {...s.body, ...patch}, baseRevision: s.revision});
+  return <div className="session-note">
+    <Scale value={s.body.condition} onPick={n => save({condition: n})} label="그때 컨디션 1~10" />
+    <div className="inline"><input value={note} onChange={e => setNote(e.target.value)} placeholder="메모" aria-label="집중 메모" />
+      <button className="small" onClick={() => save({note: note.trim() || null})}>저장</button>
+      {(s.body.note || s.body.condition) && <button className="ghost small danger" onClick={() => { setNote(''); void save({note: null, condition: null}); }}>메모·점수 지우기</button>}</div>
+  </div>;
 }

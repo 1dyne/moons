@@ -33,8 +33,13 @@ test('a loose widget list from an AI becomes a valid spec; unknown widgets are r
   const ws = spec.canvas.day!;
   assert.equal(ws.length, 4);
   const tasks = ws.find(w => w.type === 'tasks')!, focus = ws.find(w => w.type === 'focus')!;
+  assert.equal(spec.canvas.mode, 'free'); assert.equal(tasks.w, 28, '7 columns become 28 fine columns');
   assert.equal(tasks.y, 0, 'a placed widget keeps its spot');
   assert.ok(focus.y >= tasks.y + tasks.h || focus.x >= tasks.x + tasks.w, 'unplaced widgets go where nothing is');
+  const {toGrid, toFree, settle} = await import('./canvas.ts');
+  assert.deepEqual(toGrid(toFree(ws.map(w => ({...w, x: Math.round(w.x / 4), y: Math.round(w.y / 3), w: Math.round(w.w / 4), h: Math.round(w.h / 3)})))).map(w => w.w), ws.map(w => Math.round(w.w / 4)));
+  const overlap = settle([{...tasks, y: 0}, {...focus, y: 0, x: 0}], focus.id, 'free');
+  assert.equal(overlap[0]!.y, 0, '다꾸형 lets widgets overlap');
   assert.ok(spec.modules.some(m => m.type === 'timer'));
   assert.equal(spec.skin!.font, 'gaegu'); assert.equal(spec.name, '수험 다꾸');
 });

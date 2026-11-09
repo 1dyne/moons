@@ -50,7 +50,8 @@ export const PlannerSpec = z.object({
   }).default({}),
   mood: z.string().max(20).default('calm'),
   // The DIY day page (widgets the user placed) and the skin. A spec without a canvas gets a starter one from its layout.
-  canvas: z.object({day: z.array(Widget).max(80).optional()}).default({}),
+  // mode absent = a page saved before 다꾸형 existed (정리형 units).
+  canvas: z.object({day: z.array(Widget).max(80).optional(), mode: z.enum(['free', 'grid']).optional()}).default({}),
   skin: Skin.optional(),
   source: z.object({kind: z.enum(['chat', 'paper', 'notion', 'template']), ref: z.string().max(80).optional()}).optional(),
 }).superRefine((spec, ctx) => {

@@ -51,6 +51,7 @@ function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Lo
   return <div className={`app mood-${spec.mood} ${sp.className} ${decorating ? 'wide' : ''}`} style={{'--accent': CHIP_COLORS[spec.theme.accent], ...sp.style} as React.CSSProperties}>
     <header className="top">
       <Moon size={34} />
+      <span className="brand" aria-label="lit">lit</span>
       <h1>{spec.name}</h1>
       {(!sync.online || sync.waiting > 0) && <span className={`sync ${sync.online ? 'up' : 'off'}`} role="status">{sync.online ? `올리는 중 · ${sync.waiting}` : `오프라인${sync.waiting ? ` · 기록 ${sync.waiting}개 대기` : ''}`}</span>}
       <InstallButton />

@@ -1,6 +1,6 @@
 import {useRef, useState} from 'react';
 import {goalPercent, routineRate, type Settings} from '@workspace/life-contract';
-import {COLS, isDark, isDecor, settle, starterCanvas, widgetInfo, type ModuleSpec, type PlannerSpec, type Skin, type Widget} from '@workspace/planner-spec';
+import {METRICS, isDark, isDecor, minSize, settle, starterCanvas, toFree, widgetInfo, type CanvasMode, type ModuleSpec, type PlannerSpec, type Skin, type Widget} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
 import type {Ctx} from './day.ts';
 import {CarryOver, DayGoals, PersonaToday, ReviewBox, Routines, SleepBox, Tasks} from './Today.tsx';
@@ -11,8 +11,9 @@ import {HabitGrid} from './Habits.tsx';
 import {useFontFamily} from '../fonts.ts';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
-export const ROW = 30, GAP = 10;
-export const canvasOf = (spec: PlannerSpec) => spec.canvas?.day ?? starterCanvas(spec.layout?.day ?? 'sheet', spec.modules.map(m => m.type));
+/** A saved page keeps its placement; a page never arranged starts as 다꾸형 from the layout's starter. */
+export const canvasOf = (spec: PlannerSpec) => spec.canvas?.day ?? toFree(starterCanvas(spec.layout?.day ?? 'sheet', spec.modules.map(m => m.type)));
+export const modeOf = (spec: PlannerSpec): CanvasMode => spec.canvas?.day ? spec.canvas.mode ?? 'grid' : 'free';
 
 /** Skin → CSS variables and classes for the planner root. */
 export function skinProps(skin: Skin | undefined) {
@@ -47,10 +48,10 @@ const SHAPES: Record<string, string> = {
   flower: 'M50 10 C62 10 66 30 50 40 C66 30 86 38 80 52 C86 66 66 72 50 60 C66 72 62 90 50 90 C38 90 34 72 50 60 C34 72 14 66 20 52 C14 38 34 30 50 40 C34 30 38 10 50 10Z',
 };
 
-export type EditApi = {widgets: Widget[]; selected: string | null; select: (id: string | null) => void; change: (ws: Widget[], movedId?: string) => void};
+export type EditApi = {widgets: Widget[]; mode: CanvasMode; selected: string | null; select: (id: string | null) => void; change: (ws: Widget[], movedId?: string) => void};
 
 export function DayCanvas({spec, settings, p, today, day, nav, edit}: {spec: PlannerSpec; settings: Settings; p: Planner; today: string; day: string; nav: Ctx['nav']; edit?: EditApi}) {
-  const widgets = edit?.widgets ?? canvasOf(spec);
+  const widgets = edit?.widgets ?? canvasOf(spec), mode = edit?.mode ?? modeOf(spec), M = METRICS[mode];
   const timer = useTimer(p, settings), color = colors(p, day);
   const timed = widgets.some(w => ['focus', 'timetable', 'receipt', 'hourly'].includes(w.type));
   const ctx: Ctx = {p, day, nav, now: () => new Date().toISOString(), timer: timed ? timer : null, color, settings};
@@ -67,31 +68,31 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit}: {spec: Pla
   };
   const move = (e: React.PointerEvent) => {
     if (!drag || !grid.current) return;
-    const colW = (grid.current.clientWidth + GAP) / COLS, dx = Math.round((e.clientX - drag.x0) / colW), dy = Math.round((e.clientY - drag.y0) / (ROW + GAP));
-    const info = widgetInfo(drag.w.type);
+    const colW = (grid.current.clientWidth + M.gap) / M.cols, dx = Math.round((e.clientX - drag.x0) / colW), dy = Math.round((e.clientY - drag.y0) / (M.row + M.gap));
+    const min = minSize(drag.w.type, mode);
     const preview = drag.mode === 'move'
-      ? {...drag.w, x: Math.max(0, Math.min(COLS - drag.w.w, drag.w.x + dx)), y: Math.max(0, drag.w.y + dy)}
-      : {...drag.w, w: Math.max(info.minW, Math.min(COLS - drag.w.x, drag.w.w + dx)), h: Math.max(info.minH, drag.w.h + dy)};
+      ? {...drag.w, x: Math.max(0, Math.min(M.cols - drag.w.w, drag.w.x + dx)), y: Math.max(0, drag.w.y + dy)}
+      : {...drag.w, w: Math.max(min.w, Math.min(M.cols - drag.w.x, drag.w.w + dx)), h: Math.max(min.h, drag.w.h + dy)};
     if (preview.x !== drag.preview.x || preview.y !== drag.preview.y || preview.w !== drag.preview.w || preview.h !== drag.preview.h) setDrag({...drag, preview});
   };
   const end = () => {
     if (!drag || !edit) return;
-    edit.change(settle(widgets.map(w => w.id === drag.id ? drag.preview : w), drag.id), drag.id);
+    edit.change(settle(widgets.map(w => w.id === drag.id ? drag.preview : w), drag.id, mode), drag.id);
     setDrag(null);
   };
   const shown = drag ? widgets.map(w => w.id === drag.id ? drag.preview : w) : widgets;
-  const rows = shown.reduce((m, w) => Math.max(m, w.y + w.h), 0) + (edit ? 6 : 0);
+  const rows = shown.reduce((m, w) => Math.max(m, w.y + w.h), 0) + (edit ? 6 * M.ky : 0);
 
-  return <div ref={grid} className={`canvas ${edit ? 'editing' : ''}`} style={{gridTemplateRows: `repeat(${Math.max(rows, edit ? 12 : 1)}, ${ROW}px)`}}
+  return <div ref={grid} className={`canvas mode-${mode} ${edit ? 'editing' : ''}`} style={{gridTemplateColumns: `repeat(${M.cols}, minmax(0, 1fr))`, gap: `${M.gap}px`, gridTemplateRows: `repeat(${Math.max(rows, edit ? 12 * M.ky : 1)}, ${M.row}px)`}}
     onPointerMove={move} onPointerUp={end} onPointerCancel={end} onClick={e => { if (edit && e.target === e.currentTarget) edit.select(null); }}>
     {shown.length === 0 && edit && <p className="canvas-empty">빈 화면이에요. 왼쪽에서 위젯을 골라 넣고, 끌어서 배치하세요.</p>}
     {shown.map(w => {
       const title = w.title ?? widgetInfo(w.type).label, sel = edit?.selected === w.id;
       const decor = isDecor(w.type), rot = Number(w.options.rotate ?? 0), dx = Number(w.options.dx ?? 0), dy = Number(w.options.dy ?? 0);
       return <section key={w.id} className={`wg ${decor ? 'wg-decor' : `wg-${w.style ?? spec.skin?.card ?? 'line'}`} wg-type-${w.type} ${sel ? 'selected' : ''} ${drag?.id === w.id ? 'dragging' : ''}`}
-        style={{gridColumn: `${w.x + 1} / span ${w.w}`, gridRow: `${w.y + 1} / span ${w.h}`, order: w.y * COLS + w.x, ...(w.color ? {'--accent': w.color} : {}),
+        style={{gridColumn: `${w.x + 1} / span ${w.w}`, gridRow: `${w.y + 1} / span ${w.h}`, order: w.y * M.cols + w.x, ...(w.color ? {'--accent': w.color} : {}),
           ...(w.font ? {fontFamily: `var(--wfont-${w.id})`} : {}), ...(w.background ? {background: w.background} : {}), ...(w.ink ? {color: w.ink, '--ink': w.ink} : {}),
-          ...(decor ? {transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)`, zIndex: 4 + Number(w.options.layer ?? 0)} : {})} as React.CSSProperties}
+          ...(decor || rot ? {transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)`} : {}), ...(decor || mode === 'free' ? {zIndex: (decor ? 20 : 1) + Number(w.options.layer ?? 0)} : {})} as React.CSSProperties}
         onClick={edit ? e => { e.stopPropagation(); edit.select(w.id); } : undefined}>
         {edit && <div className="wg-handle" onPointerDown={e => begin(e, w, 'move')} title="끌어서 옮기기">⠿ {widgetInfo(w.type).label}</div>}
         {w.font && <FontVar id={w.id} font={w.font} />}

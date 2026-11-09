@@ -200,3 +200,39 @@ export function unlinkedDone(records: AnyRecord[], day: string, days = 14) {
   return of(records, 'task').filter(t => t.logicalDay && t.logicalDay >= from && t.logicalDay <= day && !t.body.goalIds.length && !t.body.plan.fixed && t.body.outcome.result === 'done' && !t.body.routineId)
     .sort((a, b) => (b.logicalDay ?? '').localeCompare(a.logicalDay ?? ''));
 }
+
+/** Everything a month or year page shows, computed from the daily records in [from, to]. Nothing is stored:
+ *  a check, an undo or a correction on any day changes these numbers the next time they are read. */
+export function periodSummary(records: AnyRecord[], from: string, to: string) {
+  const inRange = (d: string | null) => !!d && d >= from && d <= to;
+  const tasks = of(records, 'task').filter(t => inRange(t.logicalDay) && t.body.plan.state !== 'dropped' && !t.body.plan.fixed && !['cancelled', 'postponed'].includes(t.body.outcome.result));
+  const plain = tasks.filter(t => !t.body.routineId), routine = tasks.filter(t => t.body.routineId);
+  const done = (xs: typeof tasks) => xs.filter(t => t.body.outcome.result === 'done').length;
+  const sessions = of(records, 'session').filter(s => inRange(s.logicalDay) && s.body.end);
+  const focus = Math.round(sessions.reduce((sum, s) => sum + mins(s.body.start, s.body.end!), 0));
+  const days: string[] = []; for (let d = from; d <= to; d = addDays(d, 1)) days.push(d);
+  const scores = days.map(d => dayCondition(records, d).score).filter((x): x is number => x !== null);
+  const sleeps = of(records, 'sleep').filter(s => inRange(s.logicalDay) && s.body.start && s.body.end).map(s => mins(s.body.start!, s.body.end!));
+  const written = new Set(records.filter(r => !r.deletedAt && inRange(r.logicalDay)).map(r => r.logicalDay));
+  const goals = of(records, 'goal');
+  const touched = new Map<string, {done: number; planned: number}>();
+  for (const t of plain) for (const id of t.body.goalIds) { const g = touched.get(id) ?? {done: 0, planned: 0}; g.planned++; if (t.body.outcome.result === 'done') g.done++; touched.set(id, g); }
+  const pct = (a: number, b: number) => b ? Math.round(a / b * 100) : null;
+  return {
+    from, to, days: days.length, writtenDays: written.size,
+    tasks: {planned: plain.length, done: done(plain), partial: plain.filter(t => t.body.outcome.result === 'partial').length, missed: plain.filter(t => t.body.outcome.result === 'missed').length, rate: pct(done(plain), plain.length)},
+    routines: {picked: routine.length, done: done(routine), rate: pct(done(routine), routine.length)},
+    focusMin: focus,
+    condition: scores.length ? round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+    sleepMin: sleeps.length ? Math.round(sleeps.reduce((a, b) => a + b, 0) / sleeps.length) : null,
+    goals: [...touched.entries()].map(([id, v]) => ({id, title: goals.find(g => g.id === id)?.body.title ?? '(지운 목표)', ...v, percent: goals.some(g => g.id === id) ? goalPercent(id, records).pct : null}))
+      .sort((a, b) => b.done - a.done),
+  };
+}
+/** A year as twelve months, each a periodSummary. */
+export function yearSummary(records: AnyRecord[], year: string) {
+  return Array.from({length: 12}, (_, i) => {
+    const m = `${year}-${String(i + 1).padStart(2, '0')}`, last = new Date(Date.UTC(Number(year), i + 1, 0)).toISOString().slice(0, 10);
+    return {month: m, ...periodSummary(records, `${m}-01`, last)};
+  });
+}

@@ -4,6 +4,13 @@ import type {ModuleType} from './spec.ts';
 // The DIY page: widgets on a 12-column grid that the user places, sizes and styles, plus a skin.
 // Widgets only decide how records are shown; every widget reads and writes the same life records.
 export const COLS = 12;
+// Two placements. 정리형(grid): 12 columns × 30px rows, widgets never overlap. 다꾸형(free, the default for new pages):
+// a fine 48 × 10px lattice where anything can overlap, layer and sit exactly where the user drops it.
+export type CanvasMode = 'free' | 'grid';
+export const METRICS: Record<CanvasMode, {cols: number; row: number; gap: number; kx: number; ky: number}> = {
+  grid: {cols: 12, row: 30, gap: 10, kx: 1, ky: 1},
+  free: {cols: 48, row: 10, gap: 0, kx: 4, ky: 3},
+};
 export const WIDGET_TYPES = ['focus', 'tasks', 'timetable', 'receipt', 'hourly', 'bullet', 'page', 'checkin', 'carry', 'routine', 'habits',
   'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'text', 'sticker', 'tape', 'image', 'shape'] as const;
 export type WidgetType = (typeof WIDGET_TYPES)[number];
@@ -87,8 +94,8 @@ export const PALETTE = ['#f8c8c8', '#fbd9b4', '#fbe4b0', '#d7ecc4', '#c7e6e0', '
 export const Widget = z.object({
   id: z.string().regex(/^[a-z0-9-]{1,40}$/),
   type: z.enum(WIDGET_TYPES),
-  x: z.number().int().min(0).max(COLS - 1), y: z.number().int().min(0).max(400),
-  w: z.number().int().min(1).max(COLS), h: z.number().int().min(1).max(60),
+  x: z.number().int().min(0).max(47), y: z.number().int().min(0).max(2000),
+  w: z.number().int().min(1).max(48), h: z.number().int().min(1).max(240),
   title: z.string().max(40).optional(),          // empty string hides the title
   font: z.string().max(40).optional(),
   background: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
@@ -161,10 +168,12 @@ export function modulesOf(widgets: Widget[]): ModuleType[] {
 
 const overlaps = (a: Widget, b: Widget) => !isDecor(a.type) && !isDecor(b.type) && a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 /** After a move or resize, widgets the moved one now covers are pushed down (cascading), so nothing overlaps. */
-export function settle(widgets: Widget[], movedId: string): Widget[] {
-  const out = widgets.map(w => ({...w, x: Math.max(0, Math.min(COLS - Math.min(w.w, COLS), w.x)), w: Math.min(COLS, w.w)}));
+export function settle(widgets: Widget[], movedId: string, mode: CanvasMode = 'grid'): Widget[] {
+  const cols = METRICS[mode].cols;
+  const out = widgets.map(w => ({...w, x: Math.max(0, Math.min(cols - Math.min(w.w, cols), w.x)), w: Math.min(cols, w.w)}));
   const moved = out.find(w => w.id === movedId)!;
-  if (isDecor(moved.type)) return out;
+  // In 다꾸형 everything may overlap; layers decide what is on top.
+  if (!moved || isDecor(moved.type) || mode === 'free') return out;
   const queue = [moved];
   for (let guard = 0; queue.length && guard < 500; guard++) {
     const a = queue.shift()!;
@@ -173,7 +182,8 @@ export function settle(widgets: Widget[], movedId: string): Widget[] {
   return out;
 }
 /** Where a new widget fits: the first row below everything in the columns it needs. */
-export function placeNew(widgets: Widget[], type: WidgetType, id: string): Widget {
+export function placeNew(widgets: Widget[], type: WidgetType, id: string, mode: CanvasMode = 'grid'): Widget {
+  if (mode === 'free') return toFree([placeNew(toGridUnits(widgets), type, id, 'grid')])[0]!;
   const info = widgetInfo(type), bottom = widgets.reduce((m, w) => Math.max(m, w.y + w.h), 0);
   // Decorations start near the top so they can be dropped onto the page.
   if (isDecor(type)) {
@@ -184,3 +194,15 @@ export function placeNew(widgets: Widget[], type: WidgetType, id: string): Widge
   // A quote reads better without a heading; the user can add one.
   return {id, type, x: 0, y: bottom, w: info.w, h: info.h, options: {}, ...(type === 'text' ? {title: ''} : {})};
 }
+
+/** 정리형 → 다꾸형: the same page on the fine lattice. */
+export const toFree = (ws: Widget[]): Widget[] => ws.map(w => ({...w, x: w.x * 4, y: w.y * 3, w: w.w * 4, h: w.h * 3}));
+const toGridUnits = (ws: Widget[]): Widget[] => ws.map(w => ({...w, x: Math.min(COLS - 1, Math.round(w.x / 4)), y: Math.round(w.y / 3), w: Math.max(1, Math.min(COLS, Math.round(w.w / 4))), h: Math.max(1, Math.round(w.h / 3))}));
+/** 다꾸형 → 정리형: snap to the 12-column grid, then settle overlaps top to bottom (decorations stay free). */
+export function toGrid(ws: Widget[]): Widget[] {
+  let out = toGridUnits(ws);
+  for (const w of [...out].filter(x => !isDecor(x.type)).sort((a, b) => a.y - b.y || a.x - b.x)) out = settle(out, w.id, 'grid');
+  return out;
+}
+/** Smallest size a widget can take in a mode. */
+export const minSize = (t: WidgetType, mode: CanvasMode) => ({w: widgetInfo(t).minW * METRICS[mode].kx, h: widgetInfo(t).minH * METRICS[mode].ky});

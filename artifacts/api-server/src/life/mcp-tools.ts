@@ -10,15 +10,15 @@ import {allRecords, getSettings, getSpec, lastActivity, putSettings, saveSpec, w
 type Tool = <S extends z.ZodRawShape>(name: string, description: string, shape: S, run: (args: z.infer<z.ZodObject<S>>, owner: string) => Promise<unknown>) => unknown;
 const plannerUrl = () => (process.env.PLANNER_PUBLIC_URL ?? (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : 'http://localhost:5174')).replace(/\/$/, '');
 
-const guide = () => `MOONS 플래너 · 대화로 만드는 나만의 다이어리
-너는 "플래너 문"처럼 사용자와 대화하며 사용자의 하루에 맞는 플래너를 만든다. 순서:
+const guide = () => `lit · 대화로 만들고 마음대로 꾸미는 나만의 다이어리 (MOONS의 다이어리)
+너는 lit의 플래너 문처럼 사용자와 대화하며 사용자의 하루에 맞는 플래너를 만든다. 순서:
 1. 묻기: 무엇을 관리하고 싶은지(할 일, 루틴, 공부 시간, 컨디션, 수면, 목표, 회고, 다꾸 꾸미기), 하루 리듬(기상·취침), 쓰는 기기(폰/PC), 좋아하는 느낌(색·글꼴·종이). 모르는 건 지어내지 않는다.
 2. 제안: 어떤 위젯을 어디에 둘지, 스킨(색·글꼴·종이)을 말로 짧게 보여 주고 사용자의 OK를 받는다.
 3. 만들기: build_planner. 기존 플래너가 있으면 get_planner로 먼저 보고, 바꾸는 것만 반영한다(바꿔도 기록은 그대로, 새 버전이 된다).
 4. 채우기(원하면): 큰 목표는 add_goal_plan(마일스톤에 끝낼 달·예상 시간), 할 일·루틴·페르소나는 add_items. 할 일은 goalId로 목표에 이어야 체크가 진행률이 된다.
 5. 마지막에 플래너 주소를 알려 준다: ${plannerUrl()} (홈 화면에 설치 가능). 사용자는 "꾸미기"로 언제든 직접 고칠 수 있다.
 
-격자: 12칸 × 30px 줄. x 0~11, w 1~12, y 0부터, h는 줄 수. 겹치면 뒤 위젯이 아래로 밀린다. 꾸미기 위젯(sticker·tape·image·shape)은 겹치고 options.rotate(-45~45)로 기울일 수 있다.
+위치는 12칸 × 30px 줄 단위로 보낸다(x 0~11, w 1~12, y 0부터, h 줄 수). 기본은 다꾸형(mode:"free"): 저장할 때 4배 고운 칸으로 바뀌고 위젯끼리 겹칠 수 있다. 정리형(mode:"grid")이면 겹친 위젯이 아래로 밀린다. 꾸미기 위젯(sticker·tape·image·shape)은 겹치고 options.rotate(-45~45)로 기울일 수 있다.
 위젯: ${WIDGETS.map(w => `${w.type}(${w.label}, 기본 ${w.w}×${w.h}: ${w.desc})`).join('; ')}.
 위젯 옵션 예: tasks{categories,amounts} routine{mode:"pick_daily"|"fixed_all",askReason} timetable/hourly/page{startHour} checkin{wake:"07:00",sleep:"00:00"} text{text,size:"s|m|l|xl",align} progress/dday{goalId|date,label} sticker{glyph,size} tape{pattern:"plain|stripe|dot|check|grid",color,opacity} image{src(https),frame:"polaroid|round|circle|none",caption} shape{shape:"heart|star|cloud|circle|label|flower",color,text}.
 위젯 꾸밈: title(""이면 숨김), font, color(강조), background, ink(글자색), style("card|line|filled|plain").
@@ -40,7 +40,7 @@ async function ensureSettings(owner: string, tz?: string) {
 }
 
 export function registerPlannerTools(tool: Tool) {
-  tool('planner_guide', 'MOONS 플래너를 대화로 만들고 채우는 방법: 순서, 위젯·스킨·글꼴 목록, 기록 규칙. 플래너 도구를 쓰기 전에 한 번 읽는다.', {}, async () => guide());
+  tool('planner_guide', 'lit(사용자 다이어리·플래너)을 대화로 만들고 채우는 방법: 순서, 위젯·스킨·글꼴 목록, 기록 규칙. 플래너 도구를 쓰기 전에 한 번 읽는다.', {}, async () => guide());
 
   tool('get_planner', '사용자의 지금 플래너: 이름, 버전, 위젯 배치, 스킨, 하루 기준, 기록 수, 주소.', {}, async (_a, owner) => {
     const planner = await getSpec(owner), settings = await getSettings(owner), records = await allRecords(owner);
@@ -52,12 +52,12 @@ export function registerPlannerTools(tool: Tool) {
 
   tool('build_planner', '플래너를 만들거나 바꾼다(새 버전, 기록은 그대로). widgets는 위젯 배치(guide 참고), skin은 바꿀 스킨 값만. 사용자에게 계획을 보여 주고 OK를 받은 뒤에 부른다.',
     {name: z.string().max(40).optional(), widgets: z.array(looseWidget).min(1).max(80), skin: z.record(z.unknown()).optional(), skinPreset: z.string().optional(),
-      weekLayout: z.enum(['horizontal', 'vertical']).optional(), timezone: z.string().optional()},
-    async ({name, widgets, skin, skinPreset, weekLayout, timezone}, owner) => {
+      weekLayout: z.enum(['horizontal', 'vertical']).optional(), timezone: z.string().optional(), mode: z.enum(['free', 'grid']).optional()},
+    async ({name, widgets, skin, skinPreset, weekLayout, timezone, mode}, owner) => {
       await ensureSettings(owner, timezone);
       const current = (await getSpec(owner))?.spec as PlannerSpec | undefined;
       const preset = SKIN_PRESETS.find(p => p.id === skinPreset)?.skin;
-      const {spec, dropped} = buildSpec(current ?? null, {name, widgets, skin: {...(preset ?? {}), ...(skin ?? {})}, weekLayout});
+      const {spec, dropped} = buildSpec(current ?? null, {name, widgets, skin: {...(preset ?? {}), ...(skin ?? {})}, weekLayout, mode});
       const saved = await saveSpec(owner, spec);
       return {url: plannerUrl(), version: saved.version, widgets: spec.canvas.day!.map(w => `${w.type}@${w.x},${w.y} ${w.w}×${w.h}`), ignored: dropped,
         note: '사용자에게 주소를 알려 주고, 화면에서 "꾸미기"로 직접 옮기고 꾸밀 수 있다고 말한다.'};

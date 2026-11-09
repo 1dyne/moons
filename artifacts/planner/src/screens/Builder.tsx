@@ -10,7 +10,7 @@ import {canvasOf} from './Canvas.tsx';
 
 const moduleName = (m: ModuleType) => entry(m)?.label ?? m;
 
-// Planner Builder: describe your day → MOONS narrows it down and suggests → mockup → use it.
+// lit builder: describe your day → the planner moon narrows it down and suggests → samples → decorate → use it.
 // This first version runs on the catalog alone (no AI call); the chat shape stays the same when AI joins.
 export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: PlannerSpec; onUse: (spec: PlannerSpec) => Promise<void>; onCancel?: () => void}) {
   const [text, setText] = useState(''), [said, setSaid] = useState<string | null>(null);
@@ -22,7 +22,8 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
   const preview = cands && pick !== null ? withMood(cands[pick]!.spec, mood) : null;
   // The DIY step: the chosen sample (or a blank page) opens in the widget editor on sample records.
   const [editing, setEditing] = useState<PlannerSpec | null>(null);
-  const editFrom = (spec: PlannerSpec, blank = false) => setEditing({...spec, canvas: {day: blank ? [] : canvasOf(spec)}});
+  // New pages are 다꾸형 (free placement); the editor can switch to 정리형.
+  const editFrom = (spec: PlannerSpec, blank = false) => setEditing({...spec, canvas: {day: blank ? [] : canvasOf({...spec, canvas: {}}), mode: 'free'}});
   const setPreview = (_: null) => { setCands(null); setPick(null); };
   const input = useRef<HTMLTextAreaElement>(null);
 
@@ -38,6 +39,7 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
   return <div className={`builder ${cands ? 'split' : ''}`}>
     <div className="chat">
       {current && onCancel && <button className="ghost small back" onClick={onCancel}>‹ 내 플래너로</button>}
+      {!current && <p className="brand big">lit <span className="muted small">대화로 만들고 마음대로 꾸미는 나만의 다이어리</span></p>}
       <div className="moon-say">
         <Moon size={proposal ? 48 : 96} />
         <Speech>{current ? '어떻게 고쳐 볼까요?' : '어떤 하루를 관리하고 싶어요?'}</Speech>

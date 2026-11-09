@@ -1,14 +1,14 @@
 import {PlannerSpec} from './spec.ts';
 import {defaultModule, TEMPLATES} from './catalog.ts';
-import {COLS, Skin, Widget, WIDGET_TYPES, isDecor, modulesOf, settle, widgetInfo, type WidgetType} from './canvas.ts';
+import {COLS, Skin, Widget, WIDGET_TYPES, isDecor, modulesOf, settle, toFree, widgetInfo, type CanvasMode, type WidgetType} from './canvas.ts';
 
 // Building a planner from outside the editor (an AI connector, an import): loose widget lists in, a valid spec out.
 
 /** The spec after editing: canvas and skin saved, modules kept in step with the widgets used. */
-export function applyCanvas(spec: PlannerSpec, widgets: Widget[], skin: Skin): PlannerSpec {
+export function applyCanvas(spec: PlannerSpec, widgets: Widget[], skin: Skin, mode: CanvasMode = spec.canvas?.mode ?? 'grid'): PlannerSpec {
   const used = modulesOf(widgets), modules = [...spec.modules];
   for (const m of used) if (!modules.some(x => x.type === m)) modules.push(defaultModule(m, modules.length));
-  return PlannerSpec.parse({...spec, canvas: {...spec.canvas, day: widgets}, skin, modules: modules.length ? modules : [defaultModule('tasks', 0)]});
+  return PlannerSpec.parse({...spec, canvas: {...spec.canvas, day: widgets, mode}, skin, modules: modules.length ? modules : [defaultModule('tasks', 0)]});
 }
 
 export type LooseWidget = {type: string; x?: number; y?: number; w?: number; h?: number; title?: string; font?: string; color?: string; background?: string; ink?: string; style?: string; options?: Record<string, unknown>};
@@ -35,10 +35,12 @@ export function normalizeWidgets(input: LooseWidget[]): {widgets: Widget[]; drop
 }
 
 /** A whole planner from a name, widgets and a skin; starts from the current spec when there is one. */
-export function buildSpec(current: PlannerSpec | null, input: {name?: string; widgets: LooseWidget[]; skin?: Partial<Skin>; weekLayout?: 'horizontal' | 'vertical'}) {
+/** Widgets come in 12-column units (easy to describe in chat); a 다꾸형 page (the default) stores them on the fine lattice. */
+export function buildSpec(current: PlannerSpec | null, input: {name?: string; widgets: LooseWidget[]; skin?: Partial<Skin>; weekLayout?: 'horizontal' | 'vertical'; mode?: CanvasMode}) {
   const base = current ?? TEMPLATES[0]!.spec;
   const {widgets, dropped} = normalizeWidgets(input.widgets);
   const skin = Skin.parse({...(current?.skin ?? {}), ...(input.skin ?? {})});
-  const spec = applyCanvas({...base, ...(input.name ? {name: input.name.slice(0, 40)} : {}), layout: {...base.layout, ...(input.weekLayout ? {week: input.weekLayout} : {})}, source: {kind: 'chat'}}, widgets, skin);
+  const mode = input.mode ?? 'free';
+  const spec = applyCanvas({...base, ...(input.name ? {name: input.name.slice(0, 40)} : {}), layout: {...base.layout, ...(input.weekLayout ? {week: input.weekLayout} : {})}, source: {kind: 'chat'}}, mode === 'free' ? toFree(widgets) : widgets, skin, mode);
   return {spec, dropped};
 }

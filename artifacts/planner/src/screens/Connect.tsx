@@ -21,7 +21,7 @@ export function ConnectPage({id}: {id: string}) {
     catch (e) { if ((e as {status?: number}).status === 401) setNeedLogin(true); else setError((e as Error).message); setBusy(false); }
   };
   return <div className="center connect">
-    <div className="moon-say"><Moon size={72} /><Speech>{req ? `${req.clientName}가 내 플래너에 연결하려고 해요` : '연결 요청을 확인하는 중…'}</Speech></div>
+    <div className="moon-say"><Moon size={72} /><Speech>{req ? `${req.clientName}가 내 lit에 연결하려고 해요` : '연결 요청을 확인하는 중…'}</Speech></div>
     {req && <div className="connect-card">
       <p>연결하면 <strong>{req.clientName}</strong>({req.redirectHost})와 대화하면서 이런 걸 할 수 있어요.</p>
       <ul>

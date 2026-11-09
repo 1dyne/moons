@@ -1,9 +1,9 @@
 import {useMemo, useState} from 'react';
 import {logicalDay, type Settings} from '@workspace/life-contract';
-import {FONTS, PALETTE, SKIN_PRESETS, Skin, WIDGETS, applyCanvas, fontInfo, isDecor, placeNew, settle, widgetInfo, type PlannerSpec, type WidgetType, type Widget} from '@workspace/planner-spec';
+import {FONTS, METRICS, PALETTE, SKIN_PRESETS, Skin, WIDGETS, applyCanvas, fontInfo, isDecor, minSize, placeNew, settle, toFree, toGrid, widgetInfo, type CanvasMode, type PlannerSpec, type WidgetType, type Widget} from '@workspace/planner-spec';
 import {useFontFamily} from '../fonts.ts';
 import {ofKind, type Planner} from '../data.ts';
-import {DayCanvas, canvasOf, skinProps} from './Canvas.tsx';
+import {DayCanvas, canvasOf, modeOf, skinProps} from './Canvas.tsx';
 
 // DIY editor: add widgets, drag to place, drag the corner to size, style each one, and dress the page with a skin.
 // It edits the live page (real records in the planner, sample records in the builder), so what you see is what you use.
@@ -13,19 +13,22 @@ const newId = (type: string) => `${type}-${Date.now().toString(36)}${(seq++).toS
 
 export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {spec: PlannerSpec; settings: Settings; p: Planner; saveLabel: string; onSave: (spec: PlannerSpec) => Promise<void> | void; onCancel?: () => void; hint?: string}) {
   const today = logicalDay(new Date(), settings);
-  const [widgets, setWidgets] = useState<Widget[]>(() => canvasOf(spec));
+  const [widgets, setWidgets] = useState<Widget[]>(() => canvasOf(spec)), [mode, setMode] = useState(() => modeOf(spec));
+  const M = METRICS[mode];
+  // 다꾸형 ↔ 정리형 converts the same page; nothing is lost.
+  const switchMode = (m: CanvasMode) => { if (m === mode) return; change(m === 'free' ? toFree(widgets) : toGrid(widgets)); setMode(m); };
   const [skin, setSkin] = useState<Skin>(() => spec.skin ?? Skin.parse({}));
   const [selected, setSelected] = useState<string | null>(null), [panel, setPanel] = useState<'widgets' | 'skin'>(widgets.length ? 'skin' : 'widgets');
   const [history, setHistory] = useState<Widget[][]>([]), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const change = (ws: Widget[]) => { setHistory(h => [...h.slice(-30), widgets]); setWidgets(ws); };
   const undo = () => { const prev = history.at(-1); if (prev) { setWidgets(prev); setHistory(h => h.slice(0, -1)); } };
-  const add = (type: WidgetType) => { const w = placeNew(widgets, type, newId(type)); change([...widgets, w]); setSelected(w.id); };
+  const add = (type: WidgetType) => { const w = placeNew(widgets, type, newId(type), mode); change([...widgets, w]); setSelected(w.id); };
   const sel = widgets.find(w => w.id === selected);
-  const patch = (id: string, patch: Partial<Widget>) => change(settle(widgets.map(w => w.id === id ? {...w, ...patch} : w), id));
+  const patch = (id: string, patch: Partial<Widget>) => change(settle(widgets.map(w => w.id === id ? {...w, ...patch} : w), id, mode));
   const opt = (id: string, key: string, value: unknown) => change(widgets.map(w => w.id === id ? {...w, options: {...w.options, [key]: value}} : w));
   const nav = useMemo(() => ({day: today, setDay: () => {}, openGoal: () => {}}), [today]);
   const sp = skinProps(skin);
-  const save = async () => { setBusy(true); setError(''); try { await onSave(applyCanvas(spec, widgets, skin)); } catch (e) { setError((e as Error).message); setBusy(false); } };
+  const save = async () => { setBusy(true); setError(''); try { await onSave(applyCanvas(spec, widgets, skin, mode)); } catch (e) { setError((e as Error).message); setBusy(false); } };
   const goals = ofKind(p.records, 'goal');
 
   return <div className="editor">
@@ -33,6 +36,10 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {
       <div className="seg" role="tablist">
         <button role="tab" aria-selected={panel === 'widgets'} className={panel === 'widgets' ? 'on' : ''} onClick={() => setPanel('widgets')}>＋ 위젯</button>
         <button role="tab" aria-selected={panel === 'skin'} className={panel === 'skin' ? 'on' : ''} onClick={() => setPanel('skin')}>스킨</button>
+      </div>
+      <div className="seg" role="radiogroup" aria-label="배치 방식">
+        <button role="radio" aria-checked={mode === 'free'} className={mode === 'free' ? 'on' : ''} onClick={() => switchMode('free')} title="겹치고 원하는 곳에 두기">다꾸형</button>
+        <button role="radio" aria-checked={mode === 'grid'} className={mode === 'grid' ? 'on' : ''} onClick={() => switchMode('grid')} title="칸에 맞춰 가지런히">정리형</button>
       </div>
       <span className="muted small ed-hint">{hint ?? '위젯 머리(⠿)를 끌어 옮기고, 오른쪽 아래 모서리를 끌어 크기를 바꿔요.'}</span>
       <button className="ghost small" onClick={undo} disabled={!history.length}>되돌리기</button>
@@ -52,7 +59,7 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {
       </aside>
       <div className={`ed-canvas ${sp.className}`} style={sp.style}>
         <DayCanvas spec={{...spec, skin}} settings={settings} p={p} today={today} day={today} nav={nav}
-          edit={{widgets, selected, select: setSelected, change: ws => change(ws)}} />
+          edit={{widgets, mode, selected, select: setSelected, change: ws => change(ws)}} />
       </div>
       {sel && <aside className="ed-inspect" aria-label="위젯 설정">
         <div className="ed-inspect-head"><strong>{widgetInfo(sel.type).label}</strong><button className="ghost small" onClick={() => setSelected(null)} aria-label="닫기">✕</button></div>
@@ -74,13 +81,15 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint}: {
           <label>세로 미세 조정 <input type="range" min={-30} max={30} value={Number(sel.options.dy ?? 0)} onChange={e => opt(sel.id, 'dy', Number(e.target.value))} /></label>
           <div className="inline"><button className="small" onClick={() => opt(sel.id, 'layer', Number(sel.options.layer ?? 0) + 1)}>앞으로</button><button className="small" onClick={() => opt(sel.id, 'layer', Number(sel.options.layer ?? 0) - 1)}>뒤로</button></div>
         </div>}
+        {!isDecor(sel.type) && mode === 'free' && <div className="inline"><button className="small" onClick={() => opt(sel.id, 'layer', Number(sel.options.layer ?? 0) + 1)}>앞으로</button><button className="small" onClick={() => opt(sel.id, 'layer', Number(sel.options.layer ?? 0) - 1)}>뒤로</button>
+          {sel.type === 'text' && <label>기울기 <input type="range" min={-20} max={20} value={Number(sel.options.rotate ?? 0)} onChange={e => opt(sel.id, 'rotate', Number(e.target.value))} /></label>}</div>}
         {!isDecor(sel.type) && <label>모양 <select value={sel.style ?? ''} onChange={e => patch(sel.id, {style: (e.target.value || undefined) as Widget['style']})}>
           <option value="">스킨 따라가기</option><option value="card">카드(그림자)</option><option value="line">선</option><option value="filled">색 채움</option><option value="plain">테두리 없음</option></select></label>}
-        <div className="inline"><label>너비 <input type="number" min={widgetInfo(sel.type).minW} max={12} value={sel.w} onChange={e => patch(sel.id, {w: Number(e.target.value)})} className="num" /></label>
-          <label>높이 <input type="number" min={widgetInfo(sel.type).minH} max={60} value={sel.h} onChange={e => patch(sel.id, {h: Number(e.target.value)})} className="num" /></label></div>
+        <div className="inline"><label>너비 <input type="number" min={minSize(sel.type, mode).w} max={M.cols} value={sel.w} onChange={e => patch(sel.id, {w: Number(e.target.value)})} className="num" /></label>
+          <label>높이 <input type="number" min={minSize(sel.type, mode).h} max={240} value={sel.h} onChange={e => patch(sel.id, {h: Number(e.target.value)})} className="num" /></label></div>
         <WidgetOptions w={sel} opt={(k, v) => opt(sel.id, k, v)} goals={goals.map(g => ({id: g.id, title: g.body.title}))} />
         <div className="inline">
-          <button className="small" onClick={() => { const c = {...sel, id: newId(sel.type), y: sel.y + sel.h}; change(settle([...widgets, c], c.id)); setSelected(c.id); }}>복제</button>
+          <button className="small" onClick={() => { const c = {...sel, id: newId(sel.type), y: sel.y + sel.h}; change(settle([...widgets, c], c.id, mode)); setSelected(c.id); }}>복제</button>
           <button className="small danger" onClick={() => { change(widgets.filter(w => w.id !== sel.id)); setSelected(null); }}>지우기</button>
         </div>
       </aside>}

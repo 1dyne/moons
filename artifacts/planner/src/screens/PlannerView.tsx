@@ -10,7 +10,7 @@ import {Insights} from './Insights.tsx';
 import {Week} from './Week.tsx';
 
 export type Tab = 'today' | 'week' | 'goals' | 'month' | 'insights';
-const TABS: [Tab, string][] = [['today', '오늘'], ['week', '주간'], ['month', '달력'], ['goals', '목표'], ['insights', '분석']];
+const TABS: [Tab, string][] = [['today', '오늘'], ['week', '주간'], ['month', '월·년'], ['goals', '목표'], ['insights', '분석']];
 
 /** One renderer for both the mockup and the real planner: only the data source differs. */
 export function PlannerView({spec, settings, p, extraTabs}: {spec: PlannerSpec; settings: Settings; p: Planner; extraTabs?: React.ReactNode}) {

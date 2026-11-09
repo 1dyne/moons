@@ -1,7 +1,7 @@
 {
-  "name": "Planner · MOONS",
-  "short_name": "Planner",
-  "description": "대화로 만드는 나만의 플래너",
+  "name": "lit · 나만의 다이어리",
+  "short_name": "lit",
+  "description": "대화로 만들고 마음대로 꾸미는 나만의 다이어리",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

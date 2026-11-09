@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {parseBody, type AnyRecord, type Kind} from './records.ts';
-import {capacity, dayCondition, efficiency, estimateAccuracy, goalChain, goalPercent, goalSchedule, personaShare, suggestGoal, unlinkedDone, weeklyFocus} from './insights.ts';
+import {capacity, dayCondition, efficiency, estimateAccuracy, goalChain, goalPercent, goalSchedule, periodSummary, personaShare, suggestGoal, unlinkedDone, weeklyFocus, yearSummary} from './insights.ts';
 import {addDays} from './day.ts';
 
 let rev = 0;
@@ -80,4 +80,25 @@ test('a new task suggests the goal it shares words with; finished unlinked tasks
   assert.equal(suggestGoal(rs, day, '추리논증 오답 정리')?.id, 'M2');
   assert.equal(suggestGoal(rs, day, '장보기'), null);
   assert.deepEqual(unlinkedDone(rs, day).map(t => t.id), ['T1']);
+});
+
+test('month and year pages fill themselves from daily checks; an undo changes them', () => {
+  const a = '2026-11-02', b = '2026-11-03';
+  const rs = [
+    rec('goal', 'G', {title: '단어 600', horizon: 'month', period: '2026-11', target: {amount: 600, unit: '단어', aggregation: 'sum'}}),
+    rec('task', 'T1', {title: '단어 40', goalIds: ['G'], plan: {state: 'committed', target: {amount: 40, unit: '단어'}}, outcome: {result: 'done'}}, a),
+    rec('task', 'T2', {title: '보고서', plan: {state: 'committed'}, outcome: {result: 'missed'}}, a),
+    rec('task', 'T3', {title: '스트레칭', routineId: 'R', plan: {state: 'committed'}, outcome: {result: 'done'}}, b),
+    rec('task', 'T4', {title: '회의', plan: {state: 'committed', fixed: true}}, b),
+    rec('session', 'S', {label: '단어', taskId: 'T1', start: '2026-11-02T01:00:00Z', end: '2026-11-02T02:30:00Z', condition: 8}, a),
+  ];
+  const m = periodSummary(rs, '2026-11-01', '2026-11-30');
+  assert.deepEqual(m.tasks, {planned: 2, done: 1, partial: 0, missed: 1, rate: 50});
+  assert.deepEqual(m.routines, {picked: 1, done: 1, rate: 100});
+  assert.equal(m.focusMin, 90); assert.equal(m.writtenDays, 2); assert.equal(m.condition, 8);
+  assert.deepEqual(m.goals.map(g => [g.title, g.done, g.percent]), [['단어 600', 1, 7]]);
+  const undone = rs.map(r => r.id === 'T1' ? {...r, body: {...(r.body as object), outcome: {...(r.body as {outcome: object}).outcome, result: 'unknown'}}} as typeof r : r);
+  assert.equal(periodSummary(undone, '2026-11-01', '2026-11-30').tasks.done, 0);
+  const y = yearSummary(rs, '2026');
+  assert.equal(y.length, 12); assert.equal(y[10]!.tasks.done, 1); assert.equal(y[0]!.tasks.planned, 0);
 });

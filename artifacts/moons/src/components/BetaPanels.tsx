@@ -31,7 +31,7 @@ export function AiCard(){
   </section>;
 }
 
-const stepLabel:Record<string,string>={projects:tr('Project update'),structure:tr('Structuring'),claims:tr('Claims (answer map)'),relations:tr('Relation types'),dump:tr('Taking down sparks'),next:tr('Next to explore'),question:tr('Question'),chat_note:tr('Chat note'),explore_map:tr('Exploration map'),satellite_digest:tr('Satellite agent'),concepts:tr('Concepts'),compare:tr('Comparison'),emotions:tr('Emotion tags'),chat:tr('Chat'),form:tr('Form from a photo'),impostor:tr('Impostor'),other:tr('Other')};
+const stepLabel:Record<string,string>={projects:tr('Project update'),structure:tr('Structuring'),claims:tr('Claims (answer map)'),relations:tr('Relation types'),dump:tr('Taking down sparks'),next:tr('Next to explore'),question:tr('Question'),chat_note:tr('Chat note'),explore_map:tr('Exploration map'),satellite_digest:tr('Satellite agent'),planner_milestones:tr('Planner milestones'),concepts:tr('Concepts'),compare:tr('Comparison'),emotions:tr('Emotion tags'),chat:tr('Chat'),form:tr('Form from a photo'),impostor:tr('Impostor'),other:tr('Other')};
 const providerLabel:Record<Provider,string>={openai:'OpenAI',anthropic:'Anthropic',gemini:'Google Gemini'};
 const usd=(n:number|null)=>n===null?'—':n<0.01?`$${n.toFixed(4)}`:`$${n.toFixed(2)}`;
 const k=(n:number)=>n>=1e6?`${(n/1e6).toFixed(1)}M`:n>=1e3?`${(n/1e3).toFixed(1)}k`:String(n);

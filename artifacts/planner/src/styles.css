@@ -235,3 +235,93 @@ h1,h2,h3,p{margin:0}
   .focus-total strong{font-size:16px}
   .tt-cell{height:20px}
 }
+
+/* Scores 1–10: colour runs from red (low) through yellow to green (high). */
+.scale{display:flex;gap:4px;flex-wrap:wrap}
+.scale button{width:32px;height:32px;padding:0;border-radius:8px;font-variant-numeric:tabular-nums;font-size:13px;border-color:#e0dccd}
+.scale button.on,.scale button:hover{color:#fff;border-color:transparent;background:color-mix(in srgb,#b05a57 calc((10 - var(--lv)) * 11%),#2f9585)}
+.focus-bar .scale button{background:#ffffff14;border-color:#ffffff2a;color:#fff}
+.focus-bar.ask{background:#3d4038}
+.focus-bar .skip{color:#b9bbb0;align-self:flex-start}
+.label-in.wide{width:100%;max-width:420px;margin-top:4px}
+.checkin{display:grid;gap:10px}
+.ck-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ck-q{font-size:13px;color:#3d4038;min-width:110px}
+.ck-fixed{display:grid;gap:2px}
+.time-tag{font-size:12px;font-variant-numeric:tabular-nums;padding:1px 8px;border-radius:6px;background:#2d2f2a;color:#fff}
+.time-in{width:96px;padding:4px 6px}
+.capacity{display:grid;gap:4px;padding:10px 12px;border-radius:12px;background:var(--soft)}
+.cap-bar{position:relative;height:12px;border-radius:999px;background:#fff;overflow:hidden;display:flex}
+.cap-bar i{display:block;height:100%}
+.cap-fixed{background:#9c998c}
+.cap-real{background:color-mix(in srgb,var(--green) 45%,#fff)}
+.cap-plan{position:absolute;top:3px;height:6px!important;border-radius:999px;background:#2d2f2a}
+.cap-text{font-size:13px}
+.cap-verdict{font-size:13px}
+.cap-verdict.over{color:var(--red)}
+.cap-verdict.ok{color:var(--green)}
+.cond-score strong{font-size:26px;margin-right:2px}
+.cond-trail{display:flex;gap:4px;flex-wrap:wrap}
+.cond-dot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:11px;color:#fff;background:color-mix(in srgb,#b05a57 calc((10 - var(--lv)) * 11%),#2f9585)}
+.spent small{color:var(--muted);margin-left:1px}
+.spent.late{background:#b05a5722;color:var(--red)}
+.goal-chip b{font-weight:600;color:var(--accent)}
+.persona-chip{font-size:12px;padding:1px 8px;border-radius:999px;background:color-mix(in srgb,var(--pc) 22%,#fff);color:#2d2f2a}
+.persona-chip.big{font-size:14px;padding:4px 12px;display:inline-flex;gap:6px;align-items:baseline}
+.persona-today{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.swatches{display:flex;gap:4px}
+.swatch{width:22px;height:22px;padding:0;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #d6d2c3}
+.swatch.on{box-shadow:0 0 0 2px #2d2f2a}
+
+/* Goals: maker, milestones, overall percent, roadmap */
+.new-goal{width:100%;text-align:left;padding:14px 16px;border:1.5px dashed #b9b5a6;border-radius:14px;background:#fff;font-weight:600;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.goal-maker{gap:10px}
+.goal-in{font-size:17px;padding:10px 12px}
+.num.wide{width:120px}
+.drafts{display:grid;gap:8px}
+.ms-list{margin:0;padding-left:22px;display:grid;gap:10px}
+.ms-list li.off{opacity:.45}
+.ms-title{flex:1;min-width:160px}
+.ms-list .why{color:var(--muted);font-size:13px;margin:2px 0 0 26px}
+.first-task{display:flex;gap:6px;align-items:center;margin-left:26px;color:#3d4038}
+.seg{display:flex;gap:4px;padding:3px;border:1px solid var(--line);border-radius:999px;width:max-content}
+.seg button{border:0;border-radius:999px;padding:5px 14px;color:var(--muted);background:none;font-size:14px}
+.seg button.on{background:#2d2f2a;color:#fff}
+.goals{display:grid;gap:14px}
+details.manual summary{cursor:pointer;font-size:13px;color:var(--muted)}
+.pct{position:relative;display:inline-block;width:140px;height:20px;border-radius:999px;background:var(--soft);overflow:hidden}
+.pct i{position:absolute;inset:0 auto 0 0;background:var(--accent);opacity:.4}
+.pct em{position:relative;font-style:normal;font-size:12px;padding:0 8px;line-height:20px;font-weight:600}
+.pct.big{width:min(100%,320px);height:28px}
+.pct.big em{line-height:28px;font-size:15px}
+.big-pct{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rm-grid{display:grid;gap:2px;align-items:stretch;overflow-x:auto}
+.rm-head{font-size:11px;text-align:center;color:var(--muted);padding-bottom:4px}
+.rm-head.now{color:#2d2f2a;font-weight:700}
+.rm-goal{font-size:13px;font-weight:600;display:grid;padding:6px 6px 6px 0}
+.rm-goal em{font-style:normal;font-size:11px;color:var(--accent)}
+.rm-cell{min-height:44px;border-left:1px dashed #e3dfd2;display:flex;flex-direction:column;gap:2px;padding:3px 2px}
+.rm-cell.now{background:#fbe4b033}
+.rm-ms{display:flex;gap:2px;align-items:center;font-size:11px;padding:1px 3px;border:0;border-radius:4px;background:#f0ede3;text-align:left;overflow:hidden}
+.rm-ms span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rm-ms.done{background:#2f958522;color:var(--green)}
+.rm-ms.late{background:#b05a5722;color:var(--red)}
+
+/* Insights */
+.insights{display:grid;gap:18px}
+.month-chart{display:flex;gap:2px;align-items:flex-end;height:150px;padding-top:6px}
+.mc-col{position:relative;flex:1;height:100%;display:flex;align-items:flex-end;min-width:0}
+.mc-bar{display:block;width:100%;background:color-mix(in srgb,var(--accent) 35%,#fff);border-radius:3px 3px 0 0}
+.mc-dot{position:absolute;left:50%;width:9px;height:9px;margin:0 0 -4px -4.5px;border-radius:50%;background:color-mix(in srgb,#b05a57 calc((10 - var(--lv)) * 11%),#2f9585);box-shadow:0 0 0 2px #fff}
+.mc-day{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:9px;color:var(--muted)}
+.month-chart{margin-bottom:18px}
+table.eff{border-collapse:collapse;width:100%;font-size:14px}
+table.eff th,table.eff td{text-align:left;padding:6px 4px;border-bottom:1px dashed #e3dfd2;font-variant-numeric:tabular-nums}
+table.eff th{font-size:12px;color:var(--muted);font-weight:600}
+.tips{margin:6px 0 0;padding-left:18px;display:grid;gap:4px;font-size:14px}
+.big-num strong{font-size:24px}
+.est{font-size:13px;font-variant-numeric:tabular-nums}
+.est b.over{color:var(--red)}
+.est b.under{color:var(--green)}
+.persona-bar{display:flex;height:14px;border-radius:999px;overflow:hidden}
+.ms-measure{margin-left:26px}

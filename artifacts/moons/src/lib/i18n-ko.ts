@@ -1193,6 +1193,7 @@ export const ko: Record<string, string> = {
   'Returns to': '돌아갈 곳',
   'Decline': '거절',
   'Satellite agent': 'Satellite 에이전트',
+  'Planner milestones': '플래너 마일스톤',
   'Run at most once every (hours)': '최소 실행 간격(시간)',
   'Records read per run': '한 번에 읽을 기록 수',
   'This month': '이번 달',

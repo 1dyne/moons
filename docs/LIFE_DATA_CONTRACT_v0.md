@@ -39,7 +39,7 @@ type LifeRecord<K extends Kind, B> = {
   body: B;
   ext?: Record<string, unknown>;  // 사용자 추가 속성. 공통 의미 아님. 소비자는 무시해도 된다
 };
-type Kind = 'goal' | 'project' | 'task' | 'routine' | 'sleep' | 'condition' | 'review' | 'session';
+type Kind = 'goal' | 'project' | 'task' | 'routine' | 'sleep' | 'condition' | 'review' | 'session' | 'persona';
 ```
 
 중복 판단 키: `(sourceKind='moons-life', connectionId, id, revision)`. 같은 키는 같은 데이터다. 같은 `id`의 더 큰 `revision`이 최신이다. 더 작은 revision이 늦게 도착하면 버린다.
@@ -68,7 +68,8 @@ type Kind = 'goal' | 'project' | 'task' | 'routine' | 'sleep' | 'condition' | 'r
 ```ts
 type GoalBody = {
   title: string;
-  horizon: 'year' | 'quarter' | 'month' | 'week';
+  horizon: 'year' | 'quarter' | 'month' | 'week' | 'milestone';  // milestone: 상위 목표로 가는 단계, period = 끝낼 달
+  weight: number;                     // 상위 목표 진행률에서 차지하는 무게(기본 1)
   period: string;                     // '2026' | '2026-Q4' | '2026-11' | '2026-W45'(ISO 주)
   parentGoalId: string | null;        // 연간 → 월간 → 주간
   projectId: string | null;
@@ -79,6 +80,13 @@ type GoalBody = {
 };
 ```
 변경 이력은 revision으로 남고 `GET /items/:id/history`로 조회한다.
+
+**전체 진행률(0~100%)** — `now.goals[].percent`, 계산 규칙(`lib/life-contract/src/insights.ts` `goalPercent`):
+1. `status = achieved` → 100
+2. `target`이 있으면 이어진 결과 기준(목표량 대비)
+3. 아래 목표·마일스톤이 있으면 그 진행률의 무게 평균
+4. 이어진 할 일만 있으면 끝낸 비율, 단 **이룸 표시 전 최대 90%**(측정 기준 없이 "다 됐다"고 단정하지 않음)
+5. 아무것도 없으면 0
 
 ### project
 
@@ -95,12 +103,15 @@ type TaskBody = {
   priority: 1 | 2 | 3 | null;
   goalIds: string[]; projectId: string | null;
   routineId: string | null;                        // 루틴 인스턴스면 정의 id
+  personaIds: string[];                            // 이 일을 하는 나의 역할
   plan: {
     state: 'planned' | 'committed' | 'dropped';   // committed = 오늘 하기로 고름(pick_daily)
     due: {value: string; precision: 'day' | 'minute'} | null;
     start: {value: string; precision: 'day' | 'minute'} | null;
     end:   {value: string; precision: 'day' | 'minute'} | null;
-    target: {amount: number; unit: string} | null;   // 30 '분', 3 '세트', 20 '문제'
+    target: {amount: number; unit: string} | null;   // 3 '세트', 20 '문제'
+    estimateMin: number | null;                      // 예상 소요 시간(분). 실제는 session 합
+    fixed: boolean;                                  // 고정 일정(수업·회의): 가용 시간에서 빠짐
   };
   outcome: {
     result: 'done' | 'partial' | 'in_progress' | 'missed' | 'postponed' | 'cancelled' | 'unknown';  // missed = 사용자가 '못 했다'고 보고
@@ -136,7 +147,7 @@ type RoutineBody = {
 
 ```ts
 type SleepBody = {start: string | null; end: string | null; naps: {start: string; end: string}[]; quality: 1 | 2 | 3 | 4 | 5 | null};
-type ConditionBody = {at: string; energy: 1 | 2 | 3 | 4 | 5 | null; mood: string | null; tags: string[]};
+type ConditionBody = {at: string; energy: number | null /* 1~10 */; moment: 'wake' | 'check' | 'evening'; mood: string | null; tags: string[]};
 ```
 모듈을 쓰지 않으면 기록이 없고, `now`에 `state:'unset'`으로 나온다. 쓰지만 그날 입력이 없으면 `state:'empty'`.
 
@@ -149,7 +160,17 @@ type SessionBody = {
   start: string;              // ISO-8601
   end: string | null;         // null = 지금 집중 중(한 번에 하나)
   source: 'timer' | 'manual'; // 스톱워치 / 타임테이블에 직접 칠함
+  condition: number | null;   // 타이머를 멈출 때 물어본 그 시간의 컨디션 1~10
+  note: string | null;        // 한 줄 메모(예: 졸렸음, 카페에서 잘 됨)
+  personaIds: string[];       // 기본은 할 일의 페르소나를 물려받음
 };
+
+### persona — 나의 역할
+
+```ts
+type PersonaBody = {name: string; color: string; active: boolean};  // 수험생, 직장인, 창작자…
+```
+범위: `life.read.plan`. 최근 어떤 역할로 살았는지는 session·task의 `personaIds`로 집계한다.
 ```
 - `logicalDay`는 시작 시각의 논리 하루. 계획(`task.plan`)이 아니라 **측정값**이다.
 - 버디 피드백의 "실제 집중 시간"은 이 기록에서 나온다. `task.outcome`의 완료 보고와는 별개다.
@@ -216,6 +237,7 @@ type ReviewBody = {horizon: 'day' | 'week' | 'month'; period: string; text: stri
 - 사람이 읽는 짧은 값(`"50 단어"`)을 함께 주어 소비자의 모델 입력이 작아진다. 정확한 값은 `/items`로.
 - `If-None-Match`로 재조회하면 바뀐 게 없을 때 `304` — 채팅 턴마다 확인해도 싸다.
 - 범위 밖 kind는 빠지고 `"state": "not_shared"`로 표시한다.
+- `condition.day`: 그날 컨디션 `{wake, focus(집중 중 점수의 분 가중 평균), evening, score}`, 모두 1~10.
 - `focus`는 타임 트래커를 쓰는 플래너만 `ok`, 아니면 `unset`. 분은 `asOf` 시각 기준으로 계산된다. **ETag는 기록이 바뀔 때만 바뀌므로**, 304를 받은 소비자는 `active.startedAt`부터 직접 세면 된다(집중 중인 동안 매 턴 다시 받을 필요 없음).
 
 ## 7. 변경 알림 (확장, 선택)

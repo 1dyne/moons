@@ -48,6 +48,21 @@ export const CATALOG: CatalogEntry[] = [
       {module: 'goals', why: '오늘 할 일을 월간·연간 목표에 이어 두면, 하루를 쓰는 것만으로 목표 진행이 쌓여요.'},
       {module: 'review', why: '하루 끝에 한 줄을 남기면 다음 날 계획이 쉬워져요.'},
     ]},
+  {module: 'checkin', label: '아침 점검', triggers: ['기상', '아침', '에너지', '가용 시간', '가용시간', '현실적', '고정 일정', '할 수 있는 양', 'capacity', '모닝'],
+    questions: [
+      {id: 'checkin.window', module: 'checkin', text: '보통 몇 시에 일어나고 몇 시에 자요?', choices: [
+        {id: 'early', label: '6시 기상 · 23시 취침', effects: [{kind: 'option', module: 'checkin', key: 'wake', value: '06:00'}, {kind: 'option', module: 'checkin', key: 'sleep', value: '23:00'}]},
+        {id: 'normal', label: '7시 기상 · 24시 취침', effects: [{kind: 'option', module: 'checkin', key: 'wake', value: '07:00'}, {kind: 'option', module: 'checkin', key: 'sleep', value: '00:00'}]},
+        {id: 'late', label: '9시 기상 · 1시 취침', effects: [{kind: 'option', module: 'checkin', key: 'wake', value: '09:00'}, {kind: 'option', module: 'checkin', key: 'sleep', value: '01:00'}]},
+      ]},
+    ],
+    companions: [
+      {module: 'timer', why: '아침에 잡은 현실적인 시간과 실제 집중 시간을 저녁에 비교할 수 있어요.'},
+      {module: 'condition', why: '아침 에너지와 하루 중 컨디션을 이어 보면 어떤 날 효율이 나는지 보여요.'},
+    ]},
+  {module: 'personas', label: '페르소나', triggers: ['페르소나', '역할', '정체성', '나의 역할', 'persona', 'role', '엄마', '직장인', '학생'],
+    questions: [],
+    companions: [{module: 'timer', why: '페르소나별로 실제 쓴 시간을 재면 최근 어떤 나로 살았는지 보여요.'}]},
   {module: 'timer', label: '타임 트래커', triggers: ['타임트래커', '타임 트래커', '타이머', '스톱워치', '열품타', '순공', '집중', '공부 시간', '공부시간', '타임테이블', '시간표', '시간 기록', '타임라인', 'time tracker', 'timer', 'pomodoro', '뽀모도로'],
     questions: [
       {id: 'timer.input', module: 'timer', text: '시간은 어떻게 남길까요?', choices: [
@@ -74,9 +89,9 @@ export const CATALOG: CatalogEntry[] = [
       ]},
     ],
     companions: [{module: 'tasks', why: '목표는 하루의 할 일과 이어질 때 진행률이 저절로 계산돼요.'}]},
-  {module: 'condition', label: '컨디션', triggers: ['컨디션', '기분', '에너지', '감정', 'mood', 'energy', '상태'],
+  {module: 'condition', label: '컨디션', triggers: ['컨디션', '기분', '감정', 'mood', '상태', '효율'],
     questions: [],
-    companions: [{module: 'sleep', why: '컨디션은 수면과 같이 보면 이유가 보여요.'}]},
+    companions: [{module: 'checkin', why: '아침 에너지 점수로 그날 현실적으로 할 수 있는 양을 계산해 줘요.'}, {module: 'timer', why: '타이머를 멈출 때마다 컨디션을 남기면 어떤 시간대에 효율이 좋은지 보여요.'}, {module: 'sleep', why: '컨디션은 수면과 같이 보면 이유가 보여요.'}]},
   {module: 'sleep', label: '수면', triggers: ['수면', '잠', '기상', '취침', 'sleep'],
     questions: [],
     companions: [{module: 'condition', why: '잘 잔 날과 컨디션을 이어서 볼 수 있어요.'}]},
@@ -95,6 +110,9 @@ export const defaultModule = (type: ModuleType, order: number): ModuleSpec => {
   if (type === 'goals') return mod('goals', 'goals', '이어진 목표', order, {levels: ['year', 'month', 'week']});
   if (type === 'timer') return {...mod('timer', 'timer', '타임테이블', order, {input: 'both', startHour: 6}), view: 'timeline'};
   if (type === 'review') return mod('review', 'review', '하루 돌아보기', order);
+  if (type === 'checkin') return mod('checkin', 'checkin', '아침 점검', order, {wake: '07:00', sleep: '00:00'});
+  if (type === 'condition') return mod('condition', 'condition', '컨디션', order);
+  if (type === 'personas') return mod('personas', 'personas', '오늘의 페르소나', order);
   return mod(type, type, label, order);
 };
 
@@ -107,6 +125,8 @@ const spec = (name: string, accent: PlannerSpec['theme']['accent'], modules: Mod
 export const TEMPLATES: Template[] = [
   {id: 'daily', name: '하루 정리', summary: '왼쪽엔 할 일, 오른쪽엔 10분 타임테이블. 집중한 시간이 쌓여 하루 영수증이 돼요.',
     spec: spec('하루 정리', 'blue', [defaultModule('tasks', 0), defaultModule('timer', 1), defaultModule('goals', 2), defaultModule('review', 3)])},
+  {id: 'realistic', name: '현실 플래너', summary: '아침 에너지와 고정 일정으로 오늘 할 수 있는 양을 계산하고, 집중할 때마다 컨디션을 남겨 효율을 봐요.',
+    spec: spec('현실 플래너', 'mint', [defaultModule('checkin', 0), defaultModule('tasks', 1), defaultModule('timer', 2), defaultModule('routine', 3), defaultModule('goals', 4), defaultModule('personas', 5), defaultModule('condition', 6), defaultModule('review', 7)], [{kind: 'achievement_basis', moduleId: 'routine', basis: 'committed_today'}])},
   {id: 'routine', name: '오늘의 루틴', summary: '그날 할 루틴을 고르고, 고른 것만으로 달성률을 봐요. 컨디션도 같이.',
     spec: spec('오늘의 루틴', 'green', [defaultModule('routine', 0), defaultModule('tasks', 1), defaultModule('condition', 2), defaultModule('review', 3)], [{kind: 'achievement_basis', moduleId: 'routine', basis: 'committed_today'}])},
   {id: 'ladder', name: '목표 사다리', summary: '연간 → 월간 → 주간 목표를 세우고, 매일 할 일이 그 사다리를 올라가요.',

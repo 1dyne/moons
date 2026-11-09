@@ -1,5 +1,6 @@
 import {CONTRACT_VERSION, shareable, type AnyRecord, type Goal, type LifeRecord, type Routine, type Scope, type Settings, type Task} from './records.ts';
 import {localTime, logicalDay, periodContains, routineDue} from './day.ts';
+import {dayCondition, goalPercent} from './insights.ts';
 
 const live = (r: AnyRecord) => !r.deletedAt;
 const tasksOf = (records: AnyRecord[]) => records.filter((r): r is LifeRecord<'task'> => r.kind === 'task' && live(r));
@@ -20,7 +21,9 @@ export function goalFamily(goalId: string, records: AnyRecord[]) {
 /** Tasks that count toward a goal: linked to it or to a goal below it, on a day inside the goal's period. */
 export function linkedTasks(goal: LifeRecord<'goal'>, records: AnyRecord[]) {
   const family = goalFamily(goal.id, records);
-  return tasksOf(records).filter(t => t.body.goalIds.some(id => family.has(id)) && (!t.logicalDay || periodContains(goal.body.period, t.logicalDay)));
+  // A milestone counts work done before its due month too; calendar goals count work inside their period.
+  const inPeriod = (day: string | null) => !day || goal.body.horizon === 'milestone' ? true : periodContains(goal.body.period, day);
+  return tasksOf(records).filter(t => t.body.goalIds.some(id => family.has(id)) && inPeriod(t.logicalDay));
 }
 
 /** Progress from linked outcomes. Null without a target: there is nothing to measure against. */
@@ -93,7 +96,8 @@ export function buildNow(all: AnyRecord[], settings: Settings, at: Date, opts: {
   const today = tasksOf(records).filter(t => t.logicalDay === day && t.body.plan.state !== 'dropped');
   const outcome = (t: Task) => (t.outcome as Task['outcome'] | null);
   const count = (result: string) => today.filter(t => outcome(t.body)?.result === result).length;
-  const goals = goalsOf(records).filter(g => g.body.status === 'active' && periodContains(g.body.period, day));
+  // Calendar goals that contain today, plus open milestones (they have a due month, not a span).
+  const goals = goalsOf(records).filter(g => g.body.status === 'active' && (g.body.horizon === 'milestone' ? g.body.period >= day.slice(0, 7) : periodContains(g.body.period, day)));
   const newest = <R extends AnyRecord>(list: R[]) => list.filter(r => live(r) && r.logicalDay === day).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
   const condition = newest(records.filter((r): r is LifeRecord<'condition'> => r.kind === 'condition'));
   const sleep = newest(records.filter((r): r is LifeRecord<'sleep'> => r.kind === 'sleep'));
@@ -121,9 +125,9 @@ export function buildNow(all: AnyRecord[], settings: Settings, at: Date, opts: {
     } : {state: 'not_shared' as const},
     goals: has('life.read.plan') ? goals.map(g => {
       const p = has('life.read.outcome') ? goalProgress(g, records, asOf) : null;
-      return {id: g.id, horizon: g.body.horizon, period: g.body.period, title: g.body.title, target: qty(g.body.target), progress: p && g.body.target ? `${p.amount}/${p.unit === '%' ? 100 : g.body.target.amount} ${p.unit}` : null, parentId: g.body.parentGoalId};
+      return {id: g.id, horizon: g.body.horizon, period: g.body.period, title: g.body.title, target: qty(g.body.target), progress: p && g.body.target ? `${p.amount}/${p.unit === '%' ? 100 : g.body.target.amount} ${p.unit}` : null, percent: has('life.read.outcome') ? goalPercent(g.id, records).pct : null, parentId: g.body.parentGoalId};
     }) : {state: 'not_shared' as const},
-    condition: !has('life.read.condition') ? {state: 'not_shared' as const} : !opts.modules.condition ? {state: 'unset' as const} : condition ? {state: 'ok' as const, energy: condition.body.energy, mood: condition.body.mood, at: condition.body.at} : {state: 'empty' as const},
+    condition: !has('life.read.condition') ? {state: 'not_shared' as const} : !opts.modules.condition ? {state: 'unset' as const} : condition ? {state: 'ok' as const, energy: condition.body.energy, mood: condition.body.mood, at: condition.body.at, scale: 10, day: dayCondition(records, day)} : {state: 'empty' as const},
     sleep: !has('life.read.condition') ? {state: 'not_shared' as const} : !opts.modules.sleep ? {state: 'unset' as const} : sleep ? {state: 'ok' as const, start: sleep.body.start, end: sleep.body.end, quality: sleep.body.quality} : {state: 'empty' as const},
     // Live: minutes are computed at asOf; a consumer can keep counting from active.startedAt without asking again.
     focus: !has('life.read.outcome') ? {state: 'not_shared' as const} : !opts.modules.timer ? {state: 'unset' as const} : {state: 'ok' as const, ...focusOf(records, day, at)},

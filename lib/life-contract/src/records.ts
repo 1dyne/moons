@@ -12,8 +12,11 @@ const when = z.object({value: z.string().min(10).max(40), precision: z.enum(['da
 
 export const GoalBody = z.object({
   title: text(200).min(1),
-  horizon: z.enum(['year', 'quarter', 'month', 'week']),
+  // milestone: a step toward a parent goal, due in `period` (usually a month). Not tied to a calendar span.
+  horizon: z.enum(['year', 'quarter', 'month', 'week', 'milestone']),
   period: z.string().regex(/^\d{4}(-Q[1-4]|-\d{2}|-W\d{2})?$/),
+  // Share of the parent goal this goal stands for when progress rolls up (default 1 = equal shares).
+  weight: z.number().positive().max(100).default(1),
   parentGoalId: z.string().nullable().default(null),
   projectId: z.string().nullable().default(null),
   criterion: text(500).nullable().default(null),
@@ -34,12 +37,17 @@ export const TaskBody = z.object({
   goalIds: z.array(z.string()).max(20).default([]),
   projectId: z.string().nullable().default(null),
   routineId: z.string().nullable().default(null),
+  personaIds: z.array(z.string()).max(10).default([]),
   plan: z.object({
     state: z.enum(['planned', 'committed', 'dropped']).default('planned'),
     due: when.nullable().default(null),
     start: when.nullable().default(null),
     end: when.nullable().default(null),
     target: quantity.nullable().default(null),
+    // How long the user expects it to take; compared with measured focus sessions.
+    estimateMin: z.number().int().min(1).max(1440).nullable().default(null),
+    // A fixed appointment (class, meeting): it takes time out of the day's capacity.
+    fixed: z.boolean().default(false),
   }).default({}),
   outcome: z.object({
     // Unknown is the default: a day passing never turns a task into "not done".
@@ -76,7 +84,9 @@ export const SleepBody = z.object({
 });
 export const ConditionBody = z.object({
   at: instant,
-  energy: z.number().int().min(1).max(5).nullable().default(null),
+  // 1–10. moment: right after waking, a check during the day, or the end-of-day score.
+  energy: z.number().int().min(1).max(10).nullable().default(null),
+  moment: z.enum(['wake', 'check', 'evening']).default('check'),
   mood: text(60).nullable().default(null),
   tags: z.array(text(30)).max(10).default([]),
 });
@@ -86,6 +96,13 @@ export const ReviewBody = z.object({
   text: text(5000).nullable().default(null),
 });
 
+// A role the user lives in (학생, 직장인, 엄마, 창작자…). Tasks and sessions point to personas.
+export const PersonaBody = z.object({
+  name: text(40).min(1),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#8aaaf8'),
+  active: z.boolean().default(true),
+});
+
 // A stretch of actual focus (time tracker or painted on the timetable). end null = running now.
 export const SessionBody = z.object({
   taskId: z.string().nullable().default(null),
@@ -93,14 +110,18 @@ export const SessionBody = z.object({
   start: instant,
   end: instant.nullable().default(null),
   source: z.enum(['timer', 'manual']).default('timer'),
+  // Asked when the timer stops: how the user felt during this stretch (1–10) and a short note.
+  condition: z.number().int().min(1).max(10).nullable().default(null),
+  note: text(300).nullable().default(null),
+  personaIds: z.array(z.string()).max(10).default([]),
 }).refine(s => !s.end || s.end > s.start, {message: 'A session must end after it starts.'});
 
-export const BODIES = {goal: GoalBody, project: ProjectBody, task: TaskBody, routine: RoutineBody, sleep: SleepBody, condition: ConditionBody, review: ReviewBody, session: SessionBody} as const;
+export const BODIES = {goal: GoalBody, project: ProjectBody, task: TaskBody, routine: RoutineBody, sleep: SleepBody, condition: ConditionBody, review: ReviewBody, session: SessionBody, persona: PersonaBody} as const;
 export type Kind = keyof typeof BODIES;
 export const KINDS = Object.keys(BODIES) as Kind[];
 export type Bodies = {[K in Kind]: z.infer<(typeof BODIES)[K]>};
 export type Goal = Bodies['goal']; export type Project = Bodies['project']; export type Task = Bodies['task'];
-export type Routine = Bodies['routine']; export type Session = Bodies['session']; export type Sleep = Bodies['sleep']; export type Condition = Bodies['condition']; export type Review = Bodies['review'];
+export type Routine = Bodies['routine']; export type Session = Bodies['session']; export type Persona = Bodies['persona']; export type Sleep = Bodies['sleep']; export type Condition = Bodies['condition']; export type Review = Bodies['review'];
 
 export type Source = {type: 'planner' | 'import:notion' | 'import:paper' | 'import:csv' | 'kit'; ref?: string; confirmed: boolean};
 export type LifeRecord<K extends Kind = Kind> = {
@@ -144,7 +165,7 @@ export const ALL_SCOPES: Scope[] = ['life.read.plan', 'life.read.outcome', 'life
 /** Drops what a grant does not cover: kinds out of scope, outcome without outcome scope, private fields always. */
 export function shareable(record: AnyRecord, scopes: Scope[]): AnyRecord | null {
   const has = (s: Scope) => scopes.includes(s);
-  const need: Record<Kind, Scope> = {goal: 'life.read.plan', project: 'life.read.plan', task: 'life.read.plan', routine: 'life.read.plan', sleep: 'life.read.condition', condition: 'life.read.condition', review: 'life.read.review', session: 'life.read.outcome'};
+  const need: Record<Kind, Scope> = {goal: 'life.read.plan', project: 'life.read.plan', task: 'life.read.plan', routine: 'life.read.plan', sleep: 'life.read.condition', condition: 'life.read.condition', review: 'life.read.review', session: 'life.read.outcome', persona: 'life.read.plan'};
   if (!has(need[record.kind])) return null;
   const copy = structuredClone(record) as AnyRecord;
   delete copy.ext;

@@ -30,6 +30,7 @@ export const STEPS = [
   {id: 'chat_note', tasks: ['moons_chat_note']},
   {id: 'explore_map', tasks: ['moons_explore_map']},
   {id: 'satellite_digest', tasks: ['moons_satellite_digest']},
+  {id: 'planner_milestones', tasks: ['planner_milestones']},
   {id: 'compare', tasks: ['moons_comparison_v5', 'moons_structure_comparison']},
   {id: 'concepts', tasks: ['moons_concepts_extract', 'moons_concept_page']},
   {id: 'emotions', tasks: ['moons_emotions']},

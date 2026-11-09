@@ -17,6 +17,7 @@ export const api = {
   putSettings: (s: Settings) => call<{settings: Settings}>('/settings', {method: 'PUT', body: JSON.stringify(s)}).then(r => r.settings),
   spec: () => call<{planner: {version: number; spec: PlannerSpec} | null}>('/spec').then(r => r.planner),
   putSpec: (spec: PlannerSpec) => call<{planner: {version: number; spec: PlannerSpec}}>('/spec', {method: 'PUT', body: JSON.stringify({spec})}).then(r => r.planner),
+  milestones: (input: {goal: string; deadline: string; context: string; today: string}) => milestonesApi(input),
   async records() {
     const all: AnyRecord[] = [];
     for (let cursor: string | null = null, first = true; first || cursor; first = false) {
@@ -26,6 +27,10 @@ export const api = {
     return all;
   },
 };
+export type MilestoneDraft = {title: string; due: string; measure: {amount: number; unit: string} | null; weight: number; why: string; firstTask: string};
+/** The one AI call in the planner: a naive goal → milestone drafts the user reviews. */
+export const milestonesApi = (input: {goal: string; deadline: string; context: string; today: string}) =>
+  call<{milestones: MilestoneDraft[]; questions: string[]}>('/ai/milestones', {method: 'POST', body: JSON.stringify(input)});
 export const httpBackend: Backend = {
   write: (id, w) => call<{item: AnyRecord}>(id ? `/items/${id}` : '/items', {method: id ? 'PUT' : 'POST', body: JSON.stringify(w)}).then(r => r.item),
   remove: id => call<{item: AnyRecord}>(`/items/${id}`, {method: 'DELETE'}).then(r => r.item),

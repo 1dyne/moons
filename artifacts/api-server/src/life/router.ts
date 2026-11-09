@@ -5,6 +5,9 @@ import {uses, type PlannerSpec} from '@workspace/planner-spec';
 import {guest} from '../moons/lib/server/v5/workspace-store.ts';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 import {limited} from '../moons/lib/server/http.ts';
+import {proposeMilestones} from './milestones.ts';
+import {isOperator, withAi} from '../moons/lib/server/v5/ai-access.ts';
+import {accountId} from '../moons/lib/server/v5/identity.ts';
 import {allRecords, changesSince, deleteRecord, getSettings, getSpec, lastActivity, listRecords, putSettings, recordHistory, saveSpec, writeRecord} from './store.ts';
 
 // /api/life/v1 — the planner's own reads and writes (first-party session). Consumer access with
@@ -49,6 +52,11 @@ export function lifeRouter(checkOrigin: (req: Request) => void) {
   router.get('/items/:id/history', route(async (req, _res, owner) => ({items: await recordHistory(owner, String(req.params.id))})));
   router.get('/changes', route(async (req, _res, owner) => changesSince(owner, Math.max(0, Number(req.query.since) || 0), Number(req.query.limit) || undefined)));
 
+  // AI: naive goal → milestone drafts. Counted in the same daily AI limit and cost ledger as MOONS.
+  router.post('/ai/milestones', route(async (req, _res, owner) => {
+    if (limited(`life-ai:${owner}`, 10)) throw new WorkspaceError(429, 'Please wait a minute.');
+    return withAi(owner, () => proposeMilestones(req.body ?? {}), {operator: await isOperator(accountId(req))});
+  }));
   // The compact "right now" for chat consumers. ETag covers the data, not the clock: 304 means nothing was written.
   router.get('/now', route(async (req, res, owner) => {
     const settings = await getSettings(owner), at = new Date();

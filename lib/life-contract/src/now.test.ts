@@ -55,7 +55,8 @@ test('now: unknown stays unknown, private fields and unshared kinds are withheld
     assert.deepEqual(full.today.tasks.map(t => [t.id, t.result]), [['T1', 'done'], ['T3', 'done'], ['T4', 'unknown']]);
     assert.equal(full.today.tasks[0]!.amount, '50 단어');
   }
-  assert.deepEqual(full.condition, {state: 'ok', energy: 3, mood: null, at: '2026-10-31T02:00:00Z'});
+  assert.equal(full.condition.state, 'ok');
+  if (full.condition.state === 'ok') { assert.equal(full.condition.mood, null); assert.equal(full.condition.day.score, 3); }
   assert.deepEqual(full.sleep, {state: 'unset'});
   const planOnly = buildNow(records, settings, at, {revision: rev, scopes: ['life.read.plan'], modules: {sleep: true, condition: true}, lastActivityAt: null});
   if (!('state' in planOnly.today)) assert.equal(planOnly.today.tasks[0]!.result, 'not_shared');

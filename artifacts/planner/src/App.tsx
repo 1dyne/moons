@@ -1,14 +1,16 @@
-import {useEffect, useState} from 'react';
+import {createContext, useContext, useEffect, useState} from 'react';
 import {useClerk} from '@clerk/react';
 import type {AnyRecord, Settings} from '@workspace/life-contract';
 import {CHIP_COLORS, dayBoundary, type PlannerSpec} from '@workspace/planner-spec';
-import {api, httpBackend, usePlanner} from './data.ts';
+import {api, httpBackend, ofKind, usePlanner, type Planner} from './data.ts';
 import {authEnabled} from './runtime.ts';
 import {Moon} from './Moon.tsx';
 import {Builder} from './screens/Builder.tsx';
 import {PlannerView} from './screens/PlannerView.tsx';
 
 type Loaded = {settings: Settings & {configured: boolean}; planner: {version: number; spec: PlannerSpec} | null; records: AnyRecord[]};
+const PlannerCtx = createContext<Planner | null>(null);
+const usePersonaPlanner = () => useContext(PlannerCtx);
 const browserTz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 export default function App() {
@@ -39,13 +41,17 @@ function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Lo
       <h1>{spec.name}</h1>
       <button className="ghost small" onClick={() => setSettingsOpen(!settingsOpen)} aria-expanded={settingsOpen}>설정</button>
     </header>
-    {settingsOpen ? <SettingsPanel loaded={loaded} edit={edit} close={() => setSettingsOpen(false)} reload={reload} /> : <PlannerView spec={spec} settings={loaded.settings} p={p} />}
+    <PlannerCtx.Provider value={p}>{settingsOpen ? <SettingsPanel loaded={loaded} edit={edit} close={() => setSettingsOpen(false)} reload={reload} /> : <PlannerView spec={spec} settings={loaded.settings} p={p} />}</PlannerCtx.Provider>
   </div>;
 }
 
 function SettingsPanel({loaded, edit, close, reload}: {loaded: Loaded & {planner: NonNullable<Loaded['planner']>}; edit: () => void; close: () => void; reload: () => Promise<void>}) {
   const [tz, setTz] = useState(loaded.settings.tz), [boundary, setBoundary] = useState(loaded.settings.dayBoundary), [msg, setMsg] = useState('');
   const save = async () => { try { await api.putSettings({tz, dayBoundary: boundary}); setMsg('저장했어요.'); await reload(); } catch (e) { setMsg((e as Error).message); } };
+  const spec = loaded.planner.spec, checkin = spec.modules.find(m => m.type === 'checkin');
+  const [wake, setWake] = useState(String(checkin?.options.wake ?? '07:00')), [sleep, setSleep] = useState(String(checkin?.options.sleep ?? '00:00'));
+  // Changing the window is a spec change: a new version, records untouched.
+  const saveWindow = async () => { await api.putSpec({...spec, modules: spec.modules.map(m => m.type === 'checkin' ? {...m, options: {...m.options, wake, sleep}} : m)}); await reload(); };
   return <div className="settings">
     <section className="module"><h3>플래너</h3>
       <p className="muted">버전 {loaded.planner.version} · 화면 구성을 바꿔도 기록은 그대로예요.</p>
@@ -57,12 +63,39 @@ function SettingsPanel({loaded, edit, close, reload}: {loaded: Loaded & {planner
       <p className="muted small">새벽 {boundary} 전에 쓴 기록은 전날로 들어가요.</p>
       <button onClick={save}>저장</button> {msg && <span className="muted">{msg}</span>}
     </section>
+    <Personas />
+    {checkin && <section className="module"><h3>아침 점검 시간</h3>
+      <label>보통 일어나는 시각 <input type="time" value={wake} onChange={e => setWake(e.target.value)} /></label>
+      <label>보통 자는 시각 <input type="time" value={sleep} onChange={e => setSleep(e.target.value)} /></label>
+      <p className="muted small">깨어 있는 시간에서 고정 일정을 빼고, 아침 에너지로 오늘 현실적으로 집중할 수 있는 양을 계산해요.</p>
+      <button onClick={saveWindow}>저장</button>
+    </section>}
     <section className="module"><h3>계정</h3>{authEnabled ? <Account /> : <p className="muted">이 서버는 게스트 모드예요. 기록은 이 브라우저에 묶여 있어요.</p>}</section>
     <section className="module"><h3>다른 서비스와 연결</h3>
       <p className="muted">MOONS · 모의 우주 · 에너지긴축모드에 보낼 항목과 기간을 고르는 화면은 다음 단계에서 열려요. 기록은 지금부터 그 형식으로 쌓이고 있어요. 하루 돌아보기에서 "나만 보기"로 둔 글은 어디에도 보내지 않아요.</p>
     </section>
     <button className="ghost" onClick={close}>‹ 플래너로</button>
   </div>;
+}
+
+const PERSONA_COLORS = ['#8aaaf8', '#2f9585', '#e9b949', '#b05a57', '#00838f', '#3a66b8', '#c9a98a'];
+/** Personas are records (kind 'persona'), so consumers can read "who you've been lately" too. */
+function Personas() {
+  const p = usePersonaPlanner();
+  const [name, setName] = useState(''), [color, setColor] = useState(PERSONA_COLORS[0]!);
+  if (!p) return null;
+  const list = ofKind(p.records, 'persona');
+  return <section className="module"><h3>페르소나 <span className="muted small">내가 맡고 있는 역할</span></h3>
+    <ul className="prows">{list.map(x => <li key={x.id} className="prow">
+      <i className="dot" style={{background: x.body.color}} /><span className="ptitle">{x.body.name}</span>
+      <button className="ghost small" onClick={() => p.write(x.id, {kind: 'persona', body: {...x.body, active: !x.body.active}, baseRevision: x.revision})}>{x.body.active ? '쉬게 하기' : '다시 쓰기'}</button>
+    </li>)}</ul>
+    <form className="padd" onSubmit={async e => { e.preventDefault(); if (name.trim() && await p.write(null, {kind: 'persona', body: {name: name.trim(), color}})) setName(''); }}>
+      <input value={name} onChange={e => setName(e.target.value)} placeholder="예: 수험생, 직장인, 창작자, 운동하는 나" aria-label="페르소나 이름" />
+      <span className="swatches">{PERSONA_COLORS.map(c => <button type="button" key={c} className={`swatch ${c === color ? 'on' : ''}`} style={{background: c}} onClick={() => setColor(c)} aria-label={`색 ${c}`} />)}</span>
+      <button className="small">추가</button>
+    </form>
+  </section>;
 }
 
 function Account() {

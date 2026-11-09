@@ -1,7 +1,8 @@
 import {useEffect, useState} from 'react';
-import {addDays, focusOf, logicalDay, type LifeRecord, type Settings} from '@workspace/life-contract';
+import {actualMin, addDays, dayCondition, focusOf, logicalDay, personaShare, type LifeRecord, type Settings} from '@workspace/life-contract';
 import type {ModuleSpec} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
+import {Scale} from './Scale.tsx';
 
 // Time tracker: one running session at a time, painted on a 10-minute timetable and summed into a receipt.
 const PALETTE = ['#8aaaf8', '#2f9585', '#e9b949', '#b05a57', '#00838f', '#3a66b8', '#3f9a8a', '#c9a98a'];
@@ -25,29 +26,48 @@ export const sessionKey = (s: LifeRecord<'session'>) => s.body.taskId ?? `label:
 
 export function useTimer(p: Planner, settings: Settings) {
   const running = ofKind(p.records, 'session').find(s => !s.body.end);
+  // The session that just stopped, waiting for "how did it go?" (condition 1–10 and a note).
+  const [stopped, setStopped] = useState<LifeRecord<'session'> | null>(null);
   const stop = async () => {
     if (!running) return;
     const end = new Date();
     // Under a minute is a mis-tap: drop it rather than record noise.
-    if (end.getTime() - new Date(running.body.start).getTime() < 60_000) await p.remove(running.id);
-    else await p.write(running.id, {kind: 'session', logicalDay: running.logicalDay, body: {...running.body, end: end.toISOString()}, baseRevision: running.revision});
+    if (end.getTime() - new Date(running.body.start).getTime() < 60_000) { await p.remove(running.id); return; }
+    const saved = await p.write(running.id, {kind: 'session', logicalDay: running.logicalDay, body: {...running.body, end: end.toISOString()}, baseRevision: running.revision});
+    if (saved) setStopped(saved as LifeRecord<'session'>);
+  };
+  const rate = async (condition: number | null, note: string) => {
+    const s = stopped; setStopped(null);
+    if (!s || (condition === null && !note.trim())) return;
+    await p.write(s.id, {kind: 'session', logicalDay: s.logicalDay, body: {...s.body, condition, note: note.trim() || null}, baseRevision: s.revision});
   };
   const start = async (target: {task?: LifeRecord<'task'>; label?: string}) => {
     await stop();
     const at = new Date().toISOString(), t = target.task;
-    await p.write(null, {kind: 'session', logicalDay: logicalDay(at, settings), body: {taskId: t?.id ?? null, label: t?.body.title ?? target.label ?? '집중', start: at, source: 'timer'}});
+    await p.write(null, {kind: 'session', logicalDay: logicalDay(at, settings), body: {taskId: t?.id ?? null, label: t?.body.title ?? target.label ?? '집중', start: at, source: 'timer', personaIds: t?.body.personaIds ?? []}});
     if (t && t.body.outcome.result === 'unknown') await p.write(t.id, {kind: 'task', logicalDay: t.logicalDay, body: {...t.body, outcome: {...t.body.outcome, result: 'in_progress', actualStart: t.body.outcome.actualStart ?? at}}, baseRevision: t.revision});
   };
-  return {running, start, stop};
+  return {running, start, stop, stopped, rate};
 }
 export type Timer = ReturnType<typeof useTimer>;
 
 export function FocusBar({p, day, timer, color}: {p: Planner; day: string; timer: Timer; color: (k: string) => string}) {
   const now = useClock();
-  const [label, setLabel] = useState('');
+  const [label, setLabel] = useState(''), [note, setNote] = useState('');
   const focus = focusOf(p.records, day, now);
+  const done = timer.stopped;
+  if (done && !timer.running) {
+    const m = Math.round((new Date(done.body.end!).getTime() - new Date(done.body.start).getTime()) / 60000);
+    return <div className="focus-bar ask" role="dialog" aria-label="방금 집중 어땠어요">
+      <div className="focus-what"><span className="muted small">{done.body.label} · {hm(m)} 집중했어요</span><strong>방금 컨디션은 몇 점이었어요?</strong>
+        <Scale value={null} onPick={n => { void timer.rate(n, note); setNote(''); }} label="방금 집중할 때 컨디션 1~10" />
+        <input className="label-in wide" value={note} onChange={e => setNote(e.target.value)} placeholder="한 줄 메모(선택) · 예) 졸렸음, 카페에서 잘 됨" aria-label="메모" />
+      </div>
+      <button className="ghost small skip" onClick={() => { void timer.rate(null, note); setNote(''); }}>건너뛰기</button>
+    </div>;
+  }
   const r = timer.running;
-  const todo = ofKind(p.records, 'task').filter(t => t.logicalDay === day && !['done', 'cancelled', 'postponed'].includes(t.body.outcome.result)).slice(0, 6);
+  const todo = ofKind(p.records, 'task').filter(t => t.logicalDay === day && !t.body.plan.fixed && !['done', 'cancelled', 'postponed'].includes(t.body.outcome.result)).slice(0, 6);
   return <div className={`focus-bar ${r ? 'on' : ''}`} style={r ? {'--focus': color(sessionKey(r))} as React.CSSProperties : undefined}>
     {r ? <>
       <span className="focus-dot" />
@@ -131,9 +151,12 @@ export function Timetable({m, p, day, settings, color}: {m: ModuleSpec; p: Plann
 }
 
 export function Receipt({p, day, routineRate}: {p: Planner; day: string; routineRate: {done: number; of: number} | null}) {
+  const cond = dayCondition(p.records, day), personas = personaShare(p.records, day, 1).rows.filter(r => r.minutes > 0);
+  const estimated = ofKind(p.records, 'task').filter(t => t.logicalDay === day && t.body.plan.estimateMin && t.body.outcome.result === 'done');
+  const estSum = estimated.reduce((s, t) => s + t.body.plan.estimateMin!, 0), actSum = estimated.reduce((s, t) => s + actualMin(p.records, t.id), 0);
   const now = useClock(60_000);
   const f = focusOf(p.records, day, now);
-  const tasks = ofKind(p.records, 'task').filter(t => t.logicalDay === day && !['cancelled', 'postponed'].includes(t.body.outcome.result) && t.body.plan.state !== 'dropped');
+  const tasks = ofKind(p.records, 'task').filter(t => t.logicalDay === day && !t.body.plan.fixed && !['cancelled', 'postponed'].includes(t.body.outcome.result) && t.body.plan.state !== 'dropped');
   const done = tasks.filter(t => t.body.outcome.result === 'done').length;
   const date = new Intl.DateTimeFormat('ko-KR', {year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', timeZone: 'UTC'}).format(new Date(`${day}T00:00:00Z`));
   return <figure className="receipt" aria-label="하루 영수증">
@@ -149,6 +172,9 @@ export function Receipt({p, day, routineRate}: {p: Planner; day: string; routine
     <p className="r-line total"><span>순집중 합계</span><span>{hm(f.todayMinutes)}</span></p>
     <p className="r-line"><span>할 일 완료</span><span>{done}/{tasks.length}</span></p>
     {routineRate && routineRate.of > 0 && <p className="r-line"><span>루틴</span><span>{routineRate.done}/{routineRate.of}</span></p>}
+    {estSum > 0 && <p className="r-line"><span>예상 → 실제</span><span>{hm(estSum)} → {hm(actSum)}</span></p>}
+    {cond.score !== null && <p className="r-line"><span>컨디션</span><span>{cond.score}/10</span></p>}
+    {personas.length > 0 && <><hr />{personas.map(r => <p key={r.id} className="r-line item"><span>{r.name}</span><i /><span>{r.share}%</span></p>)}</>}
     <hr />
     <p className="r-foot">{f.todayMinutes >= 1 ? '오늘도 수고했어요' : '첫 집중을 시작해 보세요'}</p>
   </figure>;

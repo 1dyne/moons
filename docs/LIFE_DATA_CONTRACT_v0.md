@@ -39,7 +39,7 @@ type LifeRecord<K extends Kind, B> = {
   body: B;
   ext?: Record<string, unknown>;  // 사용자 추가 속성. 공통 의미 아님. 소비자는 무시해도 된다
 };
-type Kind = 'goal' | 'project' | 'task' | 'routine' | 'sleep' | 'condition' | 'review' | 'session' | 'persona';
+type Kind = 'goal' | 'project' | 'task' | 'routine' | 'sleep' | 'condition' | 'review' | 'session' | 'persona' | 'note';
 ```
 
 중복 판단 키: `(sourceKind='moons-life', connectionId, id, revision)`. 같은 키는 같은 데이터다. 같은 `id`의 더 큰 `revision`이 최신이다. 더 작은 revision이 늦게 도착하면 버린다.
@@ -70,6 +70,8 @@ type GoalBody = {
   title: string;
   horizon: 'year' | 'quarter' | 'month' | 'week' | 'milestone';  // milestone: 상위 목표로 가는 단계, period = 끝낼 달
   weight: number;                     // 상위 목표 진행률에서 차지하는 무게(기본 1)
+  deadline: string | null;            // 사용자가 원하는 마감(YYYY-MM 또는 YYYY-MM-DD)
+  effortHours: number | null;         // 남은 일에 드는 순수 집중 시간 추정(시간)
   period: string;                     // '2026' | '2026-Q4' | '2026-11' | '2026-W45'(ISO 주)
   parentGoalId: string | null;        // 연간 → 월간 → 주간
   projectId: string | null;
@@ -164,6 +166,13 @@ type SessionBody = {
   note: string | null;        // 한 줄 메모(예: 졸렸음, 카페에서 잘 됨)
   personaIds: string[];       // 기본은 할 일의 페르소나를 물려받음
 };
+
+### note — 자유 기록
+
+```ts
+type NoteBody = {text: string; signifier: 'note' | 'idea' | 'page'};  // 불렛저널 메모(–)·아이디어(!)·한 장 데일리의 페이지
+```
+범위: `life.read.review`. 사용자가 "나만 보기"로 둔 필드는 나가지 않는다.
 
 ### persona — 나의 역할
 

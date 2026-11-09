@@ -54,3 +54,10 @@ test('deletes are tombstones in changes; another account sees nothing', async ()
   assert.equal((await changesSince(other, 0)).items.length, 0);
   await assert.rejects(deleteRecord(other, task.id), /not found/);
 });
+
+test('an offline create with its own id is created once; the replay returns the stored record', async () => {
+  const id = '01JOFFLINE0000000000000001'.replace(/O/g, '0').replace('L', 'M').replace('I', '1');
+  const a = await writeRecord(owner, null, {id, kind: 'task', logicalDay: '2026-11-09', body: {title: '오프라인에서 쓴 일'}});
+  const b = await writeRecord(owner, null, {id, kind: 'task', logicalDay: '2026-11-09', body: {title: '오프라인에서 쓴 일'}});
+  assert.equal(a.id, id); assert.equal(b.revision, a.revision);
+});

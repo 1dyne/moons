@@ -1,6 +1,7 @@
 import {useCallback, useState} from 'react';
 import {parseBody, ulid, type AnyRecord, type Kind, type LifeRecord, type Settings} from '@workspace/life-contract';
 import type {PlannerSpec} from '@workspace/planner-spec';
+import {enqueue, flush, isNetworkError, pending, queued} from './offline.ts';
 
 export type Write = {kind: Kind; logicalDay?: string | null; body: unknown; privateFields?: string[]; baseRevision?: number};
 /** Where records go. The real planner writes to the life hub; the mockup writes to memory. */
@@ -18,6 +19,19 @@ export const api = {
   spec: () => call<{planner: {version: number; spec: PlannerSpec} | null}>('/spec').then(r => r.planner),
   putSpec: (spec: PlannerSpec) => call<{planner: {version: number; spec: PlannerSpec}}>('/spec', {method: 'PUT', body: JSON.stringify({spec})}).then(r => r.planner),
   planGoal: (input: Parameters<typeof planGoalApi>[0]) => planGoalApi(input),
+  /** Records as the user last saw them: the hub's copy (or the offline cache) with waiting writes applied on top. */
+  async recordsWithQueue() {
+    let list = await api.records();
+    for (const op of pending()) {
+      const id = op.path.split('/')[2];
+      if (op.method === 'DELETE') list = list.filter(r => r.id !== id);
+      else {
+        const w = op.body as Write & {id?: string}, rid = id ?? w.id!;
+        try { list = [...list.filter(r => r.id !== rid), optimistic(rid, w)]; } catch { /* a malformed queued write is skipped */ }
+      }
+    }
+    return list;
+  },
   async records() {
     const all: AnyRecord[] = [];
     for (let cursor: string | null = null, first = true; first || cursor; first = false) {
@@ -34,9 +48,31 @@ export type GoalPlanResult =
 /** The one AI call in the planner: asks until the goal is concrete, then drafts milestones with effort. */
 const planGoalApi = (input: {goal: string; deadline: string; context: string; today: string; round: number; weeklyHours?: number; answers: {q: string; a: string}[]}) =>
   call<GoalPlanResult>('/ai/goal', {method: 'POST', body: JSON.stringify(input)});
+const send = (op: {method: string; path: string; body?: unknown}) => fetch(`/api/life/v1${op.path}`, {method: op.method, credentials: 'include', headers: {'content-type': 'application/json'}, body: op.body === undefined ? undefined : JSON.stringify(op.body)});
+/** Push waiting offline writes; returns how many went up. */
+export const flushQueue = () => flush(send);
+const optimistic = (id: string, w: Write) => ({id, kind: w.kind, revision: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), deletedAt: null, logicalDay: w.logicalDay ?? null,
+  tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', source: {type: 'planner', confirmed: true}, ...(w.privateFields ? {privateFields: w.privateFields} : {}), body: parseBody(w.kind, w.body)}) as AnyRecord;
+/** The hub, with an offline fallback: when the network is gone (or writes are already waiting), the write is queued
+ *  and an optimistic record is returned so the day keeps working. */
 export const httpBackend: Backend = {
-  write: (id, w) => call<{item: AnyRecord}>(id ? `/items/${id}` : '/items', {method: id ? 'PUT' : 'POST', body: JSON.stringify(w)}).then(r => r.item),
-  remove: id => call<{item: AnyRecord}>(`/items/${id}`, {method: 'DELETE'}).then(r => r.item),
+  async write(id, w) {
+    const queue = () => {
+      const rid = id ?? ulid(), {baseRevision: _drop, ...rest} = w;
+      enqueue(id ? {method: 'PUT', path: `/items/${id}`, body: rest} : {method: 'POST', path: '/items', body: {...rest, id: rid}});
+      return optimistic(rid, w);
+    };
+    if (queued() > 0) { const r = queue(); void flushQueue(); return r; }
+    try {
+      return await call<{item: AnyRecord}>(id ? `/items/${id}` : '/items', {method: id ? 'PUT' : 'POST', body: JSON.stringify(w)}).then(r => r.item);
+    } catch (e) { if (isNetworkError(e)) return queue(); throw e; }
+  },
+  async remove(id) {
+    const gone = {id, deletedAt: new Date().toISOString()} as AnyRecord;
+    if (queued() > 0) { enqueue({method: 'DELETE', path: `/items/${id}`}); void flushQueue(); return gone; }
+    try { return await call<{item: AnyRecord}>(`/items/${id}`, {method: 'DELETE'}).then(r => r.item); }
+    catch (e) { if (isNetworkError(e)) { enqueue({method: 'DELETE', path: `/items/${id}`}); return gone; } throw e; }
+  },
 };
 /** The mockup's store: same validation as the hub, nothing leaves the page. */
 export function memoryBackend(tz: string): Backend {

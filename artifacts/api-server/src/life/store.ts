@@ -79,6 +79,11 @@ export async function writeRecord(owner: string, id: string | null, raw: unknown
   try { body = parseBody(input.kind, input.body); } catch { throw new WorkspaceError(400, `Invalid ${input.kind} record.`); }
   if (id !== null && !/^[0-9A-HJKMNP-TV-Z]{26}$/.test(id)) throw new WorkspaceError(400, 'Invalid record id.');
   return transaction(async db => {
+    // Offline creates carry their own id: the first arrival creates it, a replay returns what is stored.
+    if (!id && input.id) {
+      const stored = (await db.query('select data from life_records where owner_id=$1 and id=$2', [owner, input.id])).rows[0]?.data as AnyRecord | undefined;
+      if (stored) return stored;
+    }
     const prior = id ? (await db.query('select data from life_records where owner_id=$1 and id=$2 for update', [owner, id])).rows[0]?.data as AnyRecord | undefined : undefined;
     if (id && !prior) throw new WorkspaceError(404, 'Record not found.');
     if (prior && prior.kind !== input.kind) throw new WorkspaceError(400, 'A record cannot change its kind.');
@@ -87,7 +92,7 @@ export async function writeRecord(owner: string, id: string | null, raw: unknown
     const {revision, tz} = await nextRevision(db, owner);
     const at = new Date().toISOString();
     const record = {
-      id: prior?.id ?? ulid(), kind: input.kind, revision, createdAt: prior?.createdAt ?? at, updatedAt: at, deletedAt: null,
+      id: prior?.id ?? input.id ?? ulid(), kind: input.kind, revision, createdAt: prior?.createdAt ?? at, updatedAt: at, deletedAt: null,
       logicalDay: input.logicalDay, tz: prior?.tz ?? tz,
       source: input.source ?? prior?.source ?? {type: 'planner', confirmed: true},
       ...(input.privateFields ? {privateFields: input.privateFields} : prior?.privateFields ? {privateFields: prior.privateFields} : {}),

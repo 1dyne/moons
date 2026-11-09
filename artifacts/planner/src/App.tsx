@@ -2,7 +2,8 @@ import {createContext, useContext, useEffect, useState} from 'react';
 import {useClerk} from '@clerk/react';
 import type {AnyRecord, Settings} from '@workspace/life-contract';
 import {CHIP_COLORS, MOODS, dayBoundary, withMood, type PlannerSpec} from '@workspace/planner-spec';
-import {api, httpBackend, ofKind, usePlanner, type Planner} from './data.ts';
+import {api, flushQueue, httpBackend, ofKind, usePlanner, type Planner} from './data.ts';
+import {onQueue, queued} from './offline.ts';
 import {authEnabled} from './runtime.ts';
 import {Moon} from './Moon.tsx';
 import {Builder} from './screens/Builder.tsx';
@@ -15,7 +16,7 @@ const browserTz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC
 
 export default function App() {
   const [state, setState] = useState<Loaded | null>(null), [error, setError] = useState(''), [editing, setEditing] = useState(false);
-  const load = () => Promise.all([api.settings(), api.spec(), api.records()]).then(([settings, planner, records]) => { setState({settings, planner, records}); setError(''); }).catch(e => setError((e as Error).message));
+  const load = () => Promise.all([api.settings(), api.spec(), api.recordsWithQueue()]).then(([settings, planner, records]) => { setState({settings, planner, records}); setError(''); }).catch(e => setError((e as Error).message));
   useEffect(() => { void load(); }, []);
 
   if (error && !state) return <div className="center"><Moon size={72} /><p className="error">{error}</p><button className="primary" onClick={load}>다시 시도</button></div>;
@@ -35,14 +36,49 @@ function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Lo
   const {spec} = loaded.planner;
   const p = usePlanner(httpBackend, loaded.records);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const sync = useSync(async () => p.setRecords(await api.recordsWithQueue()));
   return <div className={`app mood-${spec.mood}`} style={{'--accent': CHIP_COLORS[spec.theme.accent]} as React.CSSProperties}>
     <header className="top">
       <Moon size={34} />
       <h1>{spec.name}</h1>
+      {(!sync.online || sync.waiting > 0) && <span className={`sync ${sync.online ? 'up' : 'off'}`} role="status">{sync.online ? `올리는 중 · ${sync.waiting}` : `오프라인${sync.waiting ? ` · 기록 ${sync.waiting}개 대기` : ''}`}</span>}
+      <InstallButton />
       <button className="ghost small" onClick={() => setSettingsOpen(!settingsOpen)} aria-expanded={settingsOpen}>설정</button>
     </header>
     <PlannerCtx.Provider value={p}>{settingsOpen ? <SettingsPanel loaded={loaded} edit={edit} close={() => setSettingsOpen(false)} reload={reload} /> : <PlannerView spec={spec} settings={loaded.settings} p={p} />}</PlannerCtx.Provider>
   </div>;
+}
+
+/** Offline queue status; flushes when the connection returns (and every 30s while writes wait). */
+function useSync(refresh: () => Promise<void>) {
+  const [waiting, setWaiting] = useState(queued()), [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
+  useEffect(() => {
+    const off = onQueue(() => setWaiting(queued()));
+    const up = async () => { setOnline(true); if (queued() && (await flushQueue()) > 0) await refresh(); };
+    const down = () => setOnline(false);
+    window.addEventListener('online', up); window.addEventListener('offline', down);
+    const t = setInterval(() => { if (queued() && navigator.onLine) void up(); }, 30_000);
+    if (queued() && navigator.onLine) void up();
+    return () => { off(); window.removeEventListener('online', up); window.removeEventListener('offline', down); clearInterval(t); };
+  }, []);
+  return {waiting, online};
+}
+
+// The browser offers installation once ("beforeinstallprompt"); keep it so the button can use it later.
+type InstallPrompt = Event & {prompt: () => Promise<void>; userChoice: Promise<{outcome: string}>};
+let deferred: InstallPrompt | null = null;
+const installListeners = new Set<() => void>();
+if (typeof window !== 'undefined') window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e as InstallPrompt; installListeners.forEach(f => f()); });
+function InstallButton() {
+  const [, bump] = useState(0), [hint, setHint] = useState(false);
+  useEffect(() => { const f = () => bump(n => n + 1); installListeners.add(f); return () => { installListeners.delete(f); }; }, []);
+  const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as unknown as {standalone?: boolean}).standalone;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (standalone || (!deferred && !ios)) return null;
+  return <span className="install">
+    <button className="small" onClick={async () => { if (deferred) { await deferred.prompt(); deferred = null; bump(n => n + 1); } else setHint(!hint); }}>앱으로 설치</button>
+    {hint && <span className="install-hint">Safari 아래 공유 버튼 → "홈 화면에 추가"를 누르세요.</span>}
+  </span>;
 }
 
 function SettingsPanel({loaded, edit, close, reload}: {loaded: Loaded & {planner: NonNullable<Loaded['planner']>}; edit: () => void; close: () => void; reload: () => Promise<void>}) {

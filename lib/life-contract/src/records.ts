@@ -148,6 +148,8 @@ export type AnyRecord = {[K in Kind]: LifeRecord<K>}[Kind];
 
 /** A write from the planner. The hub assigns id (when absent), revision and timestamps. */
 export const WriteInput = z.object({
+  // A client-made ULID for records created offline; replaying the same create is a no-op.
+  id: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/).optional(),
   kind: z.enum(KINDS as [Kind, ...Kind[]]),
   logicalDay: day.nullable().default(null),
   body: z.unknown(),

@@ -100,6 +100,12 @@ export const ReviewBody = z.object({
   text: text(5000).nullable().default(null),
 });
 
+// Free writing on a day: a bullet-journal note (–), an idea (!), or the whole free page of a one-page daily.
+export const NoteBody = z.object({
+  text: text(5000),
+  signifier: z.enum(['note', 'idea', 'page']).default('note'),
+});
+
 // A role the user lives in (학생, 직장인, 엄마, 창작자…). Tasks and sessions point to personas.
 export const PersonaBody = z.object({
   name: text(40).min(1),
@@ -120,12 +126,12 @@ export const SessionBody = z.object({
   personaIds: z.array(z.string()).max(10).default([]),
 }).refine(s => !s.end || s.end > s.start, {message: 'A session must end after it starts.'});
 
-export const BODIES = {goal: GoalBody, project: ProjectBody, task: TaskBody, routine: RoutineBody, sleep: SleepBody, condition: ConditionBody, review: ReviewBody, session: SessionBody, persona: PersonaBody} as const;
+export const BODIES = {goal: GoalBody, project: ProjectBody, task: TaskBody, routine: RoutineBody, sleep: SleepBody, condition: ConditionBody, review: ReviewBody, session: SessionBody, persona: PersonaBody, note: NoteBody} as const;
 export type Kind = keyof typeof BODIES;
 export const KINDS = Object.keys(BODIES) as Kind[];
 export type Bodies = {[K in Kind]: z.infer<(typeof BODIES)[K]>};
 export type Goal = Bodies['goal']; export type Project = Bodies['project']; export type Task = Bodies['task'];
-export type Routine = Bodies['routine']; export type Session = Bodies['session']; export type Persona = Bodies['persona']; export type Sleep = Bodies['sleep']; export type Condition = Bodies['condition']; export type Review = Bodies['review'];
+export type Routine = Bodies['routine']; export type Session = Bodies['session']; export type Persona = Bodies['persona']; export type Note = Bodies['note']; export type Sleep = Bodies['sleep']; export type Condition = Bodies['condition']; export type Review = Bodies['review'];
 
 export type Source = {type: 'planner' | 'import:notion' | 'import:paper' | 'import:csv' | 'kit'; ref?: string; confirmed: boolean};
 export type LifeRecord<K extends Kind = Kind> = {
@@ -169,7 +175,7 @@ export const ALL_SCOPES: Scope[] = ['life.read.plan', 'life.read.outcome', 'life
 /** Drops what a grant does not cover: kinds out of scope, outcome without outcome scope, private fields always. */
 export function shareable(record: AnyRecord, scopes: Scope[]): AnyRecord | null {
   const has = (s: Scope) => scopes.includes(s);
-  const need: Record<Kind, Scope> = {goal: 'life.read.plan', project: 'life.read.plan', task: 'life.read.plan', routine: 'life.read.plan', sleep: 'life.read.condition', condition: 'life.read.condition', review: 'life.read.review', session: 'life.read.outcome', persona: 'life.read.plan'};
+  const need: Record<Kind, Scope> = {goal: 'life.read.plan', project: 'life.read.plan', task: 'life.read.plan', routine: 'life.read.plan', sleep: 'life.read.condition', condition: 'life.read.condition', review: 'life.read.review', session: 'life.read.outcome', persona: 'life.read.plan', note: 'life.read.review'};
   if (!has(need[record.kind])) return null;
   const copy = structuredClone(record) as AnyRecord;
   delete copy.ext;

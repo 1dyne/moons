@@ -42,6 +42,12 @@ export const PlannerSpec = z.object({
   modules: z.array(Module).min(1).max(20),
   dashboards: z.array(z.object({id: z.string(), kind: z.enum(['goal', 'project', 'period']), widgets: z.array(z.enum(['progress', 'linked_items', 'streak', 'trend', 'history']))})).max(10).default([]),
   rules: z.array(Rule).max(20).default([]),
+  // Page layouts per period. The same records render in any of them; switching never moves data.
+  layout: z.object({
+    day: z.enum(['sheet', 'hourly', 'bullet', 'onepage']).default('sheet'),
+    week: z.enum(['horizontal', 'vertical']).default('horizontal'),
+  }).default({}),
+  mood: z.string().max(20).default('calm'),
   source: z.object({kind: z.enum(['chat', 'paper', 'notion', 'template']), ref: z.string().max(80).optional()}).optional(),
 }).superRefine((spec, ctx) => {
   const ids = spec.modules.map(m => m.id);

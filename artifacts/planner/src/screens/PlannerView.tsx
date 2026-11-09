@@ -6,9 +6,10 @@ import {Today, type Nav} from './Today.tsx';
 import {Goals} from './Goals.tsx';
 import {Month} from './Month.tsx';
 import {Insights} from './Insights.tsx';
+import {Week} from './Week.tsx';
 
-export type Tab = 'today' | 'goals' | 'month' | 'insights';
-const TABS: [Tab, string][] = [['today', '오늘'], ['goals', '목표'], ['month', '달력'], ['insights', '분석']];
+export type Tab = 'today' | 'week' | 'goals' | 'month' | 'insights';
+const TABS: [Tab, string][] = [['today', '오늘'], ['week', '주간'], ['month', '달력'], ['goals', '목표'], ['insights', '분석']];
 
 /** One renderer for both the mockup and the real planner: only the data source differs. */
 export function PlannerView({spec, settings, p, extraTabs}: {spec: PlannerSpec; settings: Settings; p: Planner; extraTabs?: React.ReactNode}) {
@@ -22,6 +23,7 @@ export function PlannerView({spec, settings, p, extraTabs}: {spec: PlannerSpec; 
     </nav>
     {p.error && <p className="error" role="alert">{p.error}</p>}
     {tab === 'today' && <Today spec={spec} settings={settings} p={p} nav={nav} today={today} />}
+    {tab === 'week' && <Week spec={spec} settings={settings} p={p} nav={nav} today={today} />}
     {tab === 'goals' && <Goals spec={spec} p={p} nav={nav} today={today} goalId={goalId} setGoalId={setGoalId} />}
     {tab === 'month' && <Month p={p} nav={nav} month={month} setMonth={setMonth} today={today} />}
     {tab === 'insights' && <Insights p={p} settings={settings} today={today} />}

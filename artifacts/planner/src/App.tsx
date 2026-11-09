@@ -51,8 +51,16 @@ function SettingsPanel({loaded, edit, close, reload}: {loaded: Loaded & {planner
   const spec = loaded.planner.spec, checkin = spec.modules.find(m => m.type === 'checkin');
   const [wake, setWake] = useState(String(checkin?.options.wake ?? '07:00')), [sleep, setSleep] = useState(String(checkin?.options.sleep ?? '00:00'));
   // Changing the window is a spec change: a new version, records untouched.
+  const saveLayout = async (patch: Partial<NonNullable<typeof spec.layout>>) => { await api.putSpec({...spec, layout: {...spec.layout, ...patch} as typeof spec.layout}); await reload(); };
   const saveWindow = async () => { await api.putSpec({...spec, modules: spec.modules.map(m => m.type === 'checkin' ? {...m, options: {...m.options, wake, sleep}} : m)}); await reload(); };
   return <div className="settings">
+    <section className="module"><h3>화면 구성 <span className="muted small">바꿔도 기록은 그대로예요</span></h3>
+      <label>하루 페이지 <select value={spec.layout?.day ?? 'sheet'} onChange={e => saveLayout({day: e.target.value as 'sheet'})}>
+        <option value="sheet">스터디 타임테이블 (할 일 + 10분 칸)</option><option value="hourly">시간대별 타임라인 (계획 vs 실제)</option>
+        <option value="bullet">불렛저널 빠른 기록</option><option value="onepage">한 장 자유 데일리 (모눈)</option></select></label>
+      <label>주간 페이지 <select value={spec.layout?.week ?? 'horizontal'} onChange={e => saveLayout({week: e.target.value as 'horizontal'})}>
+        <option value="horizontal">가로형 (7일 칸, 끌어서 옮기기)</option><option value="vertical">세로형 (시간 눈금)</option></select></label>
+    </section>
     <section className="module"><h3>플래너</h3>
       <p className="muted">버전 {loaded.planner.version} · 화면 구성을 바꿔도 기록은 그대로예요.</p>
       <button className="primary" onClick={edit}>플래너 고치기</button>

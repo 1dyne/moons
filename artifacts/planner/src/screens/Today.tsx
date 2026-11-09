@@ -5,15 +5,14 @@ import {ofKind, type Planner} from '../data.ts';
 import {FocusBar, Receipt, Timetable, colors, hm, useTimer, type Timer} from './Focus.tsx';
 import {CheckIn, ConditionDay} from './CheckIn.tsx';
 import {parseEntry} from '../parse.ts';
+import {MARK, NEXT, moveTo, outcome, saveTask, type Ctx, type Nav} from './day.ts';
+export {MARK, NEXT, moveTo, outcome, saveTask, type Ctx, type Nav} from './day.ts';
+import {BulletDay, HourlyDay, OnePageDay} from './DayLayouts.tsx';
 export {parseEntry, parseTarget} from '../parse.ts';
 
-export type Nav = {day: string; setDay: (d: string) => void; openGoal: (id: string) => void};
-type Ctx = {p: Planner; day: string; nav: Nav; now: () => string; timer: Timer | null; color: (k: string) => string};
 const CATEGORY: Record<string, string> = {must: '꼭', want: '하고 싶은', leisure: '여가'};
 const RESULT: Record<string, string> = {done: '완료', partial: '일부', in_progress: '하는 중', missed: '못 함', postponed: '미룸', cancelled: '취소', unknown: '아직'};
 // Paper-planner marks: ○ done, △ partly, × not done.
-const MARK: Record<string, string> = {done: '○', partial: '△', missed: '×', in_progress: '◐', postponed: '→', cancelled: '–', unknown: ''};
-const NEXT: Record<string, Task['outcome']['result']> = {unknown: 'done', in_progress: 'done', done: 'partial', partial: 'missed', missed: 'unknown'};
 export const label = (day: string) => new Intl.DateTimeFormat('ko-KR', {month: 'long', day: 'numeric', weekday: 'short', timeZone: 'UTC'}).format(new Date(`${day}T00:00:00Z`));
 
 /** Goals a day's task can move: calendar goals that contain the day and open milestones. */
@@ -22,7 +21,13 @@ export function Today({spec, settings, p, nav, today}: {spec: PlannerSpec; setti
   const timerModule = spec.modules.find(m => m.type === 'timer');
   const timer = useTimer(p, settings), color = colors(p, nav.day);
   const ctx: Ctx = {p, day: nav.day, nav, now: () => new Date().toISOString(), timer: timerModule ? timer : null, color};
-  const parts = modulesFor(spec, 'day').filter(m => m.type !== 'timer');
+  const layout = spec.layout?.day ?? 'sheet';
+  // Non-sheet layouts draw the day's tasks themselves; the timetable gives way to the hourly view's own "actual" column.
+  const parts = modulesFor(spec, 'day').filter(m => m.type !== 'timer' && !(layout !== 'sheet' && m.type === 'tasks'));
+  const checkin = spec.modules.find(m => m.type === 'checkin');
+  const startHour = Number(String(checkin?.options.wake ?? '').slice(0, 2)) || Number(timerModule?.options.startHour ?? 6);
+  const endHour = Number(settings.dayBoundary.slice(0, 2)) + 24;
+  const page = layout === 'hourly' ? <HourlyDay ctx={ctx} startHour={startHour} endHour={endHour} /> : layout === 'bullet' ? <BulletDay ctx={ctx} /> : layout === 'onepage' ? <OnePageDay ctx={ctx} startHour={startHour} endHour={endHour} /> : null;
   return <div className="sheet">
     <div className="day-nav">
       <button onClick={() => nav.setDay(addDays(nav.day, -1))} aria-label="전날">‹</button>
@@ -34,14 +39,15 @@ export function Today({spec, settings, p, nav, today}: {spec: PlannerSpec; setti
     <div className={timerModule ? 'sheet-cols' : 'sheet-one'}>
       <div className="col-main">
         {nav.day === today && <CarryOver ctx={ctx} />}
+        {page && <section key={`layout:${nav.day}`} className={`part part-tasks layout-${layout}`}>{page}</section>}
         {parts.map(m => <section key={`${m.id}:${nav.day}`} className={`part part-${m.type}`}>
           <h3>{m.label}</h3>
           <ModuleBody m={m} ctx={ctx} />
         </section>)}
       </div>
       {timerModule && <div className="col-side">
-        <section className="part part-timer"><h3>{timerModule.label} <span className="muted small">10분 = 한 칸</span></h3>
-          <Timetable key={nav.day} m={timerModule} p={p} day={nav.day} settings={settings} color={color} /></section>
+        {layout !== 'hourly' && <section className="part part-timer"><h3>{timerModule.label} <span className="muted small">10분 = 한 칸</span></h3>
+          <Timetable key={nav.day} m={timerModule} p={p} day={nav.day} settings={settings} color={color} /></section>}
         <Receipt p={p} day={nav.day} routineRate={uses(spec, 'routine') ? routineRate(p.records, nav.day) : null} />
       </div>}
     </div>
@@ -60,14 +66,6 @@ function ModuleBody({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
     case 'review': return <ReviewBox ctx={ctx} />;
     default: return <p className="muted">이 모듈은 곧 그려져요. 기록 형식은 이미 정해져 있어요.</p>;
   }
-}
-
-const saveTask = (ctx: Ctx, t: LifeRecord<'task'>, patch: Partial<Task>) => ctx.p.write(t.id, {kind: 'task', logicalDay: t.logicalDay, body: {...t.body, ...patch}, baseRevision: t.revision});
-const outcome = (t: LifeRecord<'task'>, o: Partial<Task['outcome']>): Partial<Task> => ({outcome: {...t.body.outcome, ...o}});
-/** Moving a task keeps history: the original says "postponed to X", X starts fresh on the new day. */
-async function moveTo(ctx: Ctx, t: LifeRecord<'task'>, day: string) {
-  const next = await ctx.p.write(null, {kind: 'task', logicalDay: day, body: {...t.body, outcome: {}}});
-  if (next) await saveTask(ctx, t, outcome(t, {result: 'postponed', postponedTo: next.id, reportedAt: ctx.now()}));
 }
 
 function CarryOver({ctx}: {ctx: Ctx}) {

@@ -2,6 +2,7 @@ import {addDays, focusOf, periodContains, weekday} from '@workspace/life-contrac
 import {ofKind, type Planner} from '../data.ts';
 import {GoalBar, horizonLabel, type Nav} from './Today.tsx';
 import {hm} from './Focus.tsx';
+import {HabitGrid} from './Habits.tsx';
 
 export function Month({p, nav, month, setMonth, today}: {p: Planner; nav: Nav; month: string; setMonth: (m: string) => void; today: string}) {
   const first = `${month}-01`, start = addDays(first, -((weekday(first) + 6) % 7));
@@ -12,6 +13,7 @@ export function Month({p, nav, month, setMonth, today}: {p: Planner; nav: Nav; m
   return <div className="month">
     <div className="day-nav"><button onClick={() => shift(-1)} aria-label="전달">‹</button><h2>{Number(month.slice(5))}월 <span className="muted">{month.slice(0, 4)}</span></h2><button onClick={() => shift(1)} aria-label="다음 달">›</button></div>
     {goals.length > 0 && <section className="module"><h3>이달의 목표</h3><ul className="rows">{goals.map(g => <li key={g.id} className="row goal-row"><button className="link" onClick={() => nav.openGoal(g.id)}><span className="horizon">{horizonLabel(g.body.horizon)}</span>{g.body.title}</button><GoalBar g={g} records={p.records} /></li>)}</ul></section>}
+    <HabitGrid p={p} month={month} today={today} />
     <div className="calendar" role="grid">
       {['월', '화', '수', '목', '금', '토', '일'].map(d => <span key={d} className="dow">{d}</span>)}
       {cells.map(d => {

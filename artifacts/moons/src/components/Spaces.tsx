@@ -1,4 +1,5 @@
-import {useEffect,useState,type FormEvent} from 'react';
+import {useEffect,useRef,useState,type FormEvent} from 'react';
+import {useSatelliteBridge} from '@/lib/sat-bridge';
 import {ArrowLeft,ArrowUpRight,BadgeCheck,Bot,Check,ChevronDown,ChevronUp,Copy,ExternalLink,FileText,Inbox as InboxIcon,KeyRound,Layers,Lightbulb,LoaderCircle,Orbit,PenLine,Plus,RefreshCw,RotateCcw,Sparkles,Trash2,X} from 'lucide-react';
 import type {Store} from '@/lib/model';
 import {errMsg,type WorkspaceApi} from '@/lib/workspace-client';
@@ -28,7 +29,8 @@ export function MySpaces({ctx}:{ctx:Ctx}){
 /** One Satellite: open it, see what it sent, decide how it reaches MOONS. */
 export function SpacePage({ctx,id}:{ctx:Ctx;id:string}){
   const {store,ws,notify,go}=ctx,s=spacesOf(store).find(x=>x.id===id);
-  const [tab,setTab]=useState<'open'|'records'|'settings'>('records'),[records,setRecords]=useState<SpaceRecord[]|null>(null),[pending,setPending]=useState(0),[connected,setConnected]=useState(false),[token,setToken]=useState(''),[busy,setBusy]=useState(false);
+  const frame=useRef<HTMLIFrameElement>(null);useSatelliteBridge(id,s?.url,frame);
+  const [tab,setTab]=useState<'open'|'records'|'settings'>(()=>s?.embed==='auto'&&s.url?'open':'records'),[records,setRecords]=useState<SpaceRecord[]|null>(null),[pending,setPending]=useState(0),[connected,setConnected]=useState(false),[token,setToken]=useState(''),[busy,setBusy]=useState(false);
   async function load(){try{const [r,st]=await Promise.all([spaceApi.records(id),spaceApi.status()]);setRecords(r.records);setPending(st.intake[id]?.pending??0);setConnected(!!st.intake[id]?.connected)}catch(e){notify(errMsg(e))}}
   useEffect(()=>{void load();
     // The agent runs when the user opens the space, if they allowed it (v8 3.3).
@@ -44,7 +46,7 @@ export function SpacePage({ctx,id}:{ctx:Ctx;id:string}){
     <header className="space-head"><Orbit size={30}/><div><h1>{s.name}</h1><p>{s.description}</p><small>{madeLabel(s)}{s.url&&<> · {new URL(s.url).host}</>}</small></div>
       {s.url&&<a className="primary" href={s.url} target="_blank" rel="noreferrer noopener"><ExternalLink size={16}/>{tr('Open')}</a>}</header>
     <nav className="dock-tabs" role="tablist">{([['records','Records'],...(embed?[['open','In MOONS']]:[]),['settings','Settings']] as const).map(([k,l])=><button key={k} role="tab" aria-selected={tab===k} onClick={()=>setTab(k as typeof tab)}>{tr(l)}{k==='records'&&pending>0&&<b>{pending}</b>}</button>)}</nav>
-    {tab==='open'&&s.url&&<div className="space-frame"><iframe title={s.name} src={s.url} sandbox="allow-scripts allow-forms allow-same-origin allow-popups" referrerPolicy="no-referrer"/><a className="text-button" href={s.url} target="_blank" rel="noreferrer noopener"><ArrowUpRight size={14}/>{tr('Open in a new tab')}</a></div>}
+    {tab==='open'&&s.url&&<div className="space-frame"><iframe ref={frame} title={s.name} src={s.url} sandbox="allow-scripts allow-forms allow-same-origin allow-popups" referrerPolicy="no-referrer"/><a className="text-button" href={s.url} target="_blank" rel="noreferrer noopener"><ArrowUpRight size={14}/>{tr('Open in a new tab')}</a></div>}
     {tab==='records'&&<>
       {s.agent.mode!=='off'&&<div className="space-agent"><Bot size={16}/><span>{tr('{n} records not drafted yet',{n:pending})}</span><button className="secondary" disabled={busy||!pending} onClick={()=>void run()}>{busy?<LoaderCircle className="spin" size={15}/>:<Sparkles size={15}/>}{tr('Draft now')}</button><button className="text-button" onClick={()=>go('/inbox')}><InboxIcon size={14}/>{tr('Inbox')}</button></div>}
       {records===null?<p role="status"><LoaderCircle className="spin" size={16}/></p>:records.length?<ul className="record-list">{records.map(r=><RecordCard key={r.id} r={r} id={id} notify={notify} reload={load}/>)}</ul>:<p className="dock-empty">{connected?'—':<button className="text-button" onClick={()=>setTab('settings')}><KeyRound size={13}/>{tr('Create token')}</button>}</p>}

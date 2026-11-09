@@ -9,7 +9,7 @@ export type Reward = 'yes' | 'meh' | 'no';
  *  toward the day's completion. reward: whether doing it felt like a reward, asked right after finishing it. */
 export type Task = {id: string; title: string; projectId?: string; stepKey?: string; plannedDate?: string; plannedStart?: string; estimateMin?: number; status: TaskStatus; createdAt: string; doneAt?: string; wish?: boolean; reward?: Reward; sourceBriefId?:string; sourceProposalId?:string};
 export type Session = {id: string; taskId: string; startedAt: string; endedAt?: string; source: 'timer' | 'manual' | 'suggested'};
-export type Confidence = {id: string; targetType: 'concept' | 'task' | 'node' | 'project'; targetId: string; value: number; note?: string; at: string};
+export type Confidence = {id: string; targetType: 'concept' | 'task' | 'node' | 'project' | 'page'; targetId: string; value: number; note?: string; at: string};
 
 export type PlannerStore = {projects?: Project[]; tasks?: Task[]; sessions?: Session[]; confidence?: Confidence[]; entries: {id: string; createdAt: string; planetIds: string[]}[]};
 

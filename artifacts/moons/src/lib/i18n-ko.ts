@@ -2,7 +2,8 @@
 // Missing keys fall back to English, so a new string never breaks the UI.
 import {projectsKo} from './projects-i18n.ts';
 import {dockKo} from './dock-i18n.ts';
-export const ko: Record<string, string> = {
+import {v9Ko} from './v9-i18n.ts';
+const koBase: Record<string, string> = {
   // v8.1 words
   'Hide word links': '단어 링크 숨기기',
   'Show word links': '단어 링크 보기',
@@ -1201,3 +1202,4 @@ export const ko: Record<string, string> = {
   'Satellites': 'Satellites',
   'Not found.': '찾을 수 없어요.',
 };
+export const ko: Record<string, string> = {...koBase, ...v9Ko};

@@ -52,9 +52,9 @@ export function MoonCharacter({large=false}:{large?:boolean}){
   </svg>;
 }
 
-export function Logo(){
+export function Logo({size='hero'}:{size?:'hero'|'rail'}={}){
   const id=useId().replace(/:/g,''),{svg,eyes,shadow}=useMoonGaze(43,.56);
-  return <svg ref={svg} className="hero-logo" viewBox="0 0 1449 1086" role="img" aria-label={tr('MOONS — blue moon in an arch')}>
+  return <svg ref={svg} className={size==='rail'?'rail-logo-mark':'hero-logo'} viewBox="0 0 1449 1086" role="img" aria-label={tr('MOONS — blue moon in an arch')}>
     <defs><clipPath id={id}><path d="M397 798C368 751 354 700 354 643C354 452 507 297 696 296C883 293 1032 453 1032 642C1032 701 1017 754 991 798Z"/></clipPath></defs>
     <image href="/moons-logo.png" width="1449" height="1086"/>
     <g clipPath={`url(#${id})`}><rect x="330" y="280" width="730" height="530" fill="#7ba4f8"/><path ref={shadow} d="M735 293C892 370 948 655 884 800H1100V260Z" fill="#345eaf"/></g>

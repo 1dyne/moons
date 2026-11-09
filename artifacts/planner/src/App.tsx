@@ -1,7 +1,7 @@
 import {createContext, useContext, useEffect, useState} from 'react';
 import {useClerk} from '@clerk/react';
 import type {AnyRecord, Settings} from '@workspace/life-contract';
-import {CHIP_COLORS, dayBoundary, type PlannerSpec} from '@workspace/planner-spec';
+import {CHIP_COLORS, MOODS, dayBoundary, withMood, type PlannerSpec} from '@workspace/planner-spec';
 import {api, httpBackend, ofKind, usePlanner, type Planner} from './data.ts';
 import {authEnabled} from './runtime.ts';
 import {Moon} from './Moon.tsx';
@@ -35,7 +35,7 @@ function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Lo
   const {spec} = loaded.planner;
   const p = usePlanner(httpBackend, loaded.records);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  return <div className="app" style={{'--accent': CHIP_COLORS[spec.theme.accent]} as React.CSSProperties}>
+  return <div className={`app mood-${spec.mood}`} style={{'--accent': CHIP_COLORS[spec.theme.accent]} as React.CSSProperties}>
     <header className="top">
       <Moon size={34} />
       <h1>{spec.name}</h1>
@@ -58,6 +58,7 @@ function SettingsPanel({loaded, edit, close, reload}: {loaded: Loaded & {planner
       <label>하루 페이지 <select value={spec.layout?.day ?? 'sheet'} onChange={e => saveLayout({day: e.target.value as 'sheet'})}>
         <option value="sheet">스터디 타임테이블 (할 일 + 10분 칸)</option><option value="hourly">시간대별 타임라인 (계획 vs 실제)</option>
         <option value="bullet">불렛저널 빠른 기록</option><option value="onepage">한 장 자유 데일리 (모눈)</option></select></label>
+      <label>무드 <select value={spec.mood} onChange={e => void api.putSpec(withMood(spec, e.target.value)).then(reload)}>{MOODS.map(m => <option key={m.id} value={m.id}>{m.name} — {m.feel}</option>)}</select></label>
       <label>주간 페이지 <select value={spec.layout?.week ?? 'horizontal'} onChange={e => saveLayout({week: e.target.value as 'horizontal'})}>
         <option value="horizontal">가로형 (7일 칸, 끌어서 옮기기)</option><option value="vertical">세로형 (시간 눈금)</option></select></label>
     </section>

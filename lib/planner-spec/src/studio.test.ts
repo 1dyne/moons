@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {TEMPLATES, compose, propose, PlannerSpec, dayBoundary} from './index.ts';
+import {TEMPLATES, candidates, compose, propose, withMood, PlannerSpec, dayBoundary} from './index.ts';
 
 test('templates are valid specs', () => {
   for (const t of TEMPLATES) assert.doesNotThrow(() => PlannerSpec.parse(t.spec), t.id);
@@ -36,4 +36,15 @@ test('a spec with a rule pointing to a missing module is refused', () => {
   const bad = structuredClone(TEMPLATES[0]!.spec);
   bad.rules.push({kind: 'carry_over', moduleId: 'nope', mode: 'ask'});
   assert.throws(() => PlannerSpec.parse(bad), /missing module/);
+});
+
+test('candidates: the words pick the first layout, the rest contrast; moods only recolour', () => {
+  const text = '불렛저널처럼 빠르게 적는 데일리';
+  const c = candidates(propose(text), text, [], {});
+  assert.equal(c.length, 3);
+  assert.equal(c[0]!.spec.layout.day, 'bullet');
+  assert.equal(new Set(c.map(x => x.spec.layout.day)).size, 3);
+  assert.ok(c.find(x => x.spec.layout.day === 'sheet')!.spec.modules.some(m => m.type === 'timer'));
+  const night = withMood(c[0]!.spec, 'night');
+  assert.equal(night.mood, 'night'); assert.equal(night.theme.accent, 'sky'); assert.deepEqual(night.modules, c[0]!.spec.modules);
 });

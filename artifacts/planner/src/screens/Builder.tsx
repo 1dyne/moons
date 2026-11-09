@@ -1,6 +1,6 @@
 import {useMemo, useRef, useState} from 'react';
 import {logicalDay, type Settings} from '@workspace/life-contract';
-import {CATALOG, TEMPLATES, compose, entry, propose, type ModuleType, type PlannerSpec, type Proposal} from '@workspace/planner-spec';
+import {CATALOG, CHIP_COLORS, MOODS, TEMPLATES, candidates, entry, propose, withMood, type ModuleType, type PlannerSpec, type Proposal, type Reference} from '@workspace/planner-spec';
 import {memoryBackend, usePlanner} from '../data.ts';
 import {sampleRecords} from '../sample.ts';
 import {Moon, Speech} from '../Moon.tsx';
@@ -14,7 +14,11 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
   const [text, setText] = useState(''), [said, setSaid] = useState<string | null>(null);
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({}), [accepted, setAccepted] = useState<ModuleType[]>([]);
-  const [name, setName] = useState(''), [preview, setPreview] = useState<PlannerSpec | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [name, setName] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  // Samples: two or three planners from the reference library; the picked one gets a mood, then becomes real.
+  const [cands, setCands] = useState<{reference: Reference; spec: PlannerSpec}[] | null>(null), [pick, setPick] = useState<number | null>(null), [mood, setMood] = useState('calm');
+  const preview = cands && pick !== null ? withMood(cands[pick]!.spec, mood) : null;
+  const setPreview = (_: null) => { setCands(null); setPick(null); };
   const input = useRef<HTMLTextAreaElement>(null);
 
   const start = (words: string, templateId?: string) => {
@@ -22,10 +26,10 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
     setSaid(words || TEMPLATES.find(t => t.id === templateId)?.name || ''); setProposal(p); setAnswers({}); setAccepted(p.suggested.map(s => s.module)); setName(p.template.name); setPreview(null);
   };
   const restart = () => { setProposal(null); setSaid(null); setPreview(null); setText(''); setTimeout(() => input.current?.focus()); };
-  const show = () => { if (!proposal) return; try { setError(''); setPreview(compose(proposal, accepted, answers, name)); } catch (e) { setError((e as Error).message); } };
+  const show = () => { if (!proposal) return; try { setError(''); setCands(candidates(proposal, said ?? '', accepted, answers, name)); setPick(null); } catch (e) { setError((e as Error).message); } };
   const use = async () => { if (!preview) return; setBusy(true); setError(''); try { await onUse(preview); } catch (e) { setError((e as Error).message); setBusy(false); } };
 
-  return <div className={`builder ${preview ? 'split' : ''}`}>
+  return <div className={`builder ${cands ? 'split' : ''}`}>
     <div className="chat">
       {current && onCancel && <button className="ghost small back" onClick={onCancel}>‹ 내 플래너로</button>}
       <div className="moon-say">
@@ -72,27 +76,36 @@ export function Builder({tz, current, onUse, onCancel}: {tz: string; current?: P
         <div className="bubble moon">
           <label className="name">플래너 이름 <input value={name} onChange={e => { setName(e.target.value); setPreview(null); }} maxLength={40} /></label>
           <div className="actions">
-            <button className="primary" onClick={show}>{preview ? '목업 다시 그리기' : '목업 보기'}</button>
+            <button className="primary" onClick={show}>{cands ? '샘플 다시 그리기' : '샘플 보기'}</button>
             <button className="ghost" onClick={restart}>처음부터 다시 말하기</button>
           </div>
         </div>
+        {cands && !preview && <div className="bubble moon"><p>같은 기능으로 <strong>{cands.length}가지</strong> 플래너를 그려 봤어요. 오른쪽에서 마음에 드는 걸 고르세요.</p></div>}
         {preview && <div className="bubble moon">
-          <p>오른쪽이 <strong>{preview.name}</strong> 목업이에요. 예시 기록이 들어 있으니 눌러 보세요. 마음에 들면 이대로 쓰면 돼요.</p>
+          <p><strong>{cands![pick!]!.reference.name}</strong>로 골랐어요. 무드를 고르고, 예시 기록을 눌러 본 뒤 마음에 들면 이대로 쓰세요.</p>
+          <div className="moods" role="radiogroup" aria-label="무드">{MOODS.map(m => <button key={m.id} role="radio" aria-checked={mood === m.id} className={`mood-chip mood-${m.id} ${mood === m.id ? 'on' : ''}`} onClick={() => setMood(m.id)} title={m.feel}><i />{m.name}</button>)}</div>
+          <button className="ghost small" onClick={() => setPick(null)}>‹ 다른 샘플 보기</button>
           <div className="actions"><button className="primary" disabled={busy} onClick={use}>{busy ? '만드는 중…' : '이대로 쓰기'}</button></div>
           <p className="muted small">예시 기록은 빠지고 빈 플래너로 시작해요. 나중에 언제든 고칠 수 있고, 고쳐도 기록은 그대로예요.</p>
         </div>}
         {error && <p className="error" role="alert">{error}</p>}
       </div>}
     </div>
+    {cands && !preview && <aside className="samples" aria-label="샘플">{cands.map((c, i) => <button key={c.reference.id + i} className="sample" onClick={() => setPick(i)}>
+      <div className="sample-head"><strong>{c.reference.name}</strong><span className="muted small">{c.reference.inspiredBy}</span></div>
+      <ul className="sample-pattern">{c.reference.pattern.map(x => <li key={x}>{x}</li>)}</ul>
+      <div className="sample-mini" aria-hidden="true"><Mockup spec={c.spec} tz={tz} mini /></div>
+      <span className="sample-pick">이걸로 볼래요 →</span>
+    </button>)}</aside>}
     {preview && <Mockup key={JSON.stringify(preview)} spec={preview} tz={tz} />}
   </div>;
 }
 
-function Mockup({spec, tz}: {spec: PlannerSpec; tz: string}) {
+function Mockup({spec, tz, mini}: {spec: PlannerSpec; tz: string; mini?: boolean}) {
   const settings: Settings = {tz, dayBoundary: '04:00'};
   const backend = useMemo(() => memoryBackend(tz), [tz]);
   const p = usePlanner(backend, useMemo(() => sampleRecords(spec, logicalDay(new Date(), settings), tz), [spec, tz]));
-  return <aside className="mockup" aria-label="목업">
+  return <aside className={`mockup mood-${spec.mood} ${mini ? 'mini' : ''}`} aria-label={mini ? undefined : '목업'} style={{'--accent': CHIP_COLORS[spec.theme.accent]} as React.CSSProperties}>
     <div className="mockup-head"><Moon size={28} /><strong>{spec.name}</strong><span className="tag">목업 · 예시 데이터</span></div>
     <PlannerView spec={spec} settings={settings} p={p} />
   </aside>;

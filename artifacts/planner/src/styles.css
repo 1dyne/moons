@@ -446,3 +446,58 @@ table.eff th{font-size:12px;color:var(--muted);font-weight:600}
   .onepage{grid-template-columns:44px 1fr}
   .hr-plan{right:56px}.hr-actual{width:40px}
 }
+
+/* Samples */
+.samples{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;align-items:start}
+.sample{display:grid;gap:8px;text-align:left;padding:12px;border-radius:16px;border:1.5px solid var(--line);background:#fff}
+.sample:hover{border-color:#2d2f2a;background:#fff}
+.sample-head{display:grid;gap:2px}
+.sample-pattern{margin:0;padding-left:16px;font-size:12px;color:#55574e;display:grid;gap:1px}
+.sample-mini{height:330px;overflow:hidden;border-radius:10px;border:1px solid #efece2;position:relative;pointer-events:none}
+.mockup.mini{position:absolute;inset:0 auto auto 0;width:200%;max-height:none;transform:scale(.5);transform-origin:0 0;border:0;box-shadow:none}
+.sample-pick{font-size:13px;font-weight:600}
+.moods{display:flex;gap:6px;flex-wrap:wrap}
+.mood-chip{display:inline-flex;gap:6px;align-items:center;border-radius:999px;padding:4px 12px;font-size:13px}
+.mood-chip i{width:14px;height:14px;border-radius:50%;border:1px solid #0002}
+.mood-chip.on{border-color:#2d2f2a;box-shadow:0 0 0 1px #2d2f2a}
+.mood-chip.mood-calm i{background:#fff}
+.mood-chip.mood-ivory i{background:#f8f1e1}
+.mood-chip.mood-study i{background:#fff linear-gradient(#cfd8d6 1px,transparent 1px) 0 0/4px 4px}
+.mood-chip.mood-deco i{background:#fff radial-gradient(#e2b6b4 1px,transparent 1.5px) 0 0/4px 4px}
+.mood-chip.mood-night i{background:#22252b}
+
+/* Moods: paper, type and night. Structure never changes. */
+.mood-ivory{--bg:#fbf6ea;--soft:#f3ecdb;--line:#e4dcc6}
+.app.mood-ivory,.mockup.mood-ivory{background:#fbf6ea}
+.mood-ivory h1,.mood-ivory h2,.mood-ivory .part>h3,.mood-ivory .receipt figcaption{font-family:'Gowun Batang',serif;letter-spacing:0}
+.mood-ivory .tt-cell,.mood-ivory .op-paper,.mood-ivory .receipt{background-color:#fffcf4}
+.mood-study .sheet,.mood-study .week{background-image:linear-gradient(#eef1ee 1px,transparent 1px),linear-gradient(90deg,#eef1ee 1px,transparent 1px);background-size:14px 14px}
+.mood-study .part>h3{border-bottom-width:3px}
+.mood-study .focus-time,.mood-study .spent,.mood-study .rate strong{font-variant-numeric:tabular-nums;letter-spacing:.04em}
+.mood-deco .sheet,.mood-deco .week{background-image:radial-gradient(#ead7d3 1px,transparent 1.4px);background-size:16px 16px}
+.mood-deco h1,.mood-deco h2,.mood-deco .part>h3,.mood-deco .pname,.mood-deco .receipt figcaption{font-family:'Gaegu',cursive;letter-spacing:0}
+.mood-deco .pname{font-size:17px}
+.mood-deco .part>h3{border-bottom:2px dashed #e2b6b4;font-size:16px}
+.mood-deco .mark{border-color:#e2b6b4}
+.mood-night{--bg:#1d2025;--ink:#e7e8e2;--muted:#9a9c93;--line:#353941;--soft:#272b31;color:var(--ink)}
+.app.mood-night,.mockup.mood-night{background:#1d2025}
+.mood-night button,.mood-night input,.mood-night select,.mood-night textarea{background:#24282e;border-color:#3a3f47;color:var(--ink)}
+.mood-night button.primary{background:#e7e8e2;color:#1d2025}
+.mood-night .tabs button.on,.mood-night .seg button.on{background:#e7e8e2;color:#1d2025}
+.mood-night .part>h3{color:#c9cbc2;border-bottom-color:#c9cbc2}
+.mood-night .focus-bar{background:#0f1114}
+.mood-night .tt-grid,.mood-night .tt-hour,.mood-night .tt-cell:last-child{border-color:#8b8e86}
+.mood-night .tt-cell{background:#1d2025;border-right-color:#2c3037}
+.mood-night .tt-row{border-bottom-color:#2c3037}
+.mood-night .receipt{background:#24282e;border-color:#353941;color:var(--ink)}
+.mood-night .receipt:after{background:linear-gradient(135deg,#24282e 50%,transparent 50%) 0 0/12px 10px repeat-x,linear-gradient(-135deg,#24282e 50%,transparent 50%) 0 0/12px 10px repeat-x}
+.mood-night .mark{background:#1d2025;color:var(--ink)}
+.mood-night .prow,.mood-night .bj{border-bottom-color:#2c3037}
+.mood-night .op-paper{background-color:#1d2025;background-image:linear-gradient(#2a2e34 1px,transparent 1px),linear-gradient(90deg,#2a2e34 1px,transparent 1px)}
+.mood-night .capacity,.mood-night .feasible,.mood-night .bubble.moon{background:#272b31}
+.mood-night .speech,.mood-night .speech:after{background:#24282e;border-color:#c9cbc2}
+.mood-night .op-check{background:#24282ecc}
+.mood-night .tt-hour,.mood-night .hr-line em,.mood-night .op-hour{color:#c9cbc2}
+.mood-night .wk-col,.mood-night .wk-v-col{border-color:#2c3037}
+.mood-night .sample,.mood-night .new-goal{background:#24282e}
+.mood-night .hb-grid button.hb{background:#24282e;border-color:#2c3037}

@@ -1,7 +1,9 @@
 import {useState} from 'react';
 import {goalPercent, linkedTasks, periodsOf, type Goal, type LifeRecord} from '@workspace/life-contract';
 import type {PlannerSpec} from '@workspace/planner-spec';
-import {api, ofKind, type MilestoneDraft, type Planner} from '../data.ts';
+import {api, ofKind, type Planner} from '../data.ts';
+import {GoalPlanPanel, NewGoal} from './GoalPlan.tsx';
+import {goalSchedule, weeklyFocus} from '@workspace/life-contract';
 import {GoalBar, horizonLabel, label, type Nav} from './Today.tsx';
 
 // Long-term goals: write one naively, let MOONS split it into milestones, review, then live by the daily list.
@@ -10,10 +12,15 @@ const ORDER = ['year', 'quarter', 'month', 'milestone', 'week'];
 const rank = (h: string) => ORDER.indexOf(h);
 
 export function Goals({spec, p, nav, today, goalId, setGoalId}: {spec: PlannerSpec; p: Planner; nav: Nav; today: string; goalId: string | null; setGoalId: (id: string | null) => void}) {
+  // Weekly focus the user gives to goals: their own setting, else the last four weeks of real focus.
+  const goalsModule = spec.modules.find(m => m.type === 'goals');
+  const weekly = typeof goalsModule?.options.weeklyMin === 'number' ? goalsModule.options.weeklyMin as number : null;
+  const weeklyMin = weekly ?? weeklyFocus(p.records, today);
+  const saveWeekly = (min: number) => { if (goalsModule) void api.putSpec({...spec, modules: spec.modules.map(m => m.type === 'goals' ? {...m, options: {...m.options, weeklyMin: min}} : m)}); };
   const goals = ofKind(p.records, 'goal');
   const [view, setView] = useState<'ladder' | 'roadmap'>('ladder');
   const selected = goals.find(g => g.id === goalId);
-  if (selected) return <GoalDashboard g={selected} p={p} nav={nav} today={today} back={() => setGoalId(null)} open={setGoalId} />;
+  if (selected) return <GoalDashboard g={selected} p={p} nav={nav} today={today} back={() => setGoalId(null)} open={setGoalId} weeklyMin={weeklyMin} />;
   const levels = (spec.modules.find(m => m.type === 'goals')?.options.levels as Goal['horizon'][] | undefined) ?? ['year', 'month', 'week'];
   const roots = goals.filter(g => !g.body.parentGoalId || !goals.some(x => x.id === g.body.parentGoalId))
     .sort((a, b) => rank(a.body.horizon) - rank(b.body.horizon) || b.body.period.localeCompare(a.body.period));
@@ -25,7 +32,8 @@ export function Goals({spec, p, nav, today, goalId, setGoalId}: {spec: PlannerSp
     <ul>{goals.filter(c => c.body.parentGoalId === g.id).sort((a, b) => a.body.period.localeCompare(b.body.period)).map(c => tree(c, depth + 1))}</ul>
   </li>;
   return <div className="goals">
-    <NewGoal p={p} today={today} onDone={setGoalId} />
+    <NewGoal p={p} today={today} weekly={weekly} onWeekly={saveWeekly} onDone={setGoalId} />
+    <Bottlenecks p={p} today={today} weeklyMin={weeklyMin} open={setGoalId} />
     <div className="seg" role="tablist">
       <button role="tab" aria-selected={view === 'ladder'} className={view === 'ladder' ? 'on' : ''} onClick={() => setView('ladder')}>목표 사다리</button>
       <button role="tab" aria-selected={view === 'roadmap'} className={view === 'roadmap' ? 'on' : ''} onClick={() => setView('roadmap')}>연간 로드맵</button>
@@ -37,67 +45,14 @@ export function Goals({spec, p, nav, today, goalId, setGoalId}: {spec: PlannerSp
   </div>;
 }
 
-type Draft = MilestoneDraft & {keep: boolean; addTask: boolean};
-function NewGoal({p, today, onDone}: {p: Planner; today: string; onDone: (id: string) => void}) {
-  const [open, setOpen] = useState(false), [goal, setGoal] = useState(''), [deadline, setDeadline] = useState(`${Number(today.slice(0, 4)) + 1}`), [context, setContext] = useState('');
-  const [drafts, setDrafts] = useState<Draft[] | null>(null), [questions, setQuestions] = useState<string[]>([]), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const split = async () => {
-    if (!goal.trim()) return;
-    setBusy(true); setError('');
-    try {
-      const r = await api.milestones({goal, deadline, context, today});
-      setDrafts(r.milestones.map((m, i) => ({...m, keep: true, addTask: i === 0}))); setQuestions(r.questions);
-    } catch (e) { setError((e as Error).message); setDrafts([]); } finally { setBusy(false); }
-  };
-  const set = (i: number, patch: Partial<Draft>) => setDrafts(d => d!.map((x, j) => j === i ? {...x, ...patch} : x));
-  const save = async () => {
-    setBusy(true);
-    const year = deadline.slice(0, 4);
-    const top = await p.write(null, {kind: 'goal', body: {title: goal.trim(), horizon: 'year', period: year, criterion: deadline.length > 4 ? `기한 ${deadline}` : null}});
-    if (top) {
-      for (const d of (drafts ?? []).filter(x => x.keep && x.title.trim())) {
-        const ms = await p.write(null, {kind: 'goal', body: {title: d.title.trim(), horizon: 'milestone', period: d.due, parentGoalId: top.id, weight: d.weight, criterion: d.why || null,
-          target: d.measure ? {...d.measure, aggregation: 'sum'} : null}});
-        if (ms && d.addTask && d.firstTask.trim()) await p.write(null, {kind: 'task', logicalDay: today, body: {title: d.firstTask.trim(), category: 'must', goalIds: [ms.id], plan: {state: 'committed'}}});
-      }
-      setOpen(false); setGoal(''); setContext(''); setDrafts(null); onDone(top.id);
-    }
-    setBusy(false);
-  };
-  if (!open) return <button className="new-goal" onClick={() => setOpen(true)}>＋ 큰 목표 세우기 <span className="muted small">대충 적으면 MOONS가 마일스톤으로 쪼개 줘요</span></button>;
-  return <section className="part goal-maker">
-    <h3>큰 목표 세우기</h3>
-    <input className="goal-in" value={goal} onChange={e => setGoal(e.target.value)} placeholder="예: 내년에 로스쿨 붙기, 올해 안에 책 한 권 쓰기" aria-label="큰 목표" autoFocus />
-    <div className="inline">
-      <label className="muted small">기한 <input value={deadline} onChange={e => setDeadline(e.target.value)} placeholder="2027 또는 2027-06" className="num wide" aria-label="기한" /></label>
-    </div>
-    <textarea rows={2} value={context} onChange={e => setContext(e.target.value)} placeholder="(선택) 지금 상황 · 일주일에 쓸 수 있는 시간 · 이미 해 둔 것" aria-label="상황" />
-    <div className="actions">
-      <button className="primary" disabled={!goal.trim() || busy} onClick={split}>{busy && !drafts ? '쪼개는 중…' : '마일스톤으로 쪼개기'}</button>
-      <button className="ghost" onClick={() => setDrafts([])} disabled={!goal.trim()}>직접 쪼갤래요</button>
-      <button className="ghost" onClick={() => { setOpen(false); setDrafts(null); }}>닫기</button>
-    </div>
-    {error && <p className="error">{error}</p>}
-    {drafts && <div className="drafts">
-      {drafts.length > 0 && <p className="muted small">MOONS가 쪼갠 초안이에요. 고치고, 빼고, 더한 뒤 내 목표로 잡으세요.</p>}
-      {questions.length > 0 && <ul className="tips">{questions.map(q => <li key={q}>{q}</li>)}</ul>}
-      <ol className="ms-list">{drafts.map((d, i) => <li key={i} className={d.keep ? '' : 'off'}>
-        <div className="inline">
-          <input type="checkbox" checked={d.keep} onChange={e => set(i, {keep: e.target.checked})} aria-label="포함" />
-          <input className="ms-title" value={d.title} onChange={e => set(i, {title: e.target.value})} aria-label="마일스톤" />
-          <input type="month" value={d.due} onChange={e => set(i, {due: e.target.value})} aria-label="끝낼 달" />
-          <select value={d.weight} onChange={e => set(i, {weight: Number(e.target.value)})} aria-label="무게" title="목표 전체에서 차지하는 무게">{[1, 2, 3, 4, 5].map(w => <option key={w} value={w}>무게 {w}</option>)}</select>
-        </div>
-        <div className="inline ms-measure"><span className="muted small">끝났다고 볼 기준</span>
-          <input className="num" inputMode="decimal" value={d.measure?.amount ?? ''} onChange={e => set(i, {measure: Number(e.target.value) > 0 ? {amount: Number(e.target.value), unit: d.measure?.unit ?? '회'} : null})} placeholder="양" aria-label="기준 양" />
-          <input className="unit" value={d.measure?.unit ?? ''} onChange={e => set(i, {measure: d.measure ? {...d.measure, unit: e.target.value} : null})} placeholder="단위" aria-label="기준 단위" disabled={!d.measure} />
-          <span className="muted small">(없으면 이어진 할 일로 최대 90%까지)</span></div>
-        {d.why && <p className="why">{d.why}</p>}
-        {d.firstTask && <label className="small first-task"><input type="checkbox" checked={d.addTask} onChange={e => set(i, {addTask: e.target.checked})} /> 오늘 할 일로 올리기: {d.firstTask}</label>}
-      </li>)}</ol>
-      <button className="small" onClick={() => setDrafts([...drafts, {title: '', due: today.slice(0, 7), measure: null, weight: 1, why: '', firstTask: '', keep: true, addTask: false}])}>＋ 마일스톤 추가</button>
-      <div className="actions"><button className="primary" disabled={busy} onClick={save}>{busy ? '저장 중…' : '이대로 내 목표로 잡기'}</button></div>
-    </div>}
+/** A standing warning on the goals page: goals that will miss their deadline and months where goals collide. */
+function Bottlenecks({p, today, weeklyMin, open}: {p: Planner; today: string; weeklyMin: number; open: (id: string) => void}) {
+  const s = goalSchedule(p.records, today, weeklyMin);
+  const late = s.goals.filter(g => g.lateDays > 0);
+  if (!late.length && !s.bottlenecks.length) return null;
+  return <section className="part fz-clash"><h3>지금 계획대로면</h3>
+    {late.map(g => <p key={g.id}>· <button className="link" onClick={() => open(g.id)}><b>{g.title}</b></button>: 마감 {g.deadline} → 가능 {g.projected} ({g.lateDays}일 늦음)</p>)}
+    {s.bottlenecks.map(m => <p key={m.month}>· {m.month} 병목: {m.goals.join(', ')} — 필요 {Math.round(m.demandMin / 60)}시간 / 가능 {Math.round(m.capacityMin / 60)}시간</p>)}
   </section>;
 }
 
@@ -152,7 +107,7 @@ function GoalForm({p, goals, levels, today}: {p: Planner; goals: LifeRecord<'goa
   </form>;
 }
 
-function GoalDashboard({g, p, nav, today, back, open}: {g: LifeRecord<'goal'>; p: Planner; nav: Nav; today: string; back: () => void; open: (id: string) => void}) {
+function GoalDashboard({g, p, nav, today, back, open, weeklyMin}: {g: LifeRecord<'goal'>; p: Planner; nav: Nav; today: string; back: () => void; open: (id: string) => void; weeklyMin: number}) {
   const goals = ofKind(p.records, 'goal'), parent = goals.find(x => x.id === g.body.parentGoalId);
   const children = goals.filter(x => x.body.parentGoalId === g.id).sort((a, b) => a.body.period.localeCompare(b.body.period));
   const tasks = linkedTasks(g, p.records).sort((a, b) => (b.logicalDay ?? '').localeCompare(a.logicalDay ?? ''));
@@ -177,6 +132,7 @@ function GoalDashboard({g, p, nav, today, back, open}: {g: LifeRecord<'goal'>; p
         <span className="mark static" aria-hidden="true">◆</span><input value={ms} onChange={e => setMs(e.target.value)} placeholder="마일스톤 추가" aria-label="마일스톤" /><input type="month" value={due} onChange={e => setDue(e.target.value)} aria-label="끝낼 달" /><button className="small">추가</button>
       </form>
     </section>}
+    {g.body.horizon !== 'milestone' && <GoalPlanPanel p={p} goalId={g.id} today={today} weeklyMin={weeklyMin} />}
     <section className="part"><h3>이 목표로 이어진 하루들</h3>
       {days.length === 0 && <p className="muted">아직 이어진 할 일이 없어요. 오늘 화면에서 할 일을 추가할 때 이 목표를 고르면 진행률이 올라가요.</p>}
       {days.map(d => <div key={d} className="history-day">

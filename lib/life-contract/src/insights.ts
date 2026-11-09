@@ -128,3 +128,50 @@ export function efficiency(records: AnyRecord[], from: string, to: string, tz: s
   for (const b of shortLow) tips.push(`${b.label}엔 컨디션이 낮은데 한 번에 ${b.avgSession}분씩 이어 했어요. 25분 집중 + 5분 쉬기로 끊어 보세요.`);
   return {byTime, days, tips};
 }
+
+const endOfMonth = (m: string) => { const [y, mo] = m.slice(0, 7).split('-').map(Number); return new Date(Date.UTC(y!, mo!, 0)).toISOString().slice(0, 10); };
+const dueDate = (d: string) => d.length === 10 ? d : d.length === 7 ? endOfMonth(d) : `${d}-12-31`;
+const monthsBetween = (from: string, to: string) => { const out: string[] = []; for (let m = from.slice(0, 7); m <= to.slice(0, 7);) { out.push(m); const [y, mo] = m.split('-').map(Number); m = mo === 12 ? `${y! + 1}-01` : `${y}-${String(mo! + 1).padStart(2, '0')}`; } return out; };
+
+/** Weekly minutes the user really focuses: the last four weeks of sessions, or a fallback when there is little history. */
+export function weeklyFocus(records: AnyRecord[], day: string, fallback = 600) {
+  const from = addDays(day, -27);
+  const total = of(records, 'session').filter(s => s.logicalDay && s.logicalDay >= from && s.logicalDay <= day && s.body.end).reduce((sum, s) => sum + mins(s.body.start, s.body.end!), 0);
+  return total >= 120 ? Math.round(total / 4) : fallback;
+}
+
+export type ScheduleRow = {id: string; topId: string; title: string; due: string; effortMin: number; remainingMin: number; start: string; finish: string; late: boolean};
+/** When can things really be done? Open milestones across ALL goals share one weekly focus budget, earliest due first.
+ *  Gives each milestone a projected finish, each top goal a feasible date vs its deadline, and the months where
+ *  demand exceeds capacity (bottlenecks) with the goals competing in them. Milestones without an effort estimate are skipped and counted. */
+export function goalSchedule(records: AnyRecord[], today: string, weeklyMin: number) {
+  const goals = of(records, 'goal');
+  const top = (g: LifeRecord<'goal'>): LifeRecord<'goal'> => { let x = g; for (let i = 0; i < 10; i++) { const p = goals.find(y => y.id === x.body.parentGoalId); if (!p) break; x = p; } return x; };
+  const open = goals.filter(g => g.body.status === 'active' && (g.body.horizon === 'milestone' || (!goals.some(c => c.body.parentGoalId === g.id) && g.body.effortHours)));
+  const estimated = open.filter(g => g.body.effortHours).sort((a, b) => dueDate(a.body.deadline ?? a.body.period).localeCompare(dueDate(b.body.deadline ?? b.body.period)) || b.body.weight - a.body.weight);
+  const daily = Math.max(1, weeklyMin / 7);
+  let cursor = today;
+  const rows: ScheduleRow[] = estimated.map(g => {
+    const effort = g.body.effortHours! * 60, remaining = Math.round(effort * (1 - goalPercent(g.id, records).pct / 100));
+    const start = cursor, finish = addDays(cursor, Math.ceil(remaining / daily));
+    cursor = finish;
+    const due = dueDate(g.body.deadline ?? g.body.period);
+    return {id: g.id, topId: top(g).id, title: g.body.title, due, effortMin: effort, remainingMin: remaining, start, finish, late: finish > due};
+  });
+  const tops = [...new Set(rows.map(r => r.topId))].map(id => {
+    const g = goals.find(x => x.id === id)!, mine = rows.filter(r => r.topId === id);
+    const projected = mine.map(r => r.finish).sort().at(-1)!;
+    const deadline = g.body.deadline ? dueDate(g.body.deadline) : g.body.horizon === 'year' ? `${g.body.period}-12-31` : null;
+    const lateDays = deadline && projected > deadline ? Math.round((Date.parse(projected) - Date.parse(deadline)) / 86_400_000) : 0;
+    return {id, title: g.body.title, deadline, projected, lateDays, remainingMin: mine.reduce((s, r) => s + r.remainingMin, 0)};
+  });
+  // Demand per month: each milestone's remaining work spread evenly from today to its due date.
+  const demand = new Map<string, {min: number; goals: Set<string>}>();
+  for (const r of rows) {
+    const ms = monthsBetween(today, r.due < today ? today : r.due), per = r.remainingMin / ms.length;
+    for (const m of ms) { const d = demand.get(m) ?? {min: 0, goals: new Set()}; d.min += per; d.goals.add(goals.find(x => x.id === r.topId)!.body.title); demand.set(m, d); }
+  }
+  const monthCap = Math.round(weeklyMin * 4.35);
+  const months = [...demand.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, d]) => ({month, demandMin: Math.round(d.min), capacityMin: monthCap, over: d.min > monthCap, goals: [...d.goals]}));
+  return {weeklyMin, rows, goals: tops, months, bottlenecks: months.filter(m => m.over && m.goals.length > 1), overloaded: months.filter(m => m.over), unestimated: open.length - estimated.length};
+}

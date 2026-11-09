@@ -325,3 +325,23 @@ table.eff th{font-size:12px;color:var(--muted);font-weight:600}
 .est b.under{color:var(--green)}
 .persona-bar{display:flex;height:14px;border-radius:999px;overflow:hidden}
 .ms-measure{margin-left:26px}
+
+/* Goal planner: questions, refined goal, feasibility */
+.qa{gap:10px}
+.qa-item{display:grid;gap:6px}
+.qa-item input{max-width:480px}
+.refined{display:grid;gap:8px}
+.refined label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.refined input{font-size:15px;color:var(--ink)}
+.feasible{display:grid;gap:8px;padding:12px;border-radius:12px;background:var(--soft)}
+.fz-head{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end}
+.fz-head>div{display:grid}
+.fz-head strong{font-size:20px;font-variant-numeric:tabular-nums}
+.fz-head strong.late,.late{color:var(--red)}
+.fz-head strong.ok{color:var(--green)}
+.fz-verdict{flex-basis:100%;font-size:14px}
+.fz-verdict.late{color:var(--red)}
+.fz-rows{margin:0;padding-left:20px;display:grid;gap:4px;font-size:14px}
+.fz-rows li{display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+.fz-rows li.late .ptitle{color:var(--red)}
+.fz-clash{display:grid;gap:4px;padding:10px 12px;border-radius:10px;background:#b05a5712;font-size:14px}

@@ -1,7 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {parseBody, type AnyRecord, type Kind} from './records.ts';
-import {capacity, dayCondition, efficiency, estimateAccuracy, goalChain, goalPercent, personaShare} from './insights.ts';
+import {capacity, dayCondition, efficiency, estimateAccuracy, goalChain, goalPercent, goalSchedule, personaShare, weeklyFocus} from './insights.ts';
+import {addDays} from './day.ts';
 
 let rev = 0;
 const rec = (kind: Kind, id: string, body: unknown, logicalDay: string | null = null) => ({id, kind, revision: ++rev, createdAt: '2026-11-09T00:00:00Z', updatedAt: '2026-11-09T00:00:00Z', deletedAt: null, logicalDay, tz: 'Asia/Seoul', source: {type: 'planner', confirmed: true}, body: parseBody(kind, body)}) as AnyRecord;
@@ -47,4 +48,22 @@ test('efficiency finds the better time of day and writes a tip', () => {
   assert.equal(e.byTime.find(b => b.id === 'morning')!.minutes, 120);
   assert.equal(e.byTime.find(b => b.id === 'morning')!.condition, 6.8);
   assert.ok(e.tips[0]!.includes('오전'));
+});
+
+test('schedule: milestones from all goals share one weekly budget; late goals and bottleneck months show up', () => {
+  const day = '2026-11-01';
+  const rs = [
+    rec('goal', 'A', {title: '로스쿨', horizon: 'year', period: '2027', deadline: '2027-01'}),
+    rec('goal', 'A1', {title: '기출 1회독', horizon: 'milestone', period: '2026-12', parentGoalId: 'A', effortHours: 40}),
+    rec('goal', 'B', {title: '책 쓰기', horizon: 'year', period: '2027', deadline: '2027-06'}),
+    rec('goal', 'B1', {title: '초고 절반', horizon: 'milestone', period: '2026-12', parentGoalId: 'B', effortHours: 30}),
+    rec('goal', 'B2', {title: '퇴고', horizon: 'milestone', period: '2027-05', parentGoalId: 'B'}),
+  ];
+  const s = goalSchedule(rs, day, 300); // 5h a week
+  assert.equal(s.unestimated, 1);
+  assert.deepEqual(s.rows.map(r => r.id), ['A1', 'B1']); // same due month: weight tie keeps due order
+  assert.equal(s.rows[0]!.finish, addDays(day, Math.ceil(2400 / (300 / 7))));
+  assert.ok(s.goals.find(g => g.id === 'B')!.projected > '2026-12-31');
+  assert.ok(s.bottlenecks.length > 0 && s.bottlenecks[0]!.goals.length === 2);
+  assert.equal(weeklyFocus(rs, day), 600);
 });

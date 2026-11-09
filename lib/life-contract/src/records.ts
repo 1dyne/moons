@@ -17,6 +17,10 @@ export const GoalBody = z.object({
   period: z.string().regex(/^\d{4}(-Q[1-4]|-\d{2}|-W\d{2})?$/),
   // Share of the parent goal this goal stands for when progress rolls up (default 1 = equal shares).
   weight: z.number().positive().max(100).default(1),
+  // The date the user wants it done by (YYYY-MM or YYYY-MM-DD). Compared with the projected finish.
+  deadline: z.string().regex(/^\d{4}-\d{2}(-\d{2})?$/).nullable().default(null),
+  // Hours of focused work the goal still needs in total (estimated when it was planned).
+  effortHours: z.number().positive().max(10000).nullable().default(null),
   parentGoalId: z.string().nullable().default(null),
   projectId: z.string().nullable().default(null),
   criterion: text(500).nullable().default(null),

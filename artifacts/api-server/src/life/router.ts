@@ -1,4 +1,5 @@
 import {Router, json as body, type Request, type Response} from 'express';
+import './autolog.ts';
 import {createHash} from 'node:crypto';
 import {ALL_SCOPES, KINDS, Settings, buildNow, logicalDay, type Kind} from '@workspace/life-contract';
 import {uses, type PlannerSpec} from '@workspace/planner-spec';
@@ -9,7 +10,7 @@ import {planGoal} from './milestones.ts';
 import {isOperator, withAi} from '../moons/lib/server/v5/ai-access.ts';
 import {accountId} from '../moons/lib/server/v5/identity.ts';
 import {createDevToken, deleteLibrary, listDevTokens, listLibrary, ownerOfDevToken, revokeDevToken, saveLibrary, setLibraryState} from './library.ts';
-import {allRecords, changesSince, deleteRecord, getSettings, getSpec, lastActivity, listRecords, putSettings, recordHistory, saveSpec, writeRecord} from './store.ts';
+import {allRecords, changesSince, deleteRecord, getSettings, getSpec, lastActivity, listRecords, putAvailability, putSettings, recordHistory, saveSpec, writeRecord} from './store.ts';
 
 // /api/life/v1 — the planner's own reads and writes (first-party session). Consumer access with
 // OAuth scopes (모의 우주, 에너지긴축모드) uses the same handlers once P3 adds the grant check.
@@ -42,6 +43,7 @@ export function lifeRouter(checkOrigin: (req: Request) => void) {
   }));
   router.get('/settings', route(async (_req, _res, owner) => ({settings: await getSettings(owner)})));
   router.put('/settings', route(async (req, _res, owner) => ({settings: await putSettings(owner, Settings.parse(req.body))})));
+  router.put('/availability', route(async (req, _res, owner) => ({availability: await putAvailability(owner, req.body?.availability ?? null)})));
   router.get('/spec', route(async (_req, _res, owner) => ({planner: await getSpec(owner)})));
   router.put('/spec', route(async (req, _res, owner) => ({planner: await saveSpec(owner, req.body?.spec)})));
 

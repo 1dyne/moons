@@ -7,6 +7,7 @@ import {goalSchedule, suggestGoal, unlinkedDone, weeklyFocus} from '@workspace/l
 import {GoalBar, horizonLabel, label, type Nav} from './Today.tsx';
 import {Gauge} from '../Gauge.tsx';
 import {Tip} from '../Tip.tsx';
+import {usePerDay} from '../avail.tsx';
 
 // Long-term goals: write one naively, let MOONS split it into milestones, review, then live by the daily list.
 // Every task linked to a milestone moves the goal's overall percentage.
@@ -65,7 +66,7 @@ function Unlinked({p, today}: {p: Planner; today: string}) {
 
 /** A standing warning on the goals page: goals that will miss their deadline and months where goals collide. */
 function Bottlenecks({p, today, weeklyMin, open}: {p: Planner; today: string; weeklyMin: number; open: (id: string) => void}) {
-  const s = goalSchedule(p.records, today, weeklyMin);
+  const s = goalSchedule(p.records, today, weeklyMin, usePerDay());
   const late = s.goals.filter(g => g.lateDays > 0);
   if (!late.length && !s.bottlenecks.length) return null;
   return <section className="part fz-clash"><h3>지금 계획대로면</h3>

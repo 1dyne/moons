@@ -58,3 +58,42 @@ test('lit connector: tabs, named task properties and a table the user can fill f
   await call('build_planner', {widgets: [{type: 'tasks'}]});
   assert.equal((await getSpec(owner))!.spec.tabs!.length, 3);
 });
+
+test('P0: availability drives plans; tasks and table rows can be listed, edited, moved and deleted; sessions fill a log table', async () => {
+  const {writeRecord} = await import('./store.ts');
+  const av = await call('set_availability', {weekdayMinutes: [435, 435, 180, 435, 180, 435, 435], exceptions: [{date: '2026-11-21', minutes: 0, note: '데이트'}, {date: '2026-11-28', hours: 1, note: '발표'}]});
+  assert.equal((av.availability as {exceptions: unknown[]}).exceptions.length, 2);
+  const plan = await call('add_goal_plan', {goal: {title: 'LEET 11월', deadline: '2026-12'}, milestones: [{title: '11월분', due: '2026-11', effortHours: 30}]});
+  assert.equal(plan.capacityBasis, 'availability');
+  const more = await call('set_availability', {exceptions: [{date: '2026-12-01', hours: 2}], addExceptions: true});
+  assert.equal((more.availability as {exceptions: unknown[]}).exceptions.length, 3);
+
+  // A log table for sessions, with a task property (Role) matched by name.
+  await call('build_planner', {widgets: [{type: 'tasks'}, {type: 'table', title: '집중 로그', options: {autoLog: 'sessions', scope: 'all', columns: [{name: '할 일', type: 'text'}, {name: 'Role', type: 'text'}, {name: '시작', type: 'text'}, {name: '분', type: 'number'}, {name: '컨디션', type: 'number'}]}},
+    {type: 'table', title: '소원 상자', options: {scope: 'all', columns: [{name: '상태', type: 'select', options: ['잠김', '해금', '사용함']}]}}],
+    taskProps: [{name: 'Role', type: 'select', options: ['Scholar', 'Speaker']}]});
+  await call('add_items', {tasks: [{title: '기출 1세트', day: '2026-11-10', props: {Role: 'Scholar'}}, {title: '기출 2세트', day: '2026-11-10'}], rows: [{table: '소원 상자', name: '케이크', cells: {상태: '잠김'}}]});
+  const tasks = await call('list_tasks', {day: '2026-11-10'} as never) as unknown as {id: string; title: string; props: Record<string, unknown>}[];
+  const t1 = tasks.find(t => t.title === '기출 1세트')!, t2 = tasks.find(t => t.title === '기출 2세트')!;
+  assert.equal(t1.props.Role, 'Scholar');
+  const moved = await call('update_task', {id: t2.id, day: '2026-11-11', result: 'done', props: {Role: 'Speaker'}});
+  assert.equal(moved.day, '2026-11-11'); assert.equal(moved.result, 'done');
+  await call('delete_task', {id: t1.id});
+  assert.deepEqual((await call('list_tasks', {from: '2026-11-10', to: '2026-11-11'}) as unknown as {title: string}[]).map(t => t.title).filter(t => t.startsWith('기출 ')), ['기출 2세트']);
+
+  const wish = await call('list_rows', {table: '소원 상자', where: {상태: '잠김'}}) as {rows: {id: string; name: string}[]};
+  assert.equal(wish.rows[0]!.name, '케이크');
+  const opened = await call('update_row', {id: wish.rows[0]!.id, cells: {상태: '해금'}});
+  assert.equal((opened.cells as Record<string, unknown>)['상태'], '해금');
+
+  // Timer stops → a row; rating the condition later updates the same row.
+  const s = await writeRecord(owner, null, {kind: 'session', logicalDay: '2026-11-11', body: {taskId: t2.id, label: '기출 2세트', start: '2026-11-11T00:00:00Z', end: '2026-11-11T01:30:00Z'}});
+  await writeRecord(owner, s.id, {kind: 'session', logicalDay: '2026-11-11', body: {...s.body, condition: 5}});
+  const log = await call('list_rows', {table: '집중 로그'}) as {rows: {cells: Record<string, unknown>; name: string}[]};
+  assert.equal(log.rows.length, 1, 'one session, one row');
+  assert.deepEqual([log.rows[0]!.cells['할 일'], log.rows[0]!.cells['Role'], log.rows[0]!.cells['분'], log.rows[0]!.cells['컨디션'], log.rows[0]!.cells['시작']], ['기출 2세트', 'Speaker', 90, 5, '09:00']);
+  const sessions = await call('list_sessions', {day: '2026-11-11', from: '2026-11-11'}) as unknown as {condition: number; props: Record<string, unknown>}[];
+  assert.equal(sessions[0]!.condition, 5); assert.equal(sessions[0]!.props.Role, 'Speaker');
+  await call('delete_row', {id: (wish.rows[0]!).id});
+  assert.equal(((await call('list_rows', {table: '소원 상자'})) as {rows: unknown[]}).rows.length, 0);
+});

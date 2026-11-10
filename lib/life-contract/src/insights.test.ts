@@ -102,3 +102,22 @@ test('month and year pages fill themselves from daily checks; an undo changes th
   const y = yearSummary(rs, '2026');
   assert.equal(y.length, 12); assert.equal(y[10]!.tasks.done, 1); assert.equal(y[0]!.tasks.planned, 0);
 });
+
+test('availability by weekday and dated exceptions drives the feasible date and month capacity', async () => {
+  const {availableOn, Availability} = await import('./records.ts');
+  const day = '2026-11-09'; // Monday
+  const av = Availability.parse({weekday: [435, 435, 180, 435, 180, 435, 435], exceptions: [{date: '2026-11-21', minutes: 0, note: '데이트'}, {date: '2026-11-22', minutes: 0}]});
+  assert.equal(availableOn(av, '2026-11-10'), 180); // Tuesday
+  assert.equal(availableOn(av, '2026-11-21'), 0);
+  const rs = [rec('goal', 'A', {title: 'LEET', horizon: 'year', period: '2027', deadline: '2027-07'}), rec('goal', 'A1', {title: '11월분', horizon: 'milestone', period: '2026-11', parentGoalId: 'A', effortHours: 40})];
+  const slow = goalSchedule(rs, day, 600), real = goalSchedule(rs, day, 600, d => availableOn(av, d));
+  assert.ok(slow.rows[0]!.finish > '2026-12-01', 'a 10h week pushes 40h into December');
+  assert.ok(real.rows[0]!.finish <= '2026-11-20', `with ~6h a day it fits in November (got ${real.rows[0]!.finish})`);
+  assert.ok(real.months[0]!.capacityMin > 5000);
+});
+
+test('하고 싶은 일(want) is left out of the completion rate', () => {
+  const rs = [rec('task', 'W1', {title: '영화', category: 'want', plan: {state: 'committed'}}, D), rec('task', 'M1', {title: '기출', category: 'must', plan: {state: 'committed'}, outcome: {result: 'done'}}, D)];
+  const s = periodSummary(rs, D, D);
+  assert.equal(s.tasks.rate, 100); assert.equal(s.wants.planned, 1);
+});

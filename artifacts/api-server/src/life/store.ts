@@ -1,4 +1,4 @@
-import {WriteInput, parseBody, ulid, type AnyRecord, type Kind, type Settings} from '@workspace/life-contract';
+import {Availability, WriteInput, parseBody, ulid, type AnyRecord, type Kind, type Settings} from '@workspace/life-contract';
 import {PlannerSpec} from '@workspace/planner-spec';
 import {q, transaction, json, type Driver} from '../moons/lib/server/db.ts';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
@@ -23,6 +23,7 @@ create table if not exists life_records (
   data jsonb not null,
   primary key (owner_id, id)
 );
+alter table life_accounts add column if not exists availability jsonb;
 create index if not exists life_records_rev on life_records(owner_id, revision);
 create index if not exists life_records_day on life_records(owner_id, logical_day);
 create table if not exists life_revisions (
@@ -47,10 +48,18 @@ export function initLife() {
 }
 
 const DEFAULT: Settings = {tz: 'UTC', dayBoundary: '04:00'};
-export async function getSettings(owner: string): Promise<Settings & {configured: boolean; revision: number}> {
+export async function getSettings(owner: string): Promise<Settings & {configured: boolean; revision: number; availability: Availability | null}> {
   await initLife();
-  const row = (await q<{tz: string; day_boundary: string; revision: number}>('select tz,day_boundary,revision from life_accounts where owner_id=$1', [owner]))[0];
-  return row ? {tz: row.tz, dayBoundary: row.day_boundary, configured: true, revision: row.revision} : {...DEFAULT, configured: false, revision: 0};
+  const row = (await q<{tz: string; day_boundary: string; revision: number; availability: unknown}>('select tz,day_boundary,revision,availability from life_accounts where owner_id=$1', [owner]))[0];
+  const av = row?.availability ? Availability.safeParse(row.availability) : null;
+  return row ? {tz: row.tz, dayBoundary: row.day_boundary, configured: true, revision: row.revision, availability: av?.success ? av.data : null} : {...DEFAULT, configured: false, revision: 0, availability: null};
+}
+/** Focus minutes by weekday plus dated exceptions; null clears it (plans fall back to recent actual focus). */
+export async function putAvailability(owner: string, raw: unknown) {
+  await initLife();
+  const av = raw === null ? null : Availability.parse(raw);
+  await q(`insert into life_accounts(owner_id,tz,day_boundary,availability) values($1,$2,$3,$4) on conflict(owner_id) do update set availability=excluded.availability,updated_at=now()`, [owner, DEFAULT.tz, DEFAULT.dayBoundary, av ? json(av) : null]);
+  return (await getSettings(owner)).availability;
 }
 export async function putSettings(owner: string, s: Settings) {
   await initLife();
@@ -71,8 +80,19 @@ async function save(db: Driver, owner: string, record: AnyRecord) {
   await db.query('insert into life_revisions(owner_id,revision,record_id,data) values($1,$2,$3,$4)', [owner, record.revision, record.id, json(record)]);
 }
 
+// Follow-up work after a write (autolog.ts: focus sessions and goal retros into the user's log tables).
+type AfterWrite = (owner: string, record: AnyRecord) => Promise<void>;
+const afterWrite: AfterWrite[] = [];
+export const onAfterWrite = (fn: AfterWrite) => { afterWrite.push(fn); };
+
 /** Create (id absent) or update a record. A stale baseRevision is refused instead of overwriting. */
 export async function writeRecord(owner: string, id: string | null, raw: unknown) {
+  const record = await writeRecordOnly(owner, id, raw);
+  for (const fn of afterWrite) await fn(owner, record).catch(() => { /* a log table never blocks the write itself */ });
+  return record;
+}
+/** The write without follow-ups (used by the follow-ups themselves). */
+export async function writeRecordOnly(owner: string, id: string | null, raw: unknown) {
   await initLife();
   const input = WriteInput.parse(raw);
   let body;

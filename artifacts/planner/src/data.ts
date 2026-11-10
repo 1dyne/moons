@@ -1,5 +1,5 @@
 import {useCallback, useState} from 'react';
-import {parseBody, ulid, type AnyRecord, type Kind, type LifeRecord, type Settings} from '@workspace/life-contract';
+import {parseBody, ulid, type AnyRecord, type Availability, type Kind, type LifeRecord, type Settings} from '@workspace/life-contract';
 import type {PlannerSpec} from '@workspace/planner-spec';
 import {enqueue, flush, isNetworkError, pending, queued} from './offline.ts';
 
@@ -14,7 +14,8 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 export const api = {
-  settings: () => call<{settings: Settings & {configured: boolean}}>('/settings').then(r => r.settings),
+  settings: () => call<{settings: Settings & {configured: boolean; availability: Availability | null}}>('/settings').then(r => r.settings),
+  putAvailability: (availability: Availability | null) => call<{availability: Availability | null}>('/availability', {method: 'PUT', body: JSON.stringify({availability})}).then(r => r.availability),
   putSettings: (s: Settings) => call<{settings: Settings}>('/settings', {method: 'PUT', body: JSON.stringify(s)}).then(r => r.settings),
   spec: () => call<{planner: {version: number; spec: PlannerSpec} | null}>('/spec').then(r => r.planner),
   putSpec: (spec: PlannerSpec) => call<{planner: {version: number; spec: PlannerSpec}}>('/spec', {method: 'PUT', body: JSON.stringify({spec})}).then(r => r.planner),

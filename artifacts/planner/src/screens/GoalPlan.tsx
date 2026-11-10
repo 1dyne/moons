@@ -3,6 +3,7 @@ import {goalSchedule, parseBody, weeklyFocus, type AnyRecord, type Kind} from '@
 import {api, ofKind, type GoalPlanResult, type MilestoneDraft, type Planner} from '../data.ts';
 import {hm} from './Focus.tsx';
 import {Tip} from '../Tip.tsx';
+import {useAvailability, usePerDay} from '../avail.tsx';
 
 // Big goal → MOONS asks until it is concrete → goal + milestones with effort → wanted deadline vs feasible date,
 // bottlenecks with other goals → the user edits and approves. Only approval writes anything.
@@ -22,8 +23,9 @@ function virtual(drafts: Draft[], title: string, deadline: string | null, today:
 }
 
 export function Feasibility({records, extra, focusId, weeklyMin, today}: {records: AnyRecord[]; extra: AnyRecord[]; focusId?: string; weeklyMin: number; today: string}) {
-  const before = useMemo(() => goalSchedule(records, today, weeklyMin), [records, today, weeklyMin]);
-  const after = useMemo(() => goalSchedule([...records, ...extra], today, weeklyMin), [records, extra, today, weeklyMin]);
+  const perDay = usePerDay();
+  const before = useMemo(() => goalSchedule(records, today, weeklyMin, perDay), [records, today, weeklyMin, perDay]);
+  const after = useMemo(() => goalSchedule([...records, ...extra], today, weeklyMin, perDay), [records, extra, today, weeklyMin, perDay]);
   const target = focusId ?? extra[0]?.id;
   const mine = after.goals.find(g => g.id === target);
   const rows = after.rows.filter(r => r.topId === target);
@@ -56,7 +58,7 @@ export function NewGoal({p, today, weekly, onWeekly, onDone}: {p: Planner; today
   const [open, setOpen] = useState(false), [goal, setGoal] = useState(''), [deadline, setDeadline] = useState(''), [context, setContext] = useState('');
   const [qas, setQas] = useState<QA[][]>([]), [result, setResult] = useState<Extract<GoalPlanResult, {status: 'ready'}> | null>(null);
   const [drafts, setDrafts] = useState<Draft[] | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const weeklyMin = weekly ?? weeklyFocus(p.records, today);
+  const weeklyMin = weekly ?? weeklyFocus(p.records, today), av = useAvailability();
   const [hours, setHours] = useState(String(Math.round(weeklyMin / 60)));
   const ask = async (answers: QA[][]) => {
     setBusy(true); setError('');
@@ -94,8 +96,9 @@ export function NewGoal({p, today, weekly, onWeekly, onDone}: {p: Planner; today
     <input className="goal-in" value={goal} onChange={e => setGoal(e.target.value)} placeholder="큰 목표" aria-label="큰 목표" autoFocus disabled={!!result} />
     <div className="inline">
       <label className="muted small">원하는 마감 <input value={deadline} onChange={e => setDeadline(e.target.value)} placeholder="2027-03 또는 2027-03-15" className="num wide" aria-label="원하는 마감" /></label>
-      <label className="muted small">일주일에 목표에 쓸 시간 <input className="num" inputMode="decimal" value={hours} onChange={e => setHours(e.target.value)} aria-label="주당 목표 시간" />시간</label>
-      <span className="muted small">(최근 4주 실제 집중 기준 {hm(weeklyFocus(p.records, today))}/주)</span>
+      {av ? <span className="muted small">설정의 집중 가능 시간으로 계산해요</span> : <>
+        <label className="muted small">일주일에 목표에 쓸 시간 <input className="num" inputMode="decimal" value={hours} onChange={e => setHours(e.target.value)} aria-label="주당 목표 시간" />시간</label>
+        <span className="muted small">(최근 4주 실제 집중 기준 {hm(weeklyFocus(p.records, today))}/주)</span></>}
     </div>
     {!result && qas.length === 0 && <textarea rows={2} value={context} onChange={e => setContext(e.target.value)} placeholder="지금 상황 (선택)" aria-label="상황" />}
 

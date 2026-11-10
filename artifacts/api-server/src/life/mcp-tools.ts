@@ -1,9 +1,10 @@
 import {z} from 'zod';
-import {ALL_SCOPES, buildNow, goalSchedule, logicalDay, weeklyFocus, type AnyRecord} from '@workspace/life-contract';
+import './autolog.ts';
+import {ALL_SCOPES, Availability, addDays, availableOn, buildNow, goalSchedule, logicalDay, weeklyFocus, type AnyRecord, type LifeRecord} from '@workspace/life-contract';
 import {BLOCKS, PERMISSIONS, isCode, BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 import {listLibrary, saveLibrary} from './library.ts';
-import {allRecords, getSettings, getSpec, lastActivity, putSettings, saveSpec, writeRecord} from './store.ts';
+import {allRecords, deleteRecord, getSettings, getSpec, lastActivity, putAvailability, putSettings, saveSpec, writeRecord} from './store.ts';
 
 // Planner tools for the MOONS connector: Claude talks with the user, then builds and fills the planner directly.
 // Writes go straight to the user's planner (it is their own tool, not their knowledge base); nothing is invented
@@ -29,6 +30,9 @@ const guide = () => `lit · 대화로 만들고 마음대로 꾸미는 나만의
 탭: 노션 페이지처럼 사용자가 추가·삭제·이름을 바꾼다. tabs로 보낼 수 있다: kind는 ${BUILTIN_TABS.map(t => `${t.kind}(${t.name})`).join(', ')}, page(빈 페이지 + 그 페이지의 widgets). 탭을 안 보내면 지금 탭 그대로.
 사용자가 이름 붙이는 속성: taskProps로 모든 할 일에 속성을 단다(이름, type ${PROP_TYPES.map(t => `${t.id}=${t.name}`).join('·')}, select면 options). tasks 위젯 options.groupBy에 select 속성 이름을 주면 그 선택지로 할 일을 나눈다.
 표 위젯(type "table"): options.columns=[{name,type,options}], options.firstName(첫 열 이름), options.scope("day" 그날 줄만 | "all" 모든 날). 줄은 add_items의 rows로 넣는다.
+자동 기록 표: 표 위젯 options.autoLog = "sessions"(집중 세션: 타이머를 멈추면 한 줄, 컨디션을 매기면 갱신) | "achievements"(목표 이룸 → 성취 기록지) | "adjustments"(목표 포기 → 조정 기록지). 열은 이름으로 맞춘다: 날짜, 할 일, 페르소나, 시작, 끝, 분, 시간, 컨디션, 메모, 목표, 완료일, 실제 시간(분), 임팩트, ROI, 다음엔 누가, 상태 + 할 일 속성 이름(Role 등).
+가용 시간: set_availability(요일별 + 날짜 예외)를 먼저 정하면 add_goal_plan의 가능한 날짜·병목이 그 시간으로 계산된다.
+고치기: list_tasks → update_task(날짜 옮기기 포함)/delete_task, list_rows → update_row/delete_row, list_sessions, get_insights.
 버튼·칸 문구는 위젯 options.labels로 바꾼다: ${Object.entries(WIDGET_LABELS).map(([t, ls]) => `${t}{${ls!.map(l => l.key).join(',')}}`).join(' ')}. 예시 문장을 플레이스홀더로 넣지 않는다(개인 공간이다).
 내 위젯(create_widget): lit에 없는 위젯은 설명서(manifest)로 만들어 사용자의 라이브러리에 넣는다. 블록 위젯이 기본이다: data.columns(열 이름·종류, key는 생략하면 이름) + view(블록 목록: ${BLOCKS.map(b => `${b.id}=${b.name}`).join(', ')}). 블록에서 열은 이름으로 부른다. 예: {"id":"leet-score","name":"기출 점수","permissions":["table:read","table:write"],"data":{"columns":[{"name":"회차","type":"text"},{"name":"점수","type":"number"}]},"view":[{"block":"form"},{"block":"chart","x":"회차","y":"점수"},{"block":"stat","value":"점수","agg":"avg","label":"평균"}]}.
 코드 위젯은 블록으로 안 될 때만: html·css·code(JavaScript, 전역 lit API: lit.table.rows/add/update/remove, lit.tasks.today, lit.goals.list, lit.condition.today, lit.context, lit.on('change')). 인터넷 접속은 막혀 있다. permissions: ${PERMISSIONS.map(p => p.id).join(', ')} 중 필요한 것만. 코드 위젯은 사용자가 lit에서 권한을 보고 승인해야 돈다고 알려 준다.
@@ -105,10 +109,12 @@ export function registerPlannerTools(tool: Tool) {
         effortHours: m.effortHours ?? null, criterion: m.why ?? null, target: m.measure ? {...m.measure, aggregation: 'sum'} : null}, source: {type: 'planner', ref: 'claude', confirmed: true}})).id);
       for (const t of firstTasks ?? []) if (ids[t.milestone]) await writeRecord(owner, null, {kind: 'task', logicalDay: t.day ?? today,
         body: {title: t.title, category: 'must', goalIds: [ids[t.milestone]], plan: {state: 'committed', estimateMin: t.estimateMin ?? null}}, source: {type: 'planner', ref: 'claude', confirmed: true}});
-      const records = await allRecords(owner), s = goalSchedule(records, today, weeklyFocus(records, today));
+      const records = await allRecords(owner), av = (await getSettings(owner)).availability;
+      // The user's own availability (by weekday, with exceptions) when set; otherwise recent actual focus.
+      const s = goalSchedule(records, today, weeklyFocus(records, today), av ? d => availableOn(av, d) : undefined);
       const mine = s.goals.find(g => g.id === top.id);
       return {goalId: top.id, milestoneIds: ids, deadline: mine?.deadline ?? goal.deadline ?? null, feasible: mine?.projected ?? null, lateDays: mine?.lateDays ?? 0,
-        weeklyFocusMin: s.weeklyMin, bottlenecks: s.bottlenecks.map(b => ({month: b.month, needMin: b.demandMin, haveMin: b.capacityMin, goals: b.goals})), url: plannerUrl()};
+        capacityBasis: av ? 'availability' : 'recent_focus', weeklyFocusMin: av ? Array.from({length: 7}, (_, i) => availableOn(av, addDays(today, i))).reduce((a, b) => a + b, 0) : s.weeklyMin, bottlenecks: s.bottlenecks.map(b => ({month: b.month, needMin: b.demandMin, haveMin: b.capacityMin, goals: b.goals})), url: plannerUrl()};
     });
 
   tool('add_items', '할 일·루틴·페르소나·표의 줄을 플래너에 넣는다. 할 일 props와 표 cells는 속성·열 이름으로 보낸다. 할 일은 day(없으면 오늘), goalId로 목표에 이으면 체크가 진행률이 된다. fixedStart/fixedEnd(HH:MM)면 고정 일정.',
@@ -166,9 +172,126 @@ export function registerPlannerTools(tool: Tool) {
     const settings = await getSettings(owner), spec = (await getSpec(owner))?.spec as PlannerSpec | undefined;
     if (!spec) throw new WorkspaceError(404, '아직 플래너가 없어요. build_planner로 먼저 만든다.');
     const records: AnyRecord[] = await allRecords(owner);
-    return buildNow(records, settings, new Date(), {revision: settings.revision, scopes: ALL_SCOPES, lastActivityAt: await lastActivity(owner),
+    const now = buildNow(records, settings, new Date(), {revision: settings.revision, scopes: ALL_SCOPES, lastActivityAt: await lastActivity(owner),
       modules: {sleep: uses(spec, 'sleep'), condition: uses(spec, 'condition'), timer: uses(spec, 'timer')}});
+    // Session by session (with the condition rated when the timer stopped), for logs and energy analysis.
+    return {...now, sessions: sessionsOf(records, now.user.logicalDay, now.user.logicalDay, settings.tz)};
   });
+
+  tool('set_availability', '사용자가 집중에 쓸 수 있는 시간을 정한다: 요일별(일~토, 분 또는 시간) + 날짜별 예외(데이트, 발표 등). 목표 일정·병목 계산이 이 값을 쓴다. clear:true면 지우고 최근 실제 집중 시간으로 돌아간다.',
+    {weekdayMinutes: z.array(z.number().int().min(0).max(1440)).length(7).optional(), weekdayHours: z.array(z.number().min(0).max(24)).length(7).optional(),
+      exceptions: z.array(z.object({date: day, minutes: z.number().int().min(0).max(1440).optional(), hours: z.number().min(0).max(24).optional(), note: z.string().max(80).optional()})).max(400).optional(),
+      addExceptions: z.boolean().optional(), clear: z.boolean().optional()},
+    async ({weekdayMinutes, weekdayHours, exceptions, addExceptions, clear}, owner) => {
+      if (clear) return {availability: await putAvailability(owner, null)};
+      const cur = (await getSettings(owner)).availability;
+      const weekday = weekdayMinutes ?? weekdayHours?.map(h => Math.round(h * 60)) ?? cur?.weekday;
+      if (!weekday) throw new WorkspaceError(400, '처음에는 요일별 시간(weekdayMinutes 또는 weekdayHours, 일요일부터 7개)이 필요해요.');
+      const ex = (exceptions ?? []).map(e => ({date: e.date, minutes: e.minutes ?? Math.round((e.hours ?? 0) * 60), note: e.note ?? null}));
+      const merged = addExceptions && cur ? [...cur.exceptions.filter(e => !ex.some(x => x.date === e.date)), ...ex] : exceptions ? ex : cur?.exceptions ?? [];
+      const av = await putAvailability(owner, Availability.parse({weekday, exceptions: merged.sort((a, b) => a.date.localeCompare(b.date))}));
+      return {availability: av, note: '다음 add_goal_plan부터 이 시간으로 가능한 날짜와 병목을 계산한다.'};
+    });
+
+  tool('list_tasks', '할 일 목록(기간·날짜). id·날짜·제목·분류(must/want/leisure)·결과·목표·속성(이름으로)·예상 시간. 고치거나 옮기기 전에 읽는다.',
+    {from: day.optional(), to: day.optional(), includeClosed: z.boolean().optional()},
+    async ({from, to, includeClosed}, owner) => {
+      const settings = await getSettings(owner), today = logicalDay(new Date(), settings);
+      const spec = (await getSpec(owner))?.spec as PlannerSpec | undefined, defs = spec?.props?.task ?? [];
+      const a = from ?? today, b = to ?? from ?? today;
+      return (await allRecords(owner)).filter((r): r is LifeRecord<'task'> => r.kind === 'task' && !!r.logicalDay && r.logicalDay >= a && r.logicalDay <= b)
+        .filter(t => includeClosed || !['cancelled', 'postponed'].includes(t.body.outcome.result))
+        .map(t => ({id: t.id, day: t.logicalDay, title: t.body.title, category: t.body.category, result: t.body.outcome.result, routine: !!t.body.routineId, fixed: t.body.plan.fixed,
+          estimateMin: t.body.plan.estimateMin, goalIds: t.body.goalIds, props: byNameOut(defs, t.body.props)}));
+    });
+
+  tool('update_task', '할 일 하나를 고친다: 제목, 날짜 옮기기(day), 분류, 결과(done/partial/missed/unknown…), 예상 시간, 목표(goalId, null이면 끊기), 속성(이름으로), 형광펜. 바꿀 것만 보낸다.',
+    {id: z.string(), title: z.string().min(1).max(200).optional(), day: day.optional(), category: z.enum(['must', 'want', 'leisure']).nullable().optional(),
+      result: z.enum(['done', 'partial', 'in_progress', 'missed', 'postponed', 'cancelled', 'unknown']).optional(), estimateMin: z.number().int().min(1).max(1440).nullable().optional(),
+      goalId: z.string().nullable().optional(), props: z.record(cell).optional(), highlight: z.enum(['yellow', 'pink', 'green', 'blue']).nullable().optional()},
+    async ({id, title, day: d, category, result, estimateMin, goalId, props, highlight}, owner) => {
+      const t = (await allRecords(owner)).find((r): r is LifeRecord<'task'> => r.id === id && r.kind === 'task');
+      if (!t) throw new WorkspaceError(404, '할 일을 찾지 못했어요. list_tasks로 id를 확인한다.');
+      const spec = (await getSpec(owner))?.spec as PlannerSpec | undefined, defs = spec?.props?.task ?? [];
+      const now = new Date().toISOString(), b = t.body;
+      const outcome = result === undefined ? b.outcome : {...b.outcome, result, reportedAt: result === 'unknown' ? null : now, completedAt: result === 'done' ? now : result === 'unknown' ? null : b.outcome.completedAt};
+      const next = {...b, ...(title ? {title} : {}), ...(category !== undefined ? {category} : {}), ...(highlight !== undefined ? {highlight} : {}),
+        ...(goalId !== undefined ? {goalIds: goalId ? [goalId] : []} : {}), ...(props ? {props: {...b.props, ...byNameIn(defs, props)}} : {}),
+        plan: {...b.plan, ...(estimateMin !== undefined ? {estimateMin} : {})}, outcome};
+      const saved = await writeRecord(owner, id, {kind: 'task', logicalDay: d ?? t.logicalDay, body: next, baseRevision: t.revision});
+      return {id: saved.id, day: saved.logicalDay, title: (saved.body as {title: string}).title, result: (saved.body as {outcome: {result: string}}).outcome.result};
+    });
+
+  tool('delete_task', '할 일 하나를 지운다(기록 이력에는 남는다). 다시 배정할 때 중복을 없애는 데 쓴다.', {id: z.string()}, async ({id}, owner) => {
+    const t = (await allRecords(owner)).find(r => r.id === id && r.kind === 'task');
+    if (!t) throw new WorkspaceError(404, '할 일을 찾지 못했어요.');
+    await deleteRecord(owner, id); return {deleted: id};
+  });
+
+  tool('list_rows', '표(DB) 위젯의 줄을 읽는다. table은 표의 id나 제목(get_planner의 tables). where로 열 값이 같은 줄만, from/to로 날짜를 좁힌다. 값은 열 이름으로 돌려준다.',
+    {table: z.string().min(1).max(60), where: z.record(cell).optional(), from: day.optional(), to: day.optional(), limit: z.number().int().min(1).max(500).optional()},
+    async ({table, where, from, to, limit}, owner) => {
+      const {w, cols} = await tableOf(owner, table);
+      const rows = (await allRecords(owner)).filter((r): r is LifeRecord<'note'> => r.kind === 'note' && r.body.signifier === 'row' && r.body.table === w.id)
+        .filter(r => (!from || (r.logicalDay ?? '') >= from) && (!to || (r.logicalDay ?? '') <= to))
+        .map(r => ({id: r.id, day: r.logicalDay, name: r.body.text, cells: byNameOut(cols, r.body.cells), createdAt: r.createdAt}))
+        .filter(r => !where || Object.entries(where).every(([k, v]) => r.cells[k] === v || (k === (w.options.firstName ?? '이름') && r.name === v)))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      return {table: {id: w.id, title: w.title ?? null, firstName: w.options.firstName ?? '이름', columns: cols.map(c => ({name: c.name, type: c.type, options: c.options})), autoLog: w.options.autoLog ?? null}, rows: rows.slice(-(limit ?? 200))};
+    });
+
+  tool('update_row', '표의 줄 하나를 고친다(열 이름으로, 보낸 칸만 바뀜). name은 첫 열. 예: 소원 상자 상태 잠김→해금→사용함.',
+    {id: z.string(), cells: z.record(cell).optional(), name: z.string().max(500).optional(), day: day.optional()},
+    async ({id, cells, name, day: d}, owner) => {
+      const r = (await allRecords(owner)).find((x): x is LifeRecord<'note'> => x.id === id && x.kind === 'note' && x.body.signifier === 'row');
+      if (!r) throw new WorkspaceError(404, '줄을 찾지 못했어요. list_rows로 id를 확인한다.');
+      const {cols} = await tableOf(owner, r.body.table ?? '');
+      const saved = await writeRecord(owner, id, {kind: 'note', logicalDay: d ?? r.logicalDay, body: {...r.body, ...(name !== undefined ? {text: name} : {}), cells: {...r.body.cells, ...byNameIn(cols, cells)}}, baseRevision: r.revision}) as LifeRecord<'note'>;
+      return {id: saved.id, name: saved.body.text, cells: byNameOut(cols, saved.body.cells)};
+    });
+
+  tool('delete_row', '표의 줄 하나를 지운다.', {id: z.string()}, async ({id}, owner) => {
+    const r = (await allRecords(owner)).find(x => x.id === id && x.kind === 'note' && (x.body as {signifier: string}).signifier === 'row');
+    if (!r) throw new WorkspaceError(404, '줄을 찾지 못했어요.');
+    await deleteRecord(owner, id); return {deleted: id};
+  });
+
+  tool('list_sessions', '집중 세션(타이머) 목록: 날짜·할 일·페르소나·시작·끝·분·컨디션(멈출 때 입력)·메모·할 일 속성(Role 등).',
+    {from: day.optional(), to: day.optional()},
+    async ({from, to}, owner) => {
+      const settings = await getSettings(owner), today = logicalDay(new Date(), settings);
+      const spec = (await getSpec(owner))?.spec as PlannerSpec | undefined;
+      return sessionsOf(await allRecords(owner), from ?? today, to ?? from ?? today, settings.tz, spec?.props?.task ?? []);
+    });
+}
+
+const clockIn = (iso: string, tz: string) => new Intl.DateTimeFormat('en-GB', {timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23'}).format(new Date(iso));
+/** Sessions in a range, with the task, personas, condition and the task's properties by name. */
+function sessionsOf(records: AnyRecord[], from: string, to: string, tz: string, defs: PropDef[] = []) {
+  const name = (id: string) => (records.find(x => x.id === id)?.body as {name?: string; title?: string} | undefined);
+  return records.filter((r): r is LifeRecord<'session'> => r.kind === 'session' && !r.deletedAt && !!r.logicalDay && r.logicalDay >= from && r.logicalDay <= to)
+    .sort((a, b) => a.body.start.localeCompare(b.body.start)).map(s => {
+      const t = records.find(x => x.id === s.body.taskId && x.kind === 'task') as LifeRecord<'task'> | undefined;
+      const persons = s.body.personaIds.length ? s.body.personaIds : t?.body.personaIds ?? [];
+      return {id: s.id, day: s.logicalDay, task: t?.body.title ?? null, taskId: s.body.taskId, label: s.body.label, personas: persons.map(id => name(id)?.name).filter(Boolean),
+        start: clockIn(s.body.start, tz), end: s.body.end ? clockIn(s.body.end, tz) : null, running: !s.body.end,
+        minutes: s.body.end ? Math.round((Date.parse(s.body.end) - Date.parse(s.body.start)) / 60000) : null, condition: s.body.condition, note: s.body.note,
+        goals: (t?.body.goalIds ?? []).map(id => name(id)?.title).filter(Boolean), props: t ? byNameOut(defs, t.body.props) : {}};
+    });
+}
+/** Values stored by id → by the name the user gave (and back). */
+function byNameOut(defs: {id: string; name: string}[], values: Record<string, unknown> | undefined) {
+  return Object.fromEntries(Object.entries(values ?? {}).filter(([k]) => k !== '__src').map(([k, v]) => [defs.find(d => d.id === k)?.name ?? k, v])) as Record<string, string | number | boolean | null>;
+}
+function byNameIn(defs: {id: string; name: string}[], values: Record<string, unknown> | undefined) {
+  return Object.fromEntries(Object.entries(values ?? {}).flatMap(([k, v]) => { const d = defs.find(x => x.name === k || x.id === k); return d ? [[d.id, v]] : []; })) as Record<string, string | number | boolean | null>;
+}
+async function tableOf(owner: string, ref: string) {
+  const spec = (await getSpec(owner))?.spec as PlannerSpec | undefined;
+  const all = [...(spec?.canvas?.day ?? []), ...(spec?.tabs ?? []).flatMap(t => t.widgets ?? [])].filter(w => w.type === 'table');
+  const w = all.find(x => x.id === ref) ?? all.find(x => (x.title ?? '') === ref);
+  if (!w) throw new WorkspaceError(404, `표를 찾지 못했어요: ${ref}. get_planner의 tables에서 id나 제목을 고른다.`);
+  return {w, cols: (w.options.columns as PropDef[] | undefined) ?? []};
 }
 
 /** "+09:00" for a time zone on a date, so HH:MM from the user means their local time. */

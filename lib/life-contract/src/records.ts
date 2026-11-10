@@ -26,6 +26,19 @@ export const GoalBody = z.object({
   criterion: text(500).nullable().default(null),
   target: quantity.extend({aggregation: z.enum(['count', 'sum', 'rate'])}).nullable().default(null),
   status: z.enum(['active', 'achieved', 'dropped', 'paused']).default('active'),
+  // Which personas this goal grows ("획득한 능력" when achieved).
+  personaIds: z.array(z.string()).max(10).default([]),
+  // Written when the goal is achieved (성취 기록지) or dropped (조정 기록지). Actual minutes come from focus sessions.
+  retro: z.object({
+    kind: z.enum(['achieved', 'dropped']),
+    at: instant,
+    actualMin: z.number().int().min(0).nullable().default(null),
+    impact: z.number().int().min(1).max(10).nullable().default(null),
+    // impact ÷ effort hours (higher = more worth it); null without both.
+    roi: z.number().finite().nullable().default(null),
+    nextOwner: z.enum(['me', 'ai', 'outsource']).nullable().default(null),
+    note: text(2000).nullable().default(null),
+  }).nullable().default(null),
 });
 export const ProjectBody = z.object({
   title: text(200).min(1),
@@ -118,6 +131,13 @@ export const PersonaBody = z.object({
   name: text(40).min(1),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).default('#8aaaf8'),
   active: z.boolean().default(true),
+  // Roles under this persona (persona → role, the 2nd level a task's 'role' property picks from).
+  roles: z.array(text(40).min(1)).max(60).default([]),
+  // Month by month: deployed (in focus this month, counts toward the limit), attached (routine, not counted), standby.
+  months: z.record(z.string().regex(/^\d{4}-\d{2}$/), z.object({
+    status: z.enum(['deployed', 'attached', 'standby']),
+    priority: z.number().int().min(1).max(9).nullable().default(null),
+  })).default({}),
 });
 
 // A stretch of actual focus (time tracker or painted on the timetable). end null = running now.
@@ -194,4 +214,16 @@ export function shareable(record: AnyRecord, scopes: Scope[]): AnyRecord | null 
   // Without the outcome grant the outcome is withheld (null), never reported as "unknown".
   if (copy.kind === 'task' && !has('life.read.outcome')) (copy.body as Record<string, unknown>).outcome = null;
   return copy;
+}
+
+/** How much focus time the user has, by weekday (0 = Sunday … 6 = Saturday, minutes) with dated exceptions. */
+export const Availability = z.object({
+  weekday: z.array(z.number().int().min(0).max(1440)).length(7),
+  exceptions: z.array(z.object({date: day, minutes: z.number().int().min(0).max(1440), note: text(80).nullable().default(null)})).max(400).default([]),
+});
+export type Availability = z.infer<typeof Availability>;
+/** Minutes available on one day (an exception wins over the weekday). */
+export function availableOn(av: Availability, d: string): number {
+  const ex = av.exceptions.find(e => e.date === d);
+  return ex ? ex.minutes : av.weekday[new Date(`${d}T12:00:00Z`).getUTCDay()]!;
 }

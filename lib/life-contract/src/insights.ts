@@ -144,16 +144,22 @@ export type ScheduleRow = {id: string; topId: string; title: string; due: string
 /** When can things really be done? Open milestones across ALL goals share one weekly focus budget, earliest due first.
  *  Gives each milestone a projected finish, each top goal a feasible date vs its deadline, and the months where
  *  demand exceeds capacity (bottlenecks) with the goals competing in them. Milestones without an effort estimate are skipped and counted. */
-export function goalSchedule(records: AnyRecord[], today: string, weeklyMin: number) {
+export function goalSchedule(records: AnyRecord[], today: string, weeklyMin: number, perDay?: (day: string) => number) {
+  // Capacity per day: the user's availability when set, otherwise the weekly budget spread evenly.
+  const cap = perDay ?? (() => weeklyMin / 7);
+  const finishAfter = (from: string, minutes: number) => {
+    let d = from, left = minutes;
+    for (let i = 0; i < 3650 && left > 0; i++) { left -= cap(d); d = addDays(d, 1); }
+    return d;
+  };
   const goals = of(records, 'goal');
   const top = (g: LifeRecord<'goal'>): LifeRecord<'goal'> => { let x = g; for (let i = 0; i < 10; i++) { const p = goals.find(y => y.id === x.body.parentGoalId); if (!p) break; x = p; } return x; };
   const open = goals.filter(g => g.body.status === 'active' && (g.body.horizon === 'milestone' || (!goals.some(c => c.body.parentGoalId === g.id) && g.body.effortHours)));
   const estimated = open.filter(g => g.body.effortHours).sort((a, b) => dueDate(a.body.deadline ?? a.body.period).localeCompare(dueDate(b.body.deadline ?? b.body.period)) || b.body.weight - a.body.weight);
-  const daily = Math.max(1, weeklyMin / 7);
   let cursor = today;
   const rows: ScheduleRow[] = estimated.map(g => {
     const effort = g.body.effortHours! * 60, remaining = Math.round(effort * (1 - goalPercent(g.id, records).pct / 100));
-    const start = cursor, finish = addDays(cursor, Math.ceil(remaining / daily));
+    const start = cursor, finish = remaining > 0 ? finishAfter(cursor, remaining) : cursor;
     cursor = finish;
     const due = dueDate(g.body.deadline ?? g.body.period);
     return {id: g.id, topId: top(g).id, title: g.body.title, due, effortMin: effort, remainingMin: remaining, start, finish, late: finish > due};
@@ -171,8 +177,9 @@ export function goalSchedule(records: AnyRecord[], today: string, weeklyMin: num
     const ms = monthsBetween(today, r.due < today ? today : r.due), per = r.remainingMin / ms.length;
     for (const m of ms) { const d = demand.get(m) ?? {min: 0, goals: new Set()}; d.min += per; d.goals.add(goals.find(x => x.id === r.topId)!.body.title); demand.set(m, d); }
   }
-  const monthCap = Math.round(weeklyMin * 4.35);
-  const months = [...demand.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, d]) => ({month, demandMin: Math.round(d.min), capacityMin: monthCap, over: d.min > monthCap, goals: [...d.goals]}));
+  // Capacity per month: the days left in it (from today) times each day's capacity.
+  const monthCapOf = (month: string) => { let sum = 0; for (let d = month === today.slice(0, 7) ? today : `${month}-01`; d.startsWith(month); d = addDays(d, 1)) sum += cap(d); return Math.round(sum); };
+  const months = [...demand.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, d]) => { const c = monthCapOf(month); return {month, demandMin: Math.round(d.min), capacityMin: c, over: d.min > c, goals: [...d.goals]}; });
   return {weeklyMin, rows, goals: tops, months, bottlenecks: months.filter(m => m.over && m.goals.length > 1), overloaded: months.filter(m => m.over), unestimated: open.length - estimated.length};
 }
 
@@ -206,7 +213,9 @@ export function unlinkedDone(records: AnyRecord[], day: string, days = 14) {
 export function periodSummary(records: AnyRecord[], from: string, to: string) {
   const inRange = (d: string | null) => !!d && d >= from && d <= to;
   const tasks = of(records, 'task').filter(t => inRange(t.logicalDay) && t.body.plan.state !== 'dropped' && !t.body.plan.fixed && !['cancelled', 'postponed'].includes(t.body.outcome.result));
-  const plain = tasks.filter(t => !t.body.routineId), routine = tasks.filter(t => t.body.routineId);
+  // 하고 싶은 일(want) is shown but never counted against the day: it stays out of the completion rate.
+  const plain = tasks.filter(t => !t.body.routineId && t.body.category !== 'want'), routine = tasks.filter(t => t.body.routineId);
+  const wants = tasks.filter(t => !t.body.routineId && t.body.category === 'want');
   const done = (xs: typeof tasks) => xs.filter(t => t.body.outcome.result === 'done').length;
   const sessions = of(records, 'session').filter(s => inRange(s.logicalDay) && s.body.end);
   const focus = Math.round(sessions.reduce((sum, s) => sum + mins(s.body.start, s.body.end!), 0));
@@ -222,6 +231,7 @@ export function periodSummary(records: AnyRecord[], from: string, to: string) {
     from, to, days: days.length, writtenDays: written.size,
     tasks: {planned: plain.length, done: done(plain), partial: plain.filter(t => t.body.outcome.result === 'partial').length, missed: plain.filter(t => t.body.outcome.result === 'missed').length, rate: pct(done(plain), plain.length)},
     routines: {picked: routine.length, done: done(routine), rate: pct(done(routine), routine.length)},
+    wants: {planned: wants.length, done: done(wants)},
     focusMin: focus,
     condition: scores.length ? round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
     sleepMin: sleeps.length ? Math.round(sleeps.reduce((a, b) => a + b, 0) / sleeps.length) : null,

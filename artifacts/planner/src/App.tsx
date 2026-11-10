@@ -1,6 +1,6 @@
 import {createContext, useContext, useEffect, useState} from 'react';
 import {useClerk} from '@clerk/react';
-import {logicalDay, type AnyRecord, type Settings} from '@workspace/life-contract';
+import {logicalDay, type AnyRecord, type Availability, type Settings} from '@workspace/life-contract';
 import {CHIP_COLORS, MOODS, dayBoundary, tabsOf, withMood, type PlannerSpec} from '@workspace/planner-spec';
 import {api, flushQueue, httpBackend, ofKind, usePlanner, type Planner} from './data.ts';
 import {onQueue, queued} from './offline.ts';
@@ -12,10 +12,12 @@ import {ConnectPage} from './screens/Connect.tsx';
 import {skinProps} from './screens/Canvas.tsx';
 import {PlannerView, currentTab} from './screens/PlannerView.tsx';
 import {MenuDrawer} from './screens/Menu.tsx';
+import {AvailabilityProvider} from './avail.tsx';
+import {AvailabilityEditor} from './screens/AvailabilityEditor.tsx';
 import {LibraryProvider, useLibraryState} from './library.tsx';
 import {Tip, setTipsOn, useTipsOn} from './Tip.tsx';
 
-type Loaded = {settings: Settings & {configured: boolean}; planner: {version: number; spec: PlannerSpec} | null; records: AnyRecord[]};
+type Loaded = {settings: Settings & {configured: boolean; availability?: Availability | null}; planner: {version: number; spec: PlannerSpec} | null; records: AnyRecord[]};
 const PlannerCtx = createContext<Planner | null>(null);
 const usePersonaPlanner = () => useContext(PlannerCtx);
 const browserTz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -64,11 +66,11 @@ function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Lo
       {settingsOpen && <button className="ghost small" onClick={() => setSettingsOpen(false)}>‹ 플래너</button>}
       <button className="menu-btn" onClick={() => setMenu(true)} aria-label="메뉴" aria-expanded={menu}><span /><span /><span /></button>
     </header>
-    <LibraryProvider value={library}>
+    <LibraryProvider value={library}><AvailabilityProvider value={loaded.settings.availability ?? null}>
     <MenuDrawer open={menu} close={() => setMenu(false)} spec={spec} saveSpec={async next => { await api.putSpec(next); await reload(); }} openSettings={() => { setDecorating(false); setSettingsOpen(true); }} />
     <PlannerCtx.Provider value={p}>{decorating ? <Editor spec={spec} settings={loaded.settings} p={p} saveLabel="저장" onCancel={() => setDecorating(false)} pageId={tabsOf(spec).find(t => t.id === currentTab() && t.kind === 'page')?.id}
       onSave={async next => { await api.putSpec(next); setDecorating(false); await reload(); }} hint="지금 기록 그대로 보면서 꾸며요. 저장하면 새 버전이 되고 기록은 그대로예요." /> : settingsOpen ? <SettingsPanel loaded={loaded} edit={edit} close={() => setSettingsOpen(false)} reload={reload} /> : <PlannerView spec={spec} settings={loaded.settings} p={p} saveSpec={async change => { await api.putSpec(change(spec)); await reload(); }} />}</PlannerCtx.Provider>
-    </LibraryProvider>
+    </AvailabilityProvider></LibraryProvider>
   </div>;
 }
 
@@ -140,6 +142,7 @@ function SettingsPanel({loaded, edit, close, reload}: {loaded: Loaded & {planner
       <Tip id="settings-boundary" block>새벽 {boundary} 전에 쓴 기록은 전날로 들어가요.</Tip>
       <button onClick={save}>저장</button> {msg && <span className="muted">{msg}</span>}
     </section>
+    <AvailabilityEditor value={loaded.settings.availability ?? null} saved={reload} />
     <Personas />
     {checkin && <section className="module"><h3>아침 점검 시간</h3>
       <label>보통 일어나는 시각 <input type="time" value={wake} onChange={e => setWake(e.target.value)} /></label>

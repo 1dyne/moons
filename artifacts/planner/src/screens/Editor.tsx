@@ -155,7 +155,12 @@ function WidgetOptions({w, opt, goals, props}: {w: Widget; opt: (k: string, v: u
     case 'routine': return <>
       <label>세는 방식 <select value={String(o.mode ?? 'pick_daily')} onChange={e => opt('mode', e.target.value)}><option value="pick_daily">그날 고른 것만</option><option value="fixed_all">정해 둔 것 전부</option></select></label>
       <label className="row-check"><input type="checkbox" checked={o.askReason === true} onChange={e => opt('askReason', e.target.checked)} /> 못 한 이유 남기기</label></>;
-    case 'table': return <label>보이는 줄 <select value={o.scope === 'all' ? 'all' : 'day'} onChange={e => opt('scope', e.target.value)}><option value="day">그날 쓴 줄만</option><option value="all">모든 날 함께</option></select></label>;
+    case 'table': return <>
+      <label>보이는 줄 <select value={o.scope === 'all' ? 'all' : 'day'} onChange={e => opt('scope', e.target.value)}><option value="day">그날 쓴 줄만</option><option value="all">모든 날 함께</option></select></label>
+      <label>자동 기록 <select value={String(o.autoLog ?? '')} onChange={e => opt('autoLog', e.target.value || undefined)}>
+        <option value="">없음</option><option value="sessions">집중 세션 (타이머를 멈추면 한 줄)</option><option value="achievements">성취 기록 (목표를 이루면)</option><option value="adjustments">조정·포기 기록 (목표를 포기하면)</option></select></label>
+      {o.autoLog ? <p className="muted small">열 이름으로 채워요: {o.autoLog === 'sessions' ? '날짜, 할 일, 페르소나, 시작, 끝, 분, 컨디션, 메모, 목표, 할 일 속성 이름' : o.autoLog === 'achievements' ? '목표, 완료일, 실제 시간(분), 실제 시간, 임팩트, ROI, 다음엔 누가, 메모, 페르소나' : '목표, 날짜, 메모, 상태, 페르소나'}</p> : null}
+    </>;
     case 'checkin': return <div className="inline">
       <label>기상 <input type="time" value={String(o.wake ?? '07:00')} onChange={e => opt('wake', e.target.value)} /></label>
       <label>취침 <input type="time" value={String(o.sleep ?? '00:00')} onChange={e => opt('sleep', e.target.value)} /></label></div>;

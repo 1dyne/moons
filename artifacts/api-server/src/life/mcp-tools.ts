@@ -18,7 +18,7 @@ const guide = () => `lit · 대화로 만들고 마음대로 꾸미는 나만의
 4. 채우기(원하면): 큰 목표는 add_goal_plan(마일스톤에 끝낼 달·예상 시간), 할 일·루틴·페르소나는 add_items. 할 일은 goalId로 목표에 이어야 체크가 진행률이 된다.
 5. 마지막에 플래너 주소를 알려 준다: ${plannerUrl()} (홈 화면에 설치 가능). 사용자는 "꾸미기"로 언제든 직접 고칠 수 있다.
 
-위치는 12칸 × 30px 줄 단위로 보낸다(x 0~11, w 1~12, y 0부터, h 줄 수). 기본은 다꾸형(mode:"free"): 저장할 때 4배 고운 칸으로 바뀌고 위젯끼리 겹칠 수 있다. 정리형(mode:"grid")이면 겹친 위젯이 아래로 밀린다. 꾸미기 위젯(sticker·tape·image·shape)은 겹치고 options.rotate(-45~45)로 기울일 수 있다.
+위치는 12칸 × 30px 줄 단위로 보낸다(x 0~11, w 1~12, y 0부터, h 줄 수). 저장할 때 4배 고운 칸으로 바뀌고 위젯끼리 겹칠 수 있다(배치 방식은 하나). 쓰는 화면에서는 위젯이 내용만큼 자라고 아래 위젯이 밀려 내려간다. options.toggle:true면 위젯을 접고 펼 수 있다. 꾸미기 위젯(sticker·tape·image·shape)은 겹치고 options.rotate(-45~45)로 기울일 수 있다.
 위젯: ${WIDGETS.map(w => `${w.type}(${w.label}, 기본 ${w.w}×${w.h}: ${w.desc})`).join('; ')}.
 위젯 옵션 예: tasks{categories,amounts} routine{mode:"pick_daily"|"fixed_all",askReason} timetable/hourly/page{startHour} checkin{wake:"07:00",sleep:"00:00"} text{text,size:"s|m|l|xl",align} progress/dday{goalId|date,label} sticker{glyph,size} tape{pattern:"plain|stripe|dot|check|grid",color,opacity} image{src(https),frame:"polaroid|round|circle|none",caption} shape{shape:"heart|star|cloud|circle|label|flower",color,text}.
 위젯 꾸밈: title(""이면 숨김), font, color(강조), background, ink(글자색), style("card|line|filled|plain").
@@ -74,11 +74,11 @@ export function registerPlannerTools(tool: Tool) {
       weekLayout: z.enum(['horizontal', 'vertical']).optional(), timezone: z.string().optional(), mode: z.enum(['free', 'grid']).optional(),
       tabs: z.array(z.object({name: z.string().min(1).max(20), kind: z.enum(['today', 'week', 'month', 'goals', 'insights', 'page']), widgets: z.array(looseWidget).max(80).optional()})).min(1).max(20).optional(),
       taskProps: z.array(propIn).max(20).optional()},
-    async ({name, widgets, skin, skinPreset, weekLayout, timezone, mode, tabs, taskProps}, owner) => {
+    async ({name, widgets, skin, skinPreset, weekLayout, timezone, tabs, taskProps}, owner) => {
       await ensureSettings(owner, timezone);
       const current = (await getSpec(owner))?.spec as PlannerSpec | undefined;
       const preset = SKIN_PRESETS.find(p => p.id === skinPreset)?.skin;
-      const {spec, dropped} = buildSpec(current ?? null, {name, widgets, skin: {...(preset ?? {}), ...(skin ?? {})}, weekLayout, mode});
+      const {spec, dropped} = buildSpec(current ?? null, {name, widgets, skin: {...(preset ?? {}), ...(skin ?? {})}, weekLayout, mode: 'free'});
       if (taskProps) spec.props = {task: mergeProps(current?.props?.task ?? [], taskProps)};
       if (tabs) spec.tabs = tabs.map((t, i) => ({id: t.kind === 'page' ? `p-${i}-${Date.now().toString(36)}` : (tabs.findIndex(x => x.kind === t.kind) === i ? t.kind : `${t.kind}-${i}`), name: t.name, kind: t.kind,
         ...(t.kind === 'page' ? {widgets: toFree(normalizeWidgets(t.widgets ?? []).widgets)} : {})}));

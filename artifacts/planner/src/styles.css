@@ -733,13 +733,13 @@ button.ghost:hover{background:color-mix(in srgb,var(--ink) 7%,transparent)}
 .g-arc .g-tick.on{stroke:var(--g-ink)}
 .g-arc .g-needle{stroke:var(--g-ink);stroke-linecap:square}
 .g-arc .g-hub{fill:var(--g-live);stroke:var(--g-ink);stroke-width:1}
-.g-lg.g-arc,.g-md.g-arc{flex-direction:column;gap:2px;align-items:center}
-.g-lg.g-arc .g-val,.g-md.g-arc .g-val{text-align:center}
-.g-number{flex-direction:column-reverse;align-items:flex-start;gap:5px}
-.g-number .g-val{font-size:20px;text-align:left;min-width:0}
-.g-sm.g-number{flex-direction:row-reverse;align-items:center;gap:6px}
-.g-sm.g-number .g-val{font-size:12px}
-.g-lg.g-number .g-val{font-size:44px;letter-spacing:-.02em}
+.g-lg.gk-arc,.g-md.gk-arc{flex-direction:column;gap:2px;align-items:center}
+.g-lg.gk-arc .g-val,.g-md.gk-arc .g-val{text-align:center}
+.gk-number{flex-direction:column-reverse;align-items:flex-start;gap:5px}
+.gk-number .g-val{font-size:20px;text-align:left;min-width:0}
+.g-sm.gk-number{flex-direction:row-reverse;align-items:center;gap:6px}
+.g-sm.gk-number .g-val{font-size:12px}
+.g-lg.gk-number .g-val{font-size:44px;letter-spacing:-.02em}
 .g-ruler{position:relative;display:block;width:96px;height:8px;border-bottom:1px solid var(--g-ink);background:repeating-linear-gradient(90deg,var(--g-ink) 0 1px,transparent 1px 10%) left bottom/calc(100% + 1px) 4px no-repeat}
 .g-sm .g-ruler{width:60px;height:6px}
 .g-lg .g-ruler{width:min(240px,60vw);height:12px;background-size:calc(100% + 1px) 6px}
@@ -874,6 +874,33 @@ h3 .tip{margin-left:6px}
 .start-way span{font-size:13px;color:var(--muted)}
 .start-way.primary-way{background:var(--ink);color:var(--bg)}
 .start-way.primary-way span{color:inherit;opacity:.75}
-.gauge-pick .gauge:not(.g-number){flex-direction:column;align-items:flex-start;gap:6px}
+.gauge-pick .gauge:not(.gk-number){flex-direction:column;align-items:flex-start;gap:6px}
 .gauge-pick .g-val{text-align:left;min-width:0}
 .tabs{width:max-content}
+
+/* Widgets show all of their content: no inner scrollbars. In use a widget grows to fit (Canvas fitLayout); in the editor it keeps
+   the size the user set and simply clips. A widget with the toggle option folds to its title. */
+.wg-body{overflow:hidden;scrollbar-width:none}
+.wg-body::-webkit-scrollbar{display:none}
+.canvas:not(.editing) .wg-body{overflow:visible;flex:none}
+.canvas:not(.editing) .wg-type-focus .wg-body{display:block}
+.canvas:not(.editing) .wg-type-focus .focus-bar{min-height:72px}
+.dbt-scroll{scrollbar-width:thin}
+.wg-toggle button{font:inherit;color:inherit;display:flex;gap:6px;align-items:center;width:100%;text-align:left}
+.wg-toggle button:hover{text-decoration:none}
+.wg.folded .wg-title{border-bottom:0;margin-bottom:8px}
+
+/* Skin panel: nothing clipped or overlapping. */
+.sk-presets{grid-template-columns:1fr!important}
+.sk-preset{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;justify-content:flex-start}
+.gauge-pick{grid-template-columns:1fr 1fr}
+.gauge-pick button{padding:10px}
+.gauge-pick .g-seg i{width:5px;height:11px}
+.gauge-pick .g-seg{gap:2px}
+.gauge-pick .g-pips{gap:2px}
+.gauge-pick .g-pips i{width:6px;height:6px}
+.gauge-pick .g-bar{width:60px;margin-block:4px}
+.gauge-pick .g-ruler{width:64px}
+.gauge-pick .gauge{max-width:100%;row-gap:8px}
+.gauge-pick .gauge .g-val{display:block;line-height:1.2}
+.gauge-pick button>span:last-child{display:block;margin-top:2px}

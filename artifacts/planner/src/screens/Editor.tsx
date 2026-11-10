@@ -15,12 +15,10 @@ const newId = (type: string) => `${type}-${Date.now().toString(36)}${(seq++).toS
 
 export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pageId}: {spec: PlannerSpec; settings: Settings; p: Planner; saveLabel: string; onSave: (spec: PlannerSpec) => Promise<void> | void; onCancel?: () => void; hint?: string; pageId?: string}) {
   const today = logicalDay(new Date(), settings);
-  // A page tab is edited the same way; it is always 다꾸형.
+  // A page tab is edited the same way. One placement mode (the fine lattice); old 정리형 pages arrive converted.
   const pageTab = pageId ? tabsOf(spec).find(t => t.id === pageId) : undefined;
-  const [widgets, setWidgets] = useState<Widget[]>(() => pageTab ? pageTab.widgets ?? [] : canvasOf(spec)), [mode, setMode] = useState<CanvasMode>(() => pageTab ? 'free' : modeOf(spec));
-  const M = METRICS[mode];
-  // 다꾸형 ↔ 정리형 converts the same page; nothing is lost.
-  const switchMode = (m: CanvasMode) => { if (m === mode) return; change(m === 'free' ? toFree(widgets) : toGrid(widgets)); setMode(m); };
+  const [widgets, setWidgets] = useState<Widget[]>(() => pageTab ? pageTab.widgets ?? [] : canvasOf(spec));
+  const mode: CanvasMode = 'free', M = METRICS[mode];
   const [skin, setSkin] = useState<Skin>(() => spec.skin ?? Skin.parse({}));
   const [selected, setSelected] = useState<string | null>(null), [panel, setPanel] = useState<'widgets' | 'skin'>(widgets.length ? 'skin' : 'widgets');
   const [history, setHistory] = useState<Widget[][]>([]), [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -42,10 +40,6 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
         <button role="tab" aria-selected={panel === 'skin'} className={panel === 'skin' ? 'on' : ''} onClick={() => setPanel('skin')}>스킨</button>
       </div>
       {pageTab && <strong className="ed-page">{pageTab.name} 페이지</strong>}
-      {!pageTab && <div className="seg" role="radiogroup" aria-label="배치 방식">
-        <button role="radio" aria-checked={mode === 'free'} className={mode === 'free' ? 'on' : ''} onClick={() => switchMode('free')} title="겹치고 원하는 곳에 두기">다꾸형</button>
-        <button role="radio" aria-checked={mode === 'grid'} className={mode === 'grid' ? 'on' : ''} onClick={() => switchMode('grid')} title="칸에 맞춰 가지런히">정리형</button>
-      </div>}
       <span className="muted small ed-hint"><Tip id={hint ? `editor-${hint.slice(0, 12)}` : 'editor-drag'}>{hint ?? '위젯 머리(⠿)를 끌어 옮기고, 오른쪽 아래 모서리를 끌어 크기를 바꿔요.'}</Tip></span>
       <button className="ghost small" onClick={undo} disabled={!history.length}>되돌리기</button>
       {onCancel && <button className="ghost small" onClick={onCancel}>취소</button>}
@@ -89,6 +83,7 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
         </div>}
         {!isDecor(sel.type) && mode === 'free' && <div className="inline"><button className="small" onClick={() => opt(sel.id, 'layer', Number(sel.options.layer ?? 0) + 1)}>앞으로</button><button className="small" onClick={() => opt(sel.id, 'layer', Number(sel.options.layer ?? 0) - 1)}>뒤로</button>
           {sel.type === 'text' && <label>기울기 <input type="range" min={-20} max={20} value={Number(sel.options.rotate ?? 0)} onChange={e => opt(sel.id, 'rotate', Number(e.target.value))} /></label>}</div>}
+        {!isDecor(sel.type) && <label className="row-check"><input type="checkbox" checked={sel.options.toggle === true} onChange={e => opt(sel.id, 'toggle', e.target.checked)} /> 토글로 접고 펴기</label>}
         {!isDecor(sel.type) && <label>모양 <select value={sel.style ?? ''} onChange={e => patch(sel.id, {style: (e.target.value || undefined) as Widget['style']})}>
           <option value="">스킨 따라가기</option><option value="card">카드(그림자)</option><option value="line">선</option><option value="filled">색 채움</option><option value="plain">테두리 없음</option></select></label>}
         <div className="inline"><label>너비 <input type="number" min={minSize(sel.type, mode).w} max={M.cols} value={sel.w} onChange={e => patch(sel.id, {w: Number(e.target.value)})} className="num" /></label>

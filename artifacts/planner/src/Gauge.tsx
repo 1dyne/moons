@@ -15,7 +15,7 @@ export function Gauge({pct, size = 'md', kind, label}: {pct: number | null; size
   const ctx = useGauge(), k = kind ?? ctx;
   const v = pct === null || Number.isNaN(pct) ? null : clamp(pct);
   const text = v === null ? '–' : `${v}%`;
-  return <span className={`gauge g-${k} g-${size} ${v === null ? 'empty' : ''} ${v === 100 ? 'full' : ''}`} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={v ?? undefined} aria-label={label ? `${label} ${text}` : text}>
+  return <span className={`gauge gk-${k} g-${size} ${v === null ? 'empty' : ''} ${v === 100 ? 'full' : ''}`} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={v ?? undefined} aria-label={label ? `${label} ${text}` : text}>
     {k === 'segment' && <Segments v={v} n={10} />}
     {k === 'pips' && <Pips v={v} />}
     {k === 'bar' && <span className="g-bar"><i style={{width: `${v ?? 0}%`}} /></span>}

@@ -1,4 +1,4 @@
-import {useRef, useState} from 'react';
+import {useLayoutEffect, useRef, useState, useSyncExternalStore} from 'react';
 import {goalPercent, routineRate, type Settings} from '@workspace/life-contract';
 import {METRICS, isDark, isDecor, minSize, settle, starterCanvas, toFree, widgetInfo, type CanvasMode, type ModuleSpec, type PlannerSpec, type Skin, type Widget} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
@@ -16,8 +16,36 @@ import {Tip} from '../Tip.tsx';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
 /** A saved page keeps its placement; a page never arranged starts as 다꾸형 from the layout's starter. */
-export const canvasOf = (spec: PlannerSpec) => spec.canvas?.day ?? toFree(starterCanvas(spec.layout?.day ?? 'sheet', spec.modules.map(m => m.type)));
-export const modeOf = (spec: PlannerSpec): CanvasMode => spec.canvas?.day ? spec.canvas.mode ?? 'grid' : 'free';
+// One placement mode: the fine 다꾸 lattice. Pages saved in the old 정리형 are converted when shown.
+export const canvasOf = (spec: PlannerSpec) => spec.canvas?.day ? (spec.canvas.mode === 'free' ? spec.canvas.day : toFree(spec.canvas.day)) : toFree(starterCanvas(spec.layout?.day ?? 'sheet', spec.modules.map(m => m.type)));
+export const modeOf = (_spec: PlannerSpec): CanvasMode => 'free';
+
+// Widgets folded with their toggle, remembered on this device.
+const FOLD = 'lit.folded', foldListeners = new Set<() => void>();
+let folded = (() => { try { return new Set<string>(JSON.parse(localStorage.getItem(FOLD) ?? '[]')); } catch { return new Set<string>(); } })();
+const toggleFold = (id: string) => { folded = new Set(folded); if (folded.has(id)) folded.delete(id); else folded.add(id); try { localStorage.setItem(FOLD, JSON.stringify([...folded])); } catch { /* this visit only */ } foldListeners.forEach(f => f()); };
+const useFolded = () => useSyncExternalStore(f => { foldListeners.add(f); return () => { foldListeners.delete(f); }; }, () => folded, () => folded);
+
+/** In use (not editing) every widget shows all of its content: a widget grows to fit, and widgets below it move down by the same amount
+ *  (only those that sat below it, so overlaps the user placed on purpose stay). A folded widget shrinks to its title. */
+function fitLayout(widgets: Widget[], need: Record<string, number>, fold: Set<string>, rowPx: number): Widget[] {
+  const sized = new Map(widgets.map(w => {
+    if (isDecor(w.type)) return [w.id, w.h];
+    const n = need[w.id];
+    if (fold.has(w.id) && w.options.toggle === true) return [w.id, Math.max(1, Math.ceil((n ?? 40) / rowPx))];
+    return [w.id, n ? Math.max(w.h, Math.ceil(n / rowPx)) : w.h];
+  }));
+  const order = [...widgets].sort((a, b) => a.y - b.y || a.x - b.x), shift = new Map<string, number>();
+  for (const b of order) {
+    let s = 0, any = false;
+    for (const a of order) {
+      if (a === b || isDecor(a.type) || isDecor(b.type) || !shift.has(a.id)) continue;
+      if (a.y + a.h <= b.y && a.x < b.x + b.w && b.x < a.x + a.w) { const v = shift.get(a.id)! + sized.get(a.id)! - a.h; s = any ? Math.max(s, v) : v; any = true; }
+    }
+    shift.set(b.id, any ? s : 0);
+  }
+  return widgets.map(w => ({...w, y: Math.max(0, w.y + (shift.get(w.id) ?? 0)), h: sized.get(w.id)!}));
+}
 
 /** Skin → CSS variables and classes for the planner root. */
 export function skinProps(skin: Skin | undefined) {
@@ -84,7 +112,29 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveS
     edit.change(settle(widgets.map(w => w.id === drag.id ? drag.preview : w), drag.id, mode), drag.id);
     setDrag(null);
   };
-  const shown = drag ? widgets.map(w => w.id === drag.id ? drag.preview : w) : widgets;
+  const fold = useFolded();
+  const [need, setNeed] = useState<Record<string, number>>({});
+  // Measure what each widget's content needs (view only; the editor keeps the sizes the user set).
+  useLayoutEffect(() => {
+    if (edit || !grid.current) return;
+    const measure = () => {
+      const next: Record<string, number> = {};
+      grid.current?.querySelectorAll<HTMLElement>('section.wg[data-id]').forEach(sec => {
+        const body = sec.querySelector<HTMLElement>(':scope > .wg-body'), id = sec.dataset.id!;
+        const title = sec.querySelector<HTMLElement>(':scope > .wg-title');
+        // + borders and a little air, so text never touches the edge.
+        next[id] = body && !(fold.has(id) && sec.dataset.toggle) ? body.offsetTop + body.offsetHeight + 10 : (title ? title.offsetTop + title.offsetHeight + 8 : 40);
+      });
+      setNeed(prev => Object.keys(next).length === Object.keys(prev).length && Object.entries(next).every(([k, v]) => Math.abs((prev[k] ?? 0) - v) < 2) ? prev : next);
+    };
+    measure();
+    void document.fonts?.ready.then(measure);
+    const ro = new ResizeObserver(measure);
+    grid.current.querySelectorAll('section.wg > .wg-body').forEach(el => ro.observe(el));
+    return () => ro.disconnect();
+  });
+  const base = drag ? widgets.map(w => w.id === drag.id ? drag.preview : w) : widgets;
+  const shown = edit ? base : fitLayout(base, need, fold, M.row + M.gap);
   const rows = shown.reduce((m, w) => Math.max(m, w.y + w.h), 0) + (edit ? 6 * M.ky : 0);
 
   return <div ref={grid} className={`canvas mode-${mode} ${edit ? 'editing' : ''}`} style={{gridTemplateColumns: `repeat(${M.cols}, minmax(0, 1fr))`, gap: `${M.gap}px`, gridTemplateRows: `repeat(${Math.max(rows, edit ? 12 * M.ky : 1)}, ${M.row}px)`}}
@@ -93,17 +143,19 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveS
     {shown.map(w => {
       const title = w.title ?? widgetInfo(w.type).label, sel = edit?.selected === w.id;
       const decor = isDecor(w.type), rot = Number(w.options.rotate ?? 0), dx = Number(w.options.dx ?? 0), dy = Number(w.options.dy ?? 0);
-      return <section key={w.id} className={`wg ${decor ? 'wg-decor' : `wg-${w.style ?? spec.skin?.card ?? 'line'}`} wg-type-${w.type} ${sel ? 'selected' : ''} ${drag?.id === w.id ? 'dragging' : ''}`}
+      const toggle = !decor && w.options.toggle === true, isFolded = toggle && fold.has(w.id);
+      return <section key={w.id} data-id={w.id} data-toggle={toggle ? '1' : undefined} className={`wg ${decor ? 'wg-decor' : `wg-${w.style ?? spec.skin?.card ?? 'line'}`} wg-type-${w.type} ${sel ? 'selected' : ''} ${drag?.id === w.id ? 'dragging' : ''} ${isFolded ? 'folded' : ''}`}
         style={{gridColumn: `${w.x + 1} / span ${w.w}`, gridRow: `${w.y + 1} / span ${w.h}`, order: w.y * M.cols + w.x, ...(w.color ? {'--accent': w.color} : {}),
           ...(w.font ? {fontFamily: `var(--wfont-${w.id})`} : {}), ...(w.background ? {background: w.background, '--wg-bg': w.background} : {}), ...(w.ink ? {color: w.ink, '--ink': w.ink, '--wg-ink': w.ink} : {}),
           ...(decor || rot ? {transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)`} : {}), ...(decor || mode === 'free' ? {zIndex: (decor ? 20 : 1) + Number(w.options.layer ?? 0)} : {})} as React.CSSProperties}
         onClick={edit ? e => { e.stopPropagation(); edit.select(w.id); } : undefined}>
         {edit && <div className="wg-handle" onPointerDown={e => begin(e, w, 'move')} title="끌어서 옮기기">⠿ {widgetInfo(w.type).label}</div>}
         {w.font && <FontVar id={w.id} font={w.font} />}
-        {title && !OWN_TITLE.includes(w.type) && !decor && <h3 className="wg-title">{title}</h3>}
-        <div className="wg-body" inert={edit ? true : undefined}>
+        {toggle ? <h3 className="wg-title wg-toggle"><button className="link" onClick={edit ? undefined : () => toggleFold(w.id)} aria-expanded={!isFolded}>{isFolded ? '▸' : '▾'} {title || widgetInfo(w.type).label}</button></h3>
+          : title && !OWN_TITLE.includes(w.type) && !decor && <h3 className="wg-title">{title}</h3>}
+        {!isFolded && <div className="wg-body" inert={edit ? true : undefined}>
           <LabelProvider value={(w.options.labels as Record<string, unknown> | undefined) ?? {}}><WidgetBody w={w} ctx={ctx} spec={spec} settings={settings} today={today} endHour={endHour} /></LabelProvider>
-        </div>
+        </div>}
         {edit && <span className="wg-resize" onPointerDown={e => begin(e, w, 'size')} title="끌어서 크기 바꾸기" />}
       </section>;
     })}

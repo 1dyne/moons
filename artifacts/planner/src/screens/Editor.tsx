@@ -101,7 +101,8 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
           <option value="">스킨 따라가기</option><option value="card">카드(그림자)</option><option value="line">선</option><option value="filled">색 채움</option><option value="plain">테두리 없음</option></select></label>}
         <div className="inline"><label>너비 <input type="number" min={minSize(sel.type, mode).w} max={M.cols} value={sel.w} onChange={e => patch(sel.id, {w: Number(e.target.value)})} className="num" /></label>
           <label>높이 <input type="number" min={minSize(sel.type, mode).h} max={240} value={sel.h} onChange={e => patch(sel.id, {h: Number(e.target.value)})} className="num" /></label></div>
-        <WidgetOptions w={sel} opt={(k, v) => opt(sel.id, k, v)} goals={goals.map(g => ({id: g.id, title: g.body.title}))} props={spec.props?.task ?? []} />
+        <WidgetOptions w={sel} opt={(k, v) => opt(sel.id, k, v)} goals={goals.map(g => ({id: g.id, title: g.body.title}))} props={spec.props?.task ?? []}
+          tables={[...widgets, ...(spec.canvas.day ?? []), ...(spec.tabs ?? []).flatMap(t => t.widgets ?? [])].filter((x, i, all) => x.type === 'table' && all.findIndex(y => y.id === x.id) === i).map(x => ({id: x.id, title: x.title || x.id}))} />
         {WIDGET_LABELS[sel.type] && <details className="ed-labels"><summary>버튼·칸 문구 바꾸기</summary>
           {WIDGET_LABELS[sel.type]!.map(l => { const cur = (sel.options.labels as Record<string, string> | undefined) ?? {}; return <label key={l.key}>{l.def || '(빈 칸)'}
             <input value={cur[l.key] ?? ''} placeholder={l.def} maxLength={60} onChange={e => opt(sel.id, 'labels', {...cur, [l.key]: e.target.value})} /></label>; })}
@@ -116,7 +117,7 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
   </div>;
 }
 
-function WidgetOptions({w, opt, goals, props}: {w: Widget; opt: (k: string, v: unknown) => void; goals: {id: string; title: string}[]; props: PropDef[]}) {
+function WidgetOptions({w, opt, goals, props, tables}: {w: Widget; opt: (k: string, v: unknown) => void; goals: {id: string; title: string}[]; props: PropDef[]; tables: {id: string; title: string}[]}) {
   const o = w.options;
   switch (w.type) {
     case 'text': return <>
@@ -161,6 +162,15 @@ function WidgetOptions({w, opt, goals, props}: {w: Widget; opt: (k: string, v: u
         <option value="">없음</option><option value="sessions">집중 세션 (타이머를 멈추면 한 줄)</option><option value="achievements">성취 기록 (목표를 이루면)</option><option value="adjustments">조정·포기 기록 (목표를 포기하면)</option></select></label>
       {o.autoLog ? <p className="muted small">열 이름으로 채워요: {o.autoLog === 'sessions' ? '날짜, 할 일, 페르소나, 시작, 끝, 분, 컨디션, 메모, 목표, 할 일 속성 이름' : o.autoLog === 'achievements' ? '목표, 완료일, 실제 시간(분), 실제 시간, 임팩트, ROI, 다음엔 누가, 메모, 페르소나' : '목표, 날짜, 메모, 상태, 페르소나'}</p> : null}
     </>;
+    case 'energy': return <>
+      <label>경고 기준 (이하) <select value={String(o.warnAt ?? 6)} onChange={e => opt('warnAt', Number(e.target.value))}>{[3, 4, 5, 6, 7].map(n => <option key={n} value={n}>{n}점</option>)}</select></label>
+      <label>시작 시각 <select value={String(o.startHour ?? 6)} onChange={e => opt('startHour', Number(e.target.value))}>{[4, 5, 6, 7, 8, 9].map(h => <option key={h} value={h}>{h}시</option>)}</select></label></>;
+    case 'mission': return <>
+      <label>순집중 목표 (시간) <input className="num" inputMode="decimal" value={String(Number(o.focusTarget ?? 480) / 60)} onChange={e => opt('focusTarget', Math.max(30, Math.round((Number(e.target.value) || 8) * 60)))} /></label>
+      <label>소원 표 <select value={String(o.wishTable ?? '')} onChange={e => opt('wishTable', e.target.value || undefined)}><option value="">없음</option>{tables.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}</select></label>
+      {!!o.wishTable && <><label>상태 열 이름 <input value={String(o.statusColumn ?? '상태')} onChange={e => opt('statusColumn', e.target.value)} /></label>
+        <div className="inline"><label>잠김 값 <input value={String(o.lockedValue ?? '잠김')} onChange={e => opt('lockedValue', e.target.value)} /></label><label>해금 값 <input value={String(o.unlockValue ?? '해금')} onChange={e => opt('unlockValue', e.target.value)} /></label></div></>}</>;
+    case 'persona-board': return <label>Deployed 한도 <input type="number" min={1} max={12} className="num" value={Number(o.limit ?? 3)} onChange={e => opt('limit', Math.max(1, Number(e.target.value) || 3))} /></label>;
     case 'checkin': return <div className="inline">
       <label>기상 <input type="time" value={String(o.wake ?? '07:00')} onChange={e => opt('wake', e.target.value)} /></label>
       <label>취침 <input type="time" value={String(o.sleep ?? '00:00')} onChange={e => opt('sleep', e.target.value)} /></label></div>;

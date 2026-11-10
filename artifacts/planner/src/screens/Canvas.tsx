@@ -14,6 +14,7 @@ import {LabelProvider} from '../labels.tsx';
 import {TableWidget} from './Table.tsx';
 import {CustomWidget} from './CustomWidget.tsx';
 import {Tip} from '../Tip.tsx';
+import {EnergyLight, Mission, PersonaBoard} from './LifeWidgets.tsx';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
 /** A saved page keeps its placement; a page never arranged starts as 다꾸형 from the layout's starter. */
@@ -170,6 +171,9 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
     case 'tasks': return <Tasks m={asModule(w, 'tasks')} ctx={ctx} />;
     case 'table': return <TableWidget w={w} ctx={ctx} />;
     case 'custom': return <CustomWidget w={w} ctx={ctx} />;
+    case 'energy': return <EnergyLight w={w} ctx={ctx} />;
+    case 'mission': return <Mission w={w} ctx={ctx} />;
+    case 'persona-board': return <PersonaBoard w={w} ctx={ctx} />;
     case 'timetable': return <Timetable key={day} m={asModule(w, 'timer')} p={p} day={day} settings={settings} color={ctx.color} />;
     case 'receipt': return <Receipt p={p} day={day} routineRate={ofKind(p.records, 'routine').length ? routineRate(p.records, day) : null} />;
     case 'hourly': return <HourlyDay ctx={ctx} startHour={start} endHour={endHour} />;

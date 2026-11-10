@@ -5,6 +5,7 @@ import {ofKind, type Planner} from '../data.ts';
 import {hm} from './Focus.tsx';
 import {Scale} from './Scale.tsx';
 import {Tip} from '../Tip.tsx';
+import {lowEnergyAlert} from './Focus.tsx';
 export {Scale};
 
 // Morning ritual: energy on waking (1–10) and today's fixed appointments → how much the day can really hold.
@@ -17,7 +18,7 @@ export function CheckIn({m, p, day, now}: {m: ModuleSpec; p: Planner; day: strin
   const fixed = ofKind(p.records, 'task').filter(t => t.logicalDay === day && t.body.plan.fixed && !['cancelled'].includes(t.body.outcome.result));
   const [title, setTitle] = useState(''), [from, setFrom] = useState('10:00'), [to, setTo] = useState('11:00');
   const cap = capacity(p.records, day, {wake, sleep, energy: w?.body.energy ?? null});
-  const setEnergy = (n: number) => p.write(w?.id ?? null, {kind: 'condition', logicalDay: day, body: {...(w?.body ?? {}), at: now(), energy: n, moment: 'wake'}, ...(w ? {baseRevision: w.revision} : {})});
+  const setEnergy = (n: number) => (lowEnergyAlert(n), p.write(w?.id ?? null, {kind: 'condition', logicalDay: day, body: {...(w?.body ?? {}), at: now(), energy: n, moment: 'wake'}, ...(w ? {baseRevision: w.revision} : {})}));
   const addFixed = async () => {
     if (!title.trim() || to <= from) return;
     if (await p.write(null, {kind: 'task', logicalDay: day, body: {title: title.trim(), plan: {state: 'committed', fixed: true, start: {value: localIso(day, from), precision: 'minute'}, end: {value: localIso(day, to), precision: 'minute'}, estimateMin: null}}})) setTitle('');
@@ -58,7 +59,7 @@ export function CheckIn({m, p, day, now}: {m: ModuleSpec; p: Planner; day: strin
 export function ConditionDay({p, day, now}: {p: Planner; day: string; now: () => string}) {
   const c = dayCondition(p.records, day);
   const evening = ofKind(p.records, 'condition').filter(x => x.logicalDay === day && x.body.moment === 'evening').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] as LifeRecord<'condition'> | undefined;
-  const save = (n: number, moment: 'evening' | 'check', prior?: LifeRecord<'condition'>) => p.write(prior?.id ?? null, {kind: 'condition', logicalDay: day, body: {...(prior?.body ?? {}), at: now(), energy: n, moment}, ...(prior ? {baseRevision: prior.revision} : {})});
+  const save = (n: number, moment: 'evening' | 'check', prior?: LifeRecord<'condition'>) => (lowEnergyAlert(n), p.write(prior?.id ?? null, {kind: 'condition', logicalDay: day, body: {...(prior?.body ?? {}), at: now(), energy: n, moment}, ...(prior ? {baseRevision: prior.revision} : {})}));
   const sessions = ofKind(p.records, 'session').filter(s => s.logicalDay === day && s.body.condition !== null);
   return <div className="condition">
     <p className="cond-score"><strong>{c.score ?? '–'}</strong><span className="muted">/10 오늘 컨디션</span>

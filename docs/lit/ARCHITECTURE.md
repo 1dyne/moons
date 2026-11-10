@@ -37,6 +37,11 @@
 - 진행률·월·년 요약은 저장하지 않고 화면을 열 때 기록으로 계산한다(`life-contract/insights.ts`). 체크를 고치면 바로 반영된다.
 - 표 위젯과 내 위젯의 줄은 `note` 기록(`signifier: 'row'`, `table` = 위젯 id, `cells`).
 - 할 일 속성 값은 `task.props[속성 id]`, 형광펜은 `task.highlight`.
+- **자동 기록 표:** 표 위젯 `options.autoLog` = `sessions`(타이머를 멈추면 한 줄, 컨디션을 매기면 같은 줄 갱신) · `achievements`(목표 이룸 → 성취 기록지) · `adjustments`(포기 → 조정 기록지). 서버가 기록을 쓸 때 채운다(`life/autolog.ts`). 열은 이름으로 맞춘다(날짜·할 일·페르소나·시작·끝·분·시간·컨디션·메모·목표 / 목표·완료일·실제 시간(분)·임팩트·ROI·다음엔 누가 / 목표·날짜·메모·상태) + 할 일 속성 이름(Role 등). 숨은 칸 `__src`로 같은 원본의 줄을 갱신한다.
+- **집중 가능 시간:** `life_accounts.availability` (요일별 분 + 날짜 예외). `goalSchedule(records, today, weekly, perDay)`가 하루 용량으로 쓴다.
+- **목표 회고:** `goal.retro` {kind achieved/dropped, actualMin(집중 합산), impact 1~10, roi = impact ÷ 시간, nextOwner 나/AI/외주, note}, `goal.personaIds`.
+- **페르소나:** `persona.roles`(페르소나 → 역할 2단), `persona.months['YYYY-MM']` {status deployed/attached/standby, priority}. 할 일 속성 type `role`은 페르소나별 역할에서 고른다(선택지 100개까지).
+- **하고 싶은 일(want):** 회색, 달성률·미션의 "일정 전부"에서 빠진다.
 
 ## 3. 목표와 데일리 연결
 
@@ -77,6 +82,13 @@
 | `get_today` | 오늘 상태 |
 | `create_widget` | 위젯 설명서를 라이브러리에 (원하면 오늘 페이지에 붙임). 코드는 사용자 승인 후 실행 |
 | `list_widgets` | 라이브러리 목록 |
+| `set_availability` | 요일별 집중 가능 시간 + 날짜 예외. 목표 일정·병목 계산이 이 값을 씀 |
+| `list_tasks` · `update_task` · `delete_task` | 할 일 읽기, 고치기(날짜 옮기기·결과·속성), 지우기 |
+| `list_rows` · `update_row` · `delete_row` | 표의 줄 읽기(열 값 조건·날짜), 고치기(열 이름으로), 지우기 |
+| `list_sessions` | 집중 세션(시작·끝·분·컨디션·메모·할 일 속성) |
+| `update_goal` | 목표 이룸(성취 기록지: 실제 시간·임팩트·ROI·다음엔 누가)·포기(조정 기록지)·다시 목표로 |
+| `set_persona` | 페르소나 월별 상태(Deployed/Attached/Standby)·우선순위·역할, 한도 경고 |
+| `get_insights` | 분석 요약: 달성률, 순집중, 컨디션·수면, 시간대별 에너지, 페르소나 비중·배치, 목표 가능 날짜·병목 |
 
 ## 7. 스타일 (계기판)
 

@@ -972,3 +972,56 @@ textarea.mono{width:100%}
 .avail-week label{display:grid;gap:2px;justify-items:center}
 .avail-week .num{width:52px;text-align:center}
 .avail-ex{display:flex;flex-wrap:wrap;gap:4px}
+
+/* 하고 싶은 일(want): grey, outside the completion count. */
+.group-want .pname,.group-want .cat{color:var(--muted)}
+.group-want .mark{border-color:var(--line)}
+
+/* 에너지 신호등 */
+.energy-light{display:grid;gap:6px}
+.energy-svg{width:100%;height:auto;max-height:110px}
+.energy-band{stroke:var(--line);stroke-dasharray:2 3}
+.energy-hour{font-size:8px;fill:var(--muted);font-family:var(--mono)}
+.dot-blue{fill:#2f6fd6;stroke:var(--ink);stroke-width:1}
+.dot-amber{fill:#e8a317;stroke:var(--ink);stroke-width:1}
+.dot-red{fill:#d0342c;stroke:var(--ink);stroke-width:1}
+.energy-warn{margin:0;padding:4px 8px;border:1px solid var(--ink);font-weight:600;font-size:13px}
+.energy-warn.amber{background:#e8a317;color:#151515}
+.energy-warn.red{background:#d0342c;color:#fff}
+
+/* 오늘의 미션 */
+.mission{display:grid;gap:8px}
+.ms-bar{display:grid;gap:3px;padding:4px 0}
+.ms-bar.won .k{color:var(--ink);font-weight:700}
+.ms-bar.won .k:after{content:' ✓';color:var(--accent)}
+.mission .g-bar{width:100%}
+.mission .gauge{width:100%}
+.ms-free{margin:0}
+.ms-free strong{font-family:var(--mono);font-size:18px}
+.wishes{display:grid;gap:4px;border-top:1px dashed var(--line);padding-top:6px}
+.wishes ul{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.wishes li{display:flex;justify-content:space-between;align-items:center;gap:6px}
+
+/* 페르소나 현황 */
+.pboard{display:grid;gap:8px}
+.pb-count{margin:0}
+.pb-count.over{color:var(--red);font-weight:600}
+.pb-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.pb-item{border:1px solid var(--line);padding:8px;display:grid;gap:6px}
+.pb-item.st-deployed{border-color:var(--ink);box-shadow:inset 4px 0 0 var(--signal,#f2c230)}
+.pb-item.st-standby{opacity:.7}
+.pb-head{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.pb-head strong{flex:1}
+.pb-head select{padding:2px 4px;font-size:12px}
+.pb-roles{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.pb-roles input{width:90px;padding:2px 6px;font-size:12px}
+.pb-abilities{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.ability{font-size:12px;border:1px solid var(--ink);background:var(--signal,#f2c230);color:#151515;padding:0 6px}
+
+/* 목표 이룸·포기 */
+.goal-personas{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.persona-pick.on{background:var(--ink);color:var(--bg)}
+.retro{display:grid;gap:8px;border:1px solid var(--ink);padding:10px}
+.scale-btn{width:28px;height:28px;padding:0;font-family:var(--mono);font-size:12px}
+.scale-btn.on{background:var(--ink);color:var(--bg)}
+.retro-view p{margin:0}

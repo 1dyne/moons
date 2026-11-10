@@ -29,9 +29,16 @@ export function PropForm({initial, onSave, onDelete, onCancel}: {initial?: PropD
 }
 
 /** One value editor; text-like values save when the box loses focus. */
-export function PropInput({def, value, onChange, compact}: {def: PropDef; value: Value | undefined; onChange: (v: Value) => void; compact?: boolean}) {
+export function PropInput({def, value, onChange, compact, groups}: {def: PropDef; value: Value | undefined; onChange: (v: Value) => void; compact?: boolean; groups?: {label: string; options: string[]}[]}) {
   const v = value ?? null;
   switch (def.type) {
+    // Role: persona → role (2 levels). Options come from each persona's roles, plus any listed on the property.
+    case 'role': return <select value={typeof v === 'string' ? v : ''} onChange={e => onChange(e.target.value || null)} aria-label={def.name}>
+      <option value="">{compact ? '' : '–'}</option>
+      {(groups ?? []).map(g => <optgroup key={g.label} label={g.label}>{g.options.map(o => <option key={`${g.label}/${o}`} value={o}>{o}</option>)}</optgroup>)}
+      {def.options.length > 0 && <optgroup label="기타">{def.options.map(o => <option key={o} value={o}>{o}</option>)}</optgroup>}
+      {typeof v === 'string' && v && ![...(groups ?? []).flatMap(g => g.options), ...def.options].includes(v) && <option value={v}>{v}</option>}
+    </select>;
     case 'check': return <input type="checkbox" checked={v === true} onChange={e => onChange(e.target.checked)} aria-label={def.name} />;
     case 'select': return <select value={typeof v === 'string' ? v : ''} onChange={e => onChange(e.target.value || null)} aria-label={def.name}>
       <option value="">{compact ? '' : '–'}</option>{def.options.map(o => <option key={o} value={o}>{o}</option>)}</select>;
@@ -43,6 +50,9 @@ export function PropInput({def, value, onChange, compact}: {def: PropDef; value:
 }
 
 const chains = new Map<string, Promise<LifeRecord<'note'>>>();
+
+/** Roles grouped by persona for a 'role' property. */
+export const roleGroups = (ctx: Ctx) => ofKind(ctx.p.records, 'persona').filter(p => p.body.active && (p.body.roles ?? []).length).map(p => ({label: p.body.name, options: p.body.roles}));
 
 export const showValue = (def: PropDef, v: Value | undefined) => v === null || v === undefined || v === '' ? null : def.type === 'check' ? (v ? '✓' : null) : String(v);
 

@@ -9,6 +9,7 @@ MOONS 저장소 안에서 개발했지만 **MOONS와 별개인 앱**이다. 이 
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 화면 구조, 데이터(기록·플래너 스펙·라이브러리), API, 계정, 커넥터 |
 | [WIDGET_PLATFORM.md](WIDGET_PLATFORM.md) | 내 라이브러리, 위젯 설명서, 블록, 코드 위젯, 보안, 메뉴 UI/UX 설계와 레퍼런스 |
 | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | 개발자용: `lit-widget` CLI, 위젯 API, 예제, 올리기 |
+| [REQUESTS_2026-11-10.md](REQUESTS_2026-11-10.md) | 울림 세션 기능 요청(Ante's Orbit)에 대한 답과 쓰는 법 |
 | [../PLANNER_SPEC_v1.md](../PLANNER_SPEC_v1.md) | 플래너 스펙(위젯 배치·스킨·탭·속성) 상세 |
 | [../LIFE_DATA_CONTRACT_v0.md](../LIFE_DATA_CONTRACT_v0.md) | 기록 계약(할 일·목표·세션·수면…), 다른 서비스와 나누는 규칙 |
 | [../LIT_MARKETPLACE.md](../LIT_MARKETPLACE.md) | 마켓플레이스 초안 (추후 설계) |

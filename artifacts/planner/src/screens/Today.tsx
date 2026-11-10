@@ -13,6 +13,7 @@ import {HIGHLIGHTS} from '@workspace/planner-spec';
 import {Tip} from '../Tip.tsx';
 import {useL} from '../labels.tsx';
 import {PropForm, PropInput, showValue} from './Table.tsx';
+import {roleGroups} from './Table.tsx';
 export {parseEntry, parseTarget} from '../parse.ts';
 
 const CATEGORY: Record<string, string> = {must: '꼭', want: '하고 싶은', leisure: '여가'};
@@ -60,11 +61,13 @@ export function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
   const groups: (readonly [string | null, typeof tasks])[] = byProp ? [...byProp.options, null].map(o => [o, tasks.filter(t => (t.body.props?.[byProp.id] ?? null) === o)] as const).filter(([, l]) => l.length)
     : cats ? (['must', 'want', 'leisure', null] as const).map(c => [c, tasks.filter(t => t.body.category === c)] as const).filter(([, l]) => l.length) : [[null, tasks] as const];
   const saveDefs = (next: PropDef[]) => ctx.saveSpec?.(sp => ({...sp, props: {...sp.props, task: next}}));
-  const done = tasks.filter(t => t.body.outcome.result === 'done').length, live = tasks.filter(t => !['cancelled', 'postponed'].includes(t.body.outcome.result)).length;
+  // 하고 싶은 일(want) is shown in grey and never counted against the day.
+  const counted = tasks.filter(t => t.body.category !== 'want');
+  const done = counted.filter(t => t.body.outcome.result === 'done').length, live = counted.filter(t => !['cancelled', 'postponed'].includes(t.body.outcome.result)).length;
   return <>
     {tasks.length > 0 && <p className="tally muted small">{done}/{live} 완료 <Tip id="tasks-cycle">체크 칸을 누를 때마다 완료 → 일부 → 못 함 → 처음으로</Tip></p>}
     {tasks.length === 0 && <Tip id="tasks-empty" block>아직 오늘 할 일이 없어요. 아래에 적어 보세요.</Tip>}
-    {groups.map(([c, list]) => <div key={String(c)} className="task-group">
+    {groups.map(([c, list]) => <div key={String(c)} className={`task-group ${cats && c ? `group-${c}` : ''}`}>
       {cats && c && <span className={`cat cat-${c}`}>{catName(c)}</span>}
       {byProp && <span className="cat">{c ?? `${byProp.name} 없음`}</span>}
       <ul className="prows">{list.map(t => <TaskRow key={t.id} t={t} ctx={ctx} />)}</ul>
@@ -132,7 +135,7 @@ function TaskRow({t, ctx}: {t: LifeRecord<'task'>; ctx: Ctx}) {
       <button className="small" onClick={() => moveTo(ctx, t, addDays(t.logicalDay!, 1))}>내일로 →</button>
       <button className="small" onClick={() => set('cancelled', {reason: reason.trim() || null})}>취소</button>
       {o.result !== 'unknown' && <button className="small" onClick={() => set('unknown')}>되돌리기</button>}
-      {defs.map(d => <label key={d.id} className="inline prop-edit"><span className="muted small">{d.name}</span><PropInput def={d} value={t.body.props?.[d.id]} onChange={v => void saveTask(ctx, t, {props: {...t.body.props, [d.id]: v}})} /></label>)}
+      {defs.map(d => <label key={d.id} className="inline prop-edit"><span className="muted small">{d.name}</span><PropInput def={d} value={t.body.props?.[d.id]} groups={d.type === 'role' ? roleGroups(ctx) : undefined} onChange={v => void saveTask(ctx, t, {props: {...t.body.props, [d.id]: v}})} /></label>)}
       <span className="inline pens" role="group" aria-label="형광펜"><span className="muted small">형광펜</span>
         {HIGHLIGHTS.map(h => <button key={h.id} className={`pen ${t.body.highlight === h.id ? 'on' : ''}`} style={{'--hl': h.color} as React.CSSProperties} aria-pressed={t.body.highlight === h.id} onClick={() => void pen(t.body.highlight === h.id ? null : h.id)} aria-label={`${h.name} 형광펜`} />)}
         {t.body.highlight && <button className="small ghost" onClick={() => void pen(null)}>지우기</button>}</span>

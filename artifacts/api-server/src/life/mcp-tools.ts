@@ -1,6 +1,6 @@
 import {z} from 'zod';
 import './autolog.ts';
-import {ALL_SCOPES, Availability, addDays, availableOn, buildNow, goalSchedule, logicalDay, weeklyFocus, type AnyRecord, type LifeRecord} from '@workspace/life-contract';
+import {ALL_SCOPES, Availability, addDays, availableOn, buildNow, dayCondition, estimateAccuracy, goalPercent, goalSchedule, logicalDay, periodSummary, personaShare, weeklyFocus, type AnyRecord, type LifeRecord} from '@workspace/life-contract';
 import {BLOCKS, PERMISSIONS, isCode, BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 import {listLibrary, saveLibrary} from './library.ts';
@@ -32,7 +32,9 @@ const guide = () => `lit · 대화로 만들고 마음대로 꾸미는 나만의
 표 위젯(type "table"): options.columns=[{name,type,options}], options.firstName(첫 열 이름), options.scope("day" 그날 줄만 | "all" 모든 날). 줄은 add_items의 rows로 넣는다.
 자동 기록 표: 표 위젯 options.autoLog = "sessions"(집중 세션: 타이머를 멈추면 한 줄, 컨디션을 매기면 갱신) | "achievements"(목표 이룸 → 성취 기록지) | "adjustments"(목표 포기 → 조정 기록지). 열은 이름으로 맞춘다: 날짜, 할 일, 페르소나, 시작, 끝, 분, 시간, 컨디션, 메모, 목표, 완료일, 실제 시간(분), 임팩트, ROI, 다음엔 누가, 상태 + 할 일 속성 이름(Role 등).
 가용 시간: set_availability(요일별 + 날짜 예외)를 먼저 정하면 add_goal_plan의 가능한 날짜·병목이 그 시간으로 계산된다.
-고치기: list_tasks → update_task(날짜 옮기기 포함)/delete_task, list_rows → update_row/delete_row, list_sessions, get_insights.
+고치기: list_tasks → update_task(날짜 옮기기 포함)/delete_task, list_rows → update_row/delete_row, list_sessions. 분석은 get_insights(요약)를 먼저 읽는다.
+목표 이룸·포기: update_goal(status achieved: impact 1~10·nextOwner me/ai/outsource·note → 성취 기록지, ROI 자동 / dropped: note → 조정 기록지 / active: 다시 목표로). 페르소나: set_persona(월별 deployed/attached/standby·우선순위·roles). 할 일 속성 type "role"은 페르소나별 역할 중에서 고른다.
+기본 위젯: energy{warnAt(기본 6),startHour}(에너지 신호등: 7↑ 파랑, 4~6 호박, 3↓ 빨강) · mission{focusTarget(분, 기본 480), wishTable(표 id), statusColumn('상태'), lockedValue('잠김'), unlockValue('해금')} · persona-board{limit(기본 3)}. 하고 싶은 일(category want)은 회색이고 달성률에서 빠진다.
 버튼·칸 문구는 위젯 options.labels로 바꾼다: ${Object.entries(WIDGET_LABELS).map(([t, ls]) => `${t}{${ls!.map(l => l.key).join(',')}}`).join(' ')}. 예시 문장을 플레이스홀더로 넣지 않는다(개인 공간이다).
 내 위젯(create_widget): lit에 없는 위젯은 설명서(manifest)로 만들어 사용자의 라이브러리에 넣는다. 블록 위젯이 기본이다: data.columns(열 이름·종류, key는 생략하면 이름) + view(블록 목록: ${BLOCKS.map(b => `${b.id}=${b.name}`).join(', ')}). 블록에서 열은 이름으로 부른다. 예: {"id":"leet-score","name":"기출 점수","permissions":["table:read","table:write"],"data":{"columns":[{"name":"회차","type":"text"},{"name":"점수","type":"number"}]},"view":[{"block":"form"},{"block":"chart","x":"회차","y":"점수"},{"block":"stat","value":"점수","agg":"avg","label":"평균"}]}.
 코드 위젯은 블록으로 안 될 때만: html·css·code(JavaScript, 전역 lit API: lit.table.rows/add/update/remove, lit.tasks.today, lit.goals.list, lit.condition.today, lit.context, lit.on('change')). 인터넷 접속은 막혀 있다. permissions: ${PERMISSIONS.map(p => p.id).join(', ')} 중 필요한 것만. 코드 위젯은 사용자가 lit에서 권한을 보고 승인해야 돈다고 알려 준다.
@@ -43,7 +45,7 @@ const looseWidget = z.object({type: z.string(), x: z.number().int().optional(), 
   style: z.enum(['card', 'line', 'filled', 'plain']).optional(), options: z.record(z.unknown()).optional()});
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const cell = z.union([z.string().max(500), z.number().finite(), z.boolean(), z.null()]);
-const propIn = z.object({name: z.string().min(1).max(30), type: z.enum(['text', 'number', 'select', 'check', 'date']), options: z.array(z.string().min(1).max(30)).max(30).optional()});
+const propIn = z.object({name: z.string().min(1).max(30), type: z.enum(['text', 'number', 'select', 'check', 'date', 'role']), options: z.array(z.string().min(1).max(30)).max(100).optional()});
 /** Properties by name: an existing one keeps its id (so values stay), new ones get an id. */
 function mergeProps(current: PropDef[], input: z.infer<typeof propIn>[]): PropDef[] {
   return input.map(p => ({id: current.find(c => c.name === p.name)?.id ?? newPropId(), name: p.name, type: p.type, options: p.type === 'select' ? p.options ?? [] : []}));
@@ -52,7 +54,7 @@ function mergeProps(current: PropDef[], input: z.infer<typeof propIn>[]): PropDe
 function fixGroupBy(spec: PlannerSpec) {
   for (const w of [...(spec.canvas.day ?? []), ...(spec.tabs ?? []).flatMap(t => t.widgets ?? [])]) {
     if (w.type === 'tasks' && typeof w.options.groupBy === 'string') { const d = spec.props.task.find(p => p.name === w.options.groupBy); if (d) w.options.groupBy = d.id; }
-    if (w.type === 'table' && Array.isArray(w.options.columns)) w.options.columns = (w.options.columns as {id?: string; name: string; type?: string; options?: string[]}[]).slice(0, 20).map(c => ({id: c.id && /^[a-z0-9]{1,24}$/.test(c.id) ? c.id : newPropId(), name: String(c.name).slice(0, 30), type: ['text', 'number', 'select', 'check', 'date'].includes(c.type ?? '') ? c.type : 'text', options: c.type === 'select' ? c.options ?? [] : []}));
+    if (w.type === 'table' && Array.isArray(w.options.columns)) w.options.columns = (w.options.columns as {id?: string; name: string; type?: string; options?: string[]}[]).slice(0, 20).map(c => ({id: c.id && /^[a-z0-9]{1,24}$/.test(c.id) ? c.id : newPropId(), name: String(c.name).slice(0, 30), type: ['text', 'number', 'select', 'check', 'date', 'role'].includes(c.type ?? '') ? c.type : 'text', options: c.type === 'select' ? c.options ?? [] : []}));
   }
 }
 const month = z.string().regex(/^\d{4}-\d{2}$/);
@@ -256,6 +258,68 @@ export function registerPlannerTools(tool: Tool) {
     await deleteRecord(owner, id); return {deleted: id};
   });
 
+  tool('update_goal', '목표 하나의 상태를 바꾼다. achieved면 성취 기록지(실제 시간은 집중 기록에서 합산, ROI = 임팩트 ÷ 노력 시간), dropped면 조정 기록지(메모)를 남기고, active로 되돌리면(다시 목표로) 기록지를 지운다. personaIds로 키우는 페르소나를 잇는다.',
+    {id: z.string(), status: z.enum(['active', 'achieved', 'dropped', 'paused']).optional(), impact: z.number().int().min(1).max(10).optional(), nextOwner: z.enum(['me', 'ai', 'outsource']).optional(),
+      note: z.string().max(2000).optional(), personaIds: z.array(z.string()).max(10).optional(), title: z.string().min(1).max(200).optional(), deadline: z.string().regex(/^\d{4}-\d{2}(-\d{2})?$/).nullable().optional()},
+    async ({id, status, impact, nextOwner, note, personaIds, title, deadline}, owner) => {
+      const records = await allRecords(owner);
+      const g = records.find((r): r is LifeRecord<'goal'> => r.id === id && r.kind === 'goal');
+      if (!g) throw new WorkspaceError(404, '목표를 찾지 못했어요.');
+      const actual = goalActualMin(records, id);
+      const retro = status === 'achieved' ? {kind: 'achieved' as const, at: new Date().toISOString(), actualMin: actual, impact: impact ?? null, roi: impact && actual ? Math.round(impact / Math.max(.1, actual / 60) * 100) / 100 : null, nextOwner: nextOwner ?? null, note: note ?? null}
+        : status === 'dropped' ? {kind: 'dropped' as const, at: new Date().toISOString(), actualMin: actual, impact: null, roi: null, nextOwner: null, note: note ?? null}
+        : status === 'active' ? null : g.body.retro;
+      const saved = await writeRecord(owner, id, {kind: 'goal', body: {...g.body, ...(status ? {status} : {}), ...(title ? {title} : {}), ...(deadline !== undefined ? {deadline} : {}), ...(personaIds ? {personaIds} : {}), retro}, baseRevision: g.revision}) as LifeRecord<'goal'>;
+      return {id: saved.id, status: saved.body.status, retro: saved.body.retro, note: status === 'achieved' || status === 'dropped' ? '자동 기록 표(성취·조정)가 있으면 한 줄이 들어갔다.' : undefined};
+    });
+
+  tool('set_persona', '페르소나를 만들거나 고친다: 이번 달(또는 month) 상태 deployed/attached/standby와 우선순위, 역할(roles: 페르소나 → Role 2단). 이번 달 Deployed가 한도를 넘으면 warning을 돌려준다.',
+    {name: z.string().min(1).max(40), month: z.string().regex(/^\d{4}-\d{2}$/).optional(), status: z.enum(['deployed', 'attached', 'standby']).nullable().optional(), priority: z.number().int().min(1).max(9).nullable().optional(),
+      roles: z.array(z.string().min(1).max(40)).max(60).optional(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), active: z.boolean().optional(), limit: z.number().int().min(1).max(12).optional()},
+    async ({name, month, status, priority, roles, color, active, limit}, owner) => {
+      const settings = await getSettings(owner), m = month ?? logicalDay(new Date(), settings).slice(0, 7);
+      const records = await allRecords(owner);
+      const cur = records.find((r): r is LifeRecord<'persona'> => r.kind === 'persona' && !r.deletedAt && r.body.name === name);
+      const months = {...(cur?.body.months ?? {})};
+      if (status === null) delete months[m];
+      else if (status || priority !== undefined) { const st = status ?? months[m]?.status; if (st) months[m] = {status: st, priority: priority !== undefined ? priority : months[m]?.priority ?? null}; }
+      const body = {...(cur?.body ?? {name}), name, months, ...(roles ? {roles} : {}), ...(color ? {color} : {}), ...(active !== undefined ? {active} : {})};
+      const saved = await writeRecord(owner, cur?.id ?? null, {kind: 'persona', body, ...(cur ? {baseRevision: cur.revision} : {}), source: {type: 'planner', ref: 'claude', confirmed: true}}) as LifeRecord<'persona'>;
+      const all = (await allRecords(owner)).filter((r): r is LifeRecord<'persona'> => r.kind === 'persona' && r.body.active);
+      const deployed = all.filter(p => p.body.months?.[m]?.status === 'deployed').map(p => p.body.name), max = limit ?? 3;
+      return {id: saved.id, name: saved.body.name, month: m, status: saved.body.months?.[m] ?? null, roles: saved.body.roles, deployed, ...(deployed.length > max ? {warning: `${m} Deployed ${deployed.length}개로 한도 ${max}를 넘었어요. Attached(루틴화된 것)는 세지 않아요.`} : {})};
+    });
+
+  tool('get_insights', '분석 요약(먼저 이것을 읽고, 필요할 때만 원본 표·세션을 연다): 기간 달성률(하고 싶은 일 제외), 순집중, 컨디션·수면 평균, 시간대별 에너지, 낮은 컨디션 횟수, 예상 대비 실제, 페르소나 시간 비중과 이번 달 배치, 목표 진행률과 가능한 날짜·병목.',
+    {days: z.number().int().min(1).max(120).optional()},
+    async ({days}, owner) => {
+      const settings = await getSettings(owner), today = logicalDay(new Date(), settings), n = days ?? 14, from = addDays(today, -(n - 1));
+      const records = await allRecords(owner), sum = periodSummary(records, from, today);
+      // Energy by hour (local): timer-stop scores at the middle of each session, plus condition checks.
+      const hourOf = (iso: string) => Number(new Intl.DateTimeFormat('en-GB', {timeZone: settings.tz, hour: '2-digit', hourCycle: 'h23'}).format(new Date(iso)));
+      const byHour = new Map<number, number[]>(), add = (iso: string, v: number) => { const h = hourOf(iso); byHour.set(h, [...(byHour.get(h) ?? []), v]); };
+      let low = 0;
+      for (const r of records) {
+        if (!r.logicalDay || r.logicalDay < from || r.logicalDay > today || r.deletedAt) continue;
+        if (r.kind === 'session' && r.body.end && r.body.condition !== null) { add(new Date((Date.parse(r.body.start) + Date.parse(r.body.end)) / 2).toISOString(), r.body.condition); if (r.body.condition <= 6) low++; }
+        if (r.kind === 'condition' && r.body.energy !== null) { add(r.body.at, r.body.energy); if (r.body.energy <= 6) low++; }
+      }
+      const av = settings.availability, sched = goalSchedule(records, today, weeklyFocus(records, today), av ? d => availableOn(av, d) : undefined);
+      const month = today.slice(0, 7), personas = records.filter((r): r is LifeRecord<'persona'> => r.kind === 'persona' && !r.deletedAt && r.body.active);
+      const daysList = Array.from({length: n}, (_, i) => addDays(from, i));
+      return {range: {from, to: today, days: n},
+        tasks: sum.tasks, wants: sum.wants, routines: sum.routines, focusMin: sum.focusMin, focusPerDayMin: Math.round(sum.focusMin / n), condition: sum.condition, sleepMin: sum.sleepMin, writtenDays: sum.writtenDays,
+        daily: daysList.map(d => ({day: d, focusMin: Math.round(records.filter((r): r is LifeRecord<'session'> => r.kind === 'session' && !r.deletedAt && r.logicalDay === d && !!r.body.end).reduce((m2, s) => m2 + (Date.parse(s.body.end!) - Date.parse(s.body.start)) / 60000, 0)), condition: dayCondition(records, d).score})),
+        energyByHour: [...byHour.entries()].sort(([a], [b]) => a - b).map(([hour, v]) => ({hour, avg: Math.round(v.reduce((a, b) => a + b, 0) / v.length * 10) / 10, samples: v.length})),
+        lowConditionCount: low,
+        estimate: {ratio: estimateAccuracy(records, from, today).ratio},
+        personaShare: personaShare(records, today, n).rows.map(r => ({name: r.name, minutes: r.minutes, share: r.share})),
+        personasThisMonth: personas.map(p => ({name: p.body.name, status: p.body.months?.[month]?.status ?? null, priority: p.body.months?.[month]?.priority ?? null})),
+        goals: records.filter((r): r is LifeRecord<'goal'> => r.kind === 'goal' && !r.deletedAt && r.body.status === 'active' && !r.body.parentGoalId)
+          .map(g => { const sg = sched.goals.find(x => x.id === g.id); return {id: g.id, title: g.body.title, percent: goalPercent(g.id, records).pct, deadline: g.body.deadline, feasible: sg?.projected ?? null, lateDays: sg?.lateDays ?? 0}; }),
+        bottlenecks: sched.bottlenecks.map(b => ({month: b.month, needMin: b.demandMin, haveMin: b.capacityMin, goals: b.goals})), capacityBasis: av ? 'availability' : 'recent_focus'};
+    });
+
   tool('list_sessions', '집중 세션(타이머) 목록: 날짜·할 일·페르소나·시작·끝·분·컨디션(멈출 때 입력)·메모·할 일 속성(Role 등).',
     {from: day.optional(), to: day.optional()},
     async ({from, to}, owner) => {
@@ -300,4 +364,12 @@ function offset(tz: string, d: string) {
   const local = new Date(at.toLocaleString('en-US', {timeZone: tz})), utc = new Date(at.toLocaleString('en-US', {timeZone: 'UTC'}));
   const min = Math.round((local.getTime() - utc.getTime()) / 60000), sign = min >= 0 ? '+' : '-', a = Math.abs(min);
   return `${sign}${String(Math.floor(a / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}`;
+}
+
+/** Focus minutes on a goal: sessions of tasks linked to it or to any goal under it. */
+function goalActualMin(records: AnyRecord[], goalId: string) {
+  const goals = records.filter((r): r is LifeRecord<'goal'> => r.kind === 'goal' && !r.deletedAt), ids = new Set([goalId]);
+  for (let added = true; added;) { added = false; for (const g of goals) if (g.body.parentGoalId && ids.has(g.body.parentGoalId) && !ids.has(g.id)) { ids.add(g.id); added = true; } }
+  const tasks = new Set(records.filter((r): r is LifeRecord<'task'> => r.kind === 'task' && r.body.goalIds.some(id => ids.has(id))).map(t => t.id));
+  return Math.round(records.filter((r): r is LifeRecord<'session'> => r.kind === 'session' && !r.deletedAt && !!r.body.taskId && tasks.has(r.body.taskId) && !!r.body.end).reduce((m, s) => m + (Date.parse(s.body.end!) - Date.parse(s.body.start)) / 60000, 0));
 }

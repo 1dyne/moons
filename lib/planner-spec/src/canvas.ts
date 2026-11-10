@@ -12,7 +12,7 @@ export const METRICS: Record<CanvasMode, {cols: number; row: number; gap: number
   free: {cols: 48, row: 10, gap: 0, kx: 4, ky: 3},
 };
 export const WIDGET_TYPES = ['focus', 'tasks', 'timetable', 'receipt', 'hourly', 'bullet', 'page', 'checkin', 'carry', 'routine', 'habits',
-  'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'table', 'custom', 'text', 'sticker', 'tape', 'image', 'shape'] as const;
+  'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'table', 'custom', 'energy', 'mission', 'persona-board', 'text', 'sticker', 'tape', 'image', 'shape'] as const;
 export type WidgetType = (typeof WIDGET_TYPES)[number];
 
 export type WidgetInfo = {type: WidgetType; label: string; desc: string; group: '기록' | '시간' | '목표' | '나' | '꾸미기' | '내 위젯'; w: number; h: number; minW: number; minH: number; module?: ModuleType};
@@ -31,6 +31,9 @@ export const WIDGETS: WidgetInfo[] = [
   {type: 'checkin', label: '아침 점검', desc: '기상 에너지·고정 일정·현실 가용 시간', group: '나', w: 7, h: 9, minW: 4, minH: 6, module: 'checkin'},
   {type: 'condition', label: '컨디션', desc: '1~10점, 오늘 점수', group: '나', w: 6, h: 6, minW: 4, minH: 4, module: 'condition'},
   {type: 'sleep', label: '수면', desc: '잠든·일어난 시각', group: '나', w: 4, h: 4, minW: 3, minH: 3, module: 'sleep'},
+  {type: 'energy', label: '에너지 신호등', desc: '시간대별 컨디션 점(7↑ 파랑·4~6 호박·3↓ 빨강), 낮으면 경고', group: '나', w: 6, h: 4, minW: 3, minH: 3, module: 'condition'},
+  {type: 'persona-board', label: '페르소나 현황', desc: '이번 달 배치(Deployed·Attached·Standby), 한도 경고, 획득한 능력', group: '나', w: 6, h: 8, minW: 4, minH: 4, module: 'personas'},
+  {type: 'mission', label: '오늘의 미션', desc: '순집중 목표 vs 일정 전부 완료, 먼저 찬 쪽부터 자유시간, 해금할 소원', group: '목표', w: 6, h: 6, minW: 4, minH: 4, module: 'timer'},
   {type: 'personas', label: '페르소나', desc: '오늘 어떤 나로 시간을 썼나', group: '나', w: 6, h: 3, minW: 3, minH: 2, module: 'personas'},
   {type: 'routine', label: '오늘의 루틴', desc: '그날 할 루틴을 골라 체크', group: '목표', w: 5, h: 8, minW: 3, minH: 4, module: 'routine'},
   {type: 'habits', label: '습관 격자', desc: '한 달 루틴 × 날짜', group: '목표', w: 12, h: 6, minW: 6, minH: 4, module: 'routine'},
@@ -45,13 +48,13 @@ export const WIDGETS: WidgetInfo[] = [
 ];
 export const widgetInfo = (t: WidgetType) => WIDGETS.find(w => w.type === t)!;
 /** A user-made property (Notion-style): a column in a table widget or an extra field on tasks. */
-export const PROP_TYPES = [{id: 'text', name: '글'}, {id: 'number', name: '숫자'}, {id: 'select', name: '선택'}, {id: 'check', name: '체크'}, {id: 'date', name: '날짜'}] as const;
+export const PROP_TYPES = [{id: 'text', name: '글'}, {id: 'number', name: '숫자'}, {id: 'select', name: '선택'}, {id: 'check', name: '체크'}, {id: 'date', name: '날짜'}, {id: 'role', name: '역할 (페르소나별)'}] as const;
 export type PropType = typeof PROP_TYPES[number]['id'];
 export const PropDef = z.object({
   id: z.string().regex(/^[a-z0-9]{1,24}$/),
   name: z.string().trim().min(1).max(30),
   type: z.enum(PROP_TYPES.map(t => t.id) as [PropType, ...PropType[]]),
-  options: z.array(z.string().trim().min(1).max(30)).max(30).default([]),
+  options: z.array(z.string().trim().min(1).max(30)).max(100).default([]),
 });
 export type PropDef = z.infer<typeof PropDef>;
 export const newPropId = () => Math.random().toString(36).slice(2, 10);
@@ -64,6 +67,7 @@ export const WIDGET_LABELS: Partial<Record<WidgetType, {key: string; def: string
   sleep: [{key: 'sleep', def: '☾ 잘게요'}, {key: 'wake', def: '일어났어요'}],
   review: [{key: 'placeholder', def: '오늘은 어땠나요? 한 줄이면 충분해요.'}],
   table: [{key: 'add', def: '+ 새 줄'}],
+  mission: [{key: 'focus', def: '순집중'}, {key: 'plan', def: '일정 전부 완료'}, {key: 'free', def: '자유시간'}, {key: 'unlock', def: '해금'}],
 };
 
 /** Decorations float: they may overlap anything, rotate, and never push other widgets. */

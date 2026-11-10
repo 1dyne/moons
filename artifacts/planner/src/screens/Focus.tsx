@@ -41,6 +41,7 @@ export function useTimer(p: Planner, settings: Settings) {
     const s = stopped; setStopped(null);
     if (!s || (condition === null && !note.trim())) return;
     await p.write(s.id, {kind: 'session', logicalDay: s.logicalDay, body: {...s.body, condition, note: note.trim() || null}, baseRevision: s.revision});
+    if (condition !== null) lowEnergyAlert(condition);
   };
   const start = async (target: {task?: LifeRecord<'task'>; label?: string}) => {
     await stop();
@@ -193,4 +194,14 @@ function SessionNote({s, p}: {s: LifeRecord<'session'>; p: Planner}) {
       <button className="small" onClick={() => save({note: note.trim() || null})}>저장</button>
       {(s.body.note || s.body.condition) && <button className="ghost small danger" onClick={() => { setNote(''); void save({note: null, condition: null}); }}>메모·점수 지우기</button>}</div>
   </div>;
+}
+
+/** 에너지 신호등: when the user asked for it, a low score raises a notification right away (this device). */
+export function lowEnergyAlert(score: number) {
+  let at = NaN; try { at = Number(localStorage.getItem('lit.energyAlert')); } catch { /* no storage */ }
+  if (!Number.isFinite(at) || score > at || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const body = `컨디션 ${score}점이 찍혔어요. 잠깐 쉬거나 가벼운 일로 바꿔 볼까요?`;
+  const plain = () => { try { new Notification('lit · 에너지 낮음', {body}); } catch { /* not allowed here */ } };
+  if (navigator.serviceWorker?.controller) void navigator.serviceWorker.ready.then(r => r.showNotification('lit · 에너지 낮음', {body, tag: 'lit-energy'})).catch(plain);
+  else plain();
 }

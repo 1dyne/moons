@@ -8,6 +8,7 @@ import {GoalBar, horizonLabel, label, type Nav} from './Today.tsx';
 import {Gauge} from '../Gauge.tsx';
 import {Tip} from '../Tip.tsx';
 import {usePerDay} from '../avail.tsx';
+import {GoalRetroForm, GoalRetroView} from './LifeWidgets.tsx';
 
 // Long-term goals: write one naively, let MOONS split it into milestones, review, then live by the daily list.
 // Every task linked to a milestone moves the goal's overall percentage.
@@ -131,7 +132,8 @@ function GoalDashboard({g, p, nav, today, back, open, weeklyMin}: {g: LifeRecord
   const children = goals.filter(x => x.body.parentGoalId === g.id).sort((a, b) => a.body.period.localeCompare(b.body.period));
   const tasks = linkedTasks(g, p.records).sort((a, b) => (b.logicalDay ?? '').localeCompare(a.logicalDay ?? ''));
   const days = [...new Set(tasks.map(t => t.logicalDay ?? ''))];
-  const [ms, setMs] = useState(''), [due, setDue] = useState(today.slice(0, 7));
+  const [ms, setMs] = useState(''), [due, setDue] = useState(today.slice(0, 7)), [retro, setRetro] = useState<'achieved' | 'dropped' | null>(null);
+  const personas = ofKind(p.records, 'persona').filter(x => x.body.active);
   const setStatus = (x: LifeRecord<'goal'>, status: Goal['status']) => p.write(x.id, {kind: 'goal', body: {...x.body, status}, baseRevision: x.revision});
   const gp = goalPercent(g.id, p.records);
   return <div className="dashboard">
@@ -140,6 +142,11 @@ function GoalDashboard({g, p, nav, today, back, open, weeklyMin}: {g: LifeRecord
     <div className="big-pct"><Gauge pct={gp.basis === 'none' ? null : gp.pct} size="lg" label={g.body.title} />
       <span className="muted small">{{achieved: '이룬 목표', target: '목표량 대비', children: '마일스톤·아래 목표의 무게로 계산', tasks: '이어진 할 일 중 끝낸 비율 · "이뤘어요"를 누르기 전엔 최대 90%', none: '아직 이어진 일이 없어요'}[gp.basis]}</span></div>
     {g.body.criterion && <p className="muted">{g.body.criterion}</p>}
+    {personas.length > 0 && <div className="goal-personas"><span className="k">키우는 페르소나</span>{personas.map(x => { const on = (g.body.personaIds ?? []).includes(x.id);
+      return <button key={x.id} className={`small persona-pick ${on ? 'on' : ''}`} aria-pressed={on} style={{'--pc': x.body.color} as React.CSSProperties}
+        onClick={() => p.write(g.id, {kind: 'goal', body: {...g.body, personaIds: on ? g.body.personaIds.filter(id => id !== x.id) : [...(g.body.personaIds ?? []), x.id]}, baseRevision: g.revision})}>{x.body.name}</button>; })}</div>}
+    <GoalRetroView g={g} />
+    {retro && <GoalRetroForm g={g} p={p} kind={retro} done={() => setRetro(null)} />}
     {parent && <p className="muted">위 목표: <button className="link" onClick={() => open(parent.id)}>{parent.body.title}</button> ({goalPercent(parent.id, p.records).pct}%)</p>}
     {g.body.horizon !== 'milestone' && <section className="part"><h3>마일스톤 · 아래 목표</h3>
       <ul className="prows">{children.map(c => <li key={c.id} className={`prow ${c.body.status === 'achieved' ? 'done' : ''}`}>
@@ -160,8 +167,10 @@ function GoalDashboard({g, p, nav, today, back, open, weeklyMin}: {g: LifeRecord
       </div>)}
     </section>
     <div className="inline">
-      {g.body.status !== 'achieved' && <button className="small" onClick={() => setStatus(g, 'achieved')}>이뤘어요</button>}
-      {g.body.status !== 'active' && <button className="small" onClick={() => setStatus(g, 'active')}>다시 진행</button>}
+      {g.body.status !== 'achieved' && g.body.status !== 'dropped' && <button className="small" onClick={() => setRetro('achieved')}>이뤘어요</button>}
+      {g.body.status !== 'dropped' && g.body.status !== 'achieved' && <button className="small" onClick={() => setRetro('dropped')}>포기</button>}
+      {g.body.status === 'dropped' && <button className="small primary" onClick={() => p.write(g.id, {kind: 'goal', body: {...g.body, status: 'active', retro: null}, baseRevision: g.revision})}>다시 목표로</button>}
+      {g.body.status !== 'active' && g.body.status !== 'dropped' && <button className="small" onClick={() => setStatus(g, 'active')}>다시 진행</button>}
       {g.body.status === 'active' && <button className="small" onClick={() => setStatus(g, 'paused')}>잠시 멈춤</button>}
       <button className="small danger" onClick={async () => { await p.remove(g.id); back(); }}>지우기</button>
     </div>

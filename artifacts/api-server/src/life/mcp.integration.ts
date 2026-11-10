@@ -97,3 +97,34 @@ test('P0: availability drives plans; tasks and table rows can be listed, edited,
   await call('delete_row', {id: (wish.rows[0]!).id});
   assert.equal(((await call('list_rows', {table: '소원 상자'})) as {rows: unknown[]}).rows.length, 0);
 });
+
+test('P1/P2: goal achieve/drop writes retro rows, persona months warn over the limit, insights summarise', async () => {
+  const {writeRecord, allRecords: all} = await import('./store.ts');
+  await call('build_planner', {widgets: [{type: 'mission', options: {focusTarget: 60}}, {type: 'energy'}, {type: 'persona-board'},
+    {type: 'table', title: '성취 기록지', options: {autoLog: 'achievements', scope: 'all', columns: [{name: '목표'}, {name: '실제 시간(분)', type: 'number'}, {name: '임팩트', type: 'number'}, {name: 'ROI', type: 'number'}, {name: '다음엔 누가'}]}},
+    {type: 'table', title: '조정 기록지', options: {autoLog: 'adjustments', scope: 'all', columns: [{name: '목표'}, {name: '메모'}]}}]});
+  const plan = await call('add_goal_plan', {goal: {title: '발표 준비'}, milestones: [{title: '슬라이드', due: '2026-11', effortHours: 4}], firstTasks: [{title: '목차', milestone: 0, day: '2026-11-12'}]});
+  const t = (await all(owner)).find(r => r.kind === 'task' && (r.body as {title: string}).title === '목차')!;
+  const {logicalDay} = await import('@workspace/life-contract'), {getSettings} = await import('./store.ts');
+  const today = logicalDay(new Date(), await getSettings(owner));
+  await writeRecord(owner, null, {kind: 'session', logicalDay: today, body: {taskId: t.id, label: '목차', start: `${today}T00:00:00Z`, end: `${today}T02:00:00Z`, condition: 4}});
+  const done = await call('update_goal', {id: plan.goalId, status: 'achieved', impact: 8, nextOwner: 'ai', note: '잘 됐다'});
+  assert.deepEqual([(done.retro as {actualMin: number}).actualMin, (done.retro as {roi: number}).roi], [120, 4]);
+  const ach = await call('list_rows', {table: '성취 기록지'}) as {rows: {cells: Record<string, unknown>}[]};
+  assert.deepEqual([ach.rows[0]!.cells['목표'], ach.rows[0]!.cells['실제 시간(분)'], ach.rows[0]!.cells['ROI'], ach.rows[0]!.cells['다음엔 누가']], ['발표 준비', 120, 4, 'AI']);
+  await call('update_goal', {id: (plan.milestoneIds as string[])[0]!, status: 'dropped', note: '범위를 줄임'});
+  const adj = await call('list_rows', {table: '조정 기록지'}) as {rows: {cells: Record<string, unknown>}[]};
+  assert.equal(adj.rows[0]!.cells['메모'], '범위를 줄임');
+  const back = await call('update_goal', {id: (plan.milestoneIds as string[])[0]!, status: 'active'});
+  assert.equal(back.retro, null, '다시 목표로 clears the retro');
+
+  for (const name of ['Scholar', 'Speaker', 'Builder']) await call('set_persona', {name, month: '2026-11', status: 'deployed'});
+  await call('set_persona', {name: 'Runner', month: '2026-11', status: 'attached', roles: ['아침 달리기']});
+  const over = await call('set_persona', {name: 'Wealth Architect', month: '2026-11', status: 'deployed', roles: ['Portfolio']});
+  assert.match(String(over.warning), /한도 3/); assert.deepEqual(over.roles, ['Portfolio']);
+
+  const ins = await call('get_insights', {days: 30});
+  assert.ok(Array.isArray(ins.energyByHour) && (ins.energyByHour as unknown[]).length >= 1);
+  assert.ok((ins.lowConditionCount as number) >= 1);
+  assert.equal((ins.personasThisMonth as {status: string | null}[]).filter(p => p.status === 'deployed').length >= 4, true);
+});

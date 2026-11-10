@@ -1,0 +1,9 @@
+/* lit passes the skin as CSS variables: --lit-bg --lit-surface --lit-ink --lit-muted --lit-accent --lit-radius */
+.w{display:grid;gap:8px}
+.k{margin:0;color:var(--lit-muted);font-size:12px}
+.k b{color:var(--lit-ink);font-size:16px}
+form{display:flex;gap:6px}
+input{flex:1;min-width:0;border:1px solid var(--lit-ink);background:var(--lit-surface);padding:4px 6px;border-radius:var(--lit-radius)}
+button{border:1px solid var(--lit-ink);background:var(--lit-ink);color:var(--lit-surface);padding:4px 10px;border-radius:var(--lit-radius);cursor:pointer}
+ol{margin:0;padding-left:20px}
+li.best{background:var(--lit-accent);color:#151515}

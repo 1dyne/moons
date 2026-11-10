@@ -4,3 +4,4 @@ export * from './studio.ts';
 export * from './references.ts';
 export * from './canvas.ts';
 export * from './build.ts';
+export * from './widgets.ts';

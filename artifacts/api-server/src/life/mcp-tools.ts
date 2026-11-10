@@ -1,7 +1,8 @@
 import {z} from 'zod';
 import {ALL_SCOPES, buildNow, goalSchedule, logicalDay, weeklyFocus, type AnyRecord} from '@workspace/life-contract';
-import {BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
+import {BLOCKS, PERMISSIONS, isCode, BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
+import {listLibrary, saveLibrary} from './library.ts';
 import {allRecords, getSettings, getSpec, lastActivity, putSettings, saveSpec, writeRecord} from './store.ts';
 
 // Planner tools for the MOONS connector: Claude talks with the user, then builds and fills the planner directly.
@@ -29,6 +30,8 @@ const guide = () => `lit · 대화로 만들고 마음대로 꾸미는 나만의
 사용자가 이름 붙이는 속성: taskProps로 모든 할 일에 속성을 단다(이름, type ${PROP_TYPES.map(t => `${t.id}=${t.name}`).join('·')}, select면 options). tasks 위젯 options.groupBy에 select 속성 이름을 주면 그 선택지로 할 일을 나눈다.
 표 위젯(type "table"): options.columns=[{name,type,options}], options.firstName(첫 열 이름), options.scope("day" 그날 줄만 | "all" 모든 날). 줄은 add_items의 rows로 넣는다.
 버튼·칸 문구는 위젯 options.labels로 바꾼다: ${Object.entries(WIDGET_LABELS).map(([t, ls]) => `${t}{${ls!.map(l => l.key).join(',')}}`).join(' ')}. 예시 문장을 플레이스홀더로 넣지 않는다(개인 공간이다).
+내 위젯(create_widget): lit에 없는 위젯은 설명서(manifest)로 만들어 사용자의 라이브러리에 넣는다. 블록 위젯이 기본이다: data.columns(열 이름·종류, key는 생략하면 이름) + view(블록 목록: ${BLOCKS.map(b => `${b.id}=${b.name}`).join(', ')}). 블록에서 열은 이름으로 부른다. 예: {"id":"leet-score","name":"기출 점수","permissions":["table:read","table:write"],"data":{"columns":[{"name":"회차","type":"text"},{"name":"점수","type":"number"}]},"view":[{"block":"form"},{"block":"chart","x":"회차","y":"점수"},{"block":"stat","value":"점수","agg":"avg","label":"평균"}]}.
+코드 위젯은 블록으로 안 될 때만: html·css·code(JavaScript, 전역 lit API: lit.table.rows/add/update/remove, lit.tasks.today, lit.goals.list, lit.condition.today, lit.context, lit.on('change')). 인터넷 접속은 막혀 있다. permissions: ${PERMISSIONS.map(p => p.id).join(', ')} 중 필요한 것만. 코드 위젯은 사용자가 lit에서 권한을 보고 승인해야 돈다고 알려 준다.
 기록 규칙: 하루는 logicalDay(YYYY-MM-DD, 사용자 하루 경계 기준). 목표는 연간 → 마일스톤(끝낼 달) → 할 일. 사용자가 말하지 않은 시험일·점수 등은 묻는다.`;
 
 const looseWidget = z.object({type: z.string(), x: z.number().int().optional(), y: z.number().int().optional(), w: z.number().int().optional(), h: z.number().int().optional(),
@@ -139,6 +142,25 @@ export function registerPlannerTools(tool: Tool) {
       }
       return {...made, rows: rowsMade, url: plannerUrl()};
     });
+
+  tool('create_widget', '내 위젯을 설명서(manifest)로 만들어 사용자의 lit 라이브러리에 넣는다(같은 id면 새 버전). place:true면 오늘 페이지 아래에 붙인다. 블록 위젯은 바로 쓰이고, 코드 위젯은 사용자가 lit에서 승인해야 실행된다. 사용자에게 무엇을 만들지 말하고 OK를 받은 뒤에 부른다.',
+    {manifest: z.record(z.unknown()), place: z.boolean().optional()},
+    async ({manifest, place}, owner) => {
+      const item = await saveLibrary(owner, {kind: 'custom', data: {manifest}}, 'claude');
+      const m = (item.data as {manifest: {name: string; size: {w: number; h: number}}}).manifest;
+      if (place) {
+        const current = (await getSpec(owner))?.spec as PlannerSpec | undefined;
+        if (!current) throw new WorkspaceError(404, '아직 플래너가 없어요. build_planner로 먼저 만든다.');
+        const day = current.canvas?.day ?? [], bottom = day.reduce((n, w) => Math.max(n, w.y + w.h), 0);
+        await saveSpec(owner, {...current, canvas: {day: [...day, {id: `custom-${Date.now().toString(36)}`, type: 'custom', x: 0, y: bottom, w: m.size.w * 4, h: m.size.h * 3, title: m.name, options: {ref: item.id}}], mode: 'free'}});
+      }
+      const code = isCode((item.data as {manifest: Parameters<typeof isCode>[0]}).manifest);
+      return {id: item.id, name: item.name, placed: !!place, needsApproval: code, url: plannerUrl(),
+        note: code ? '코드 위젯이라 사용자가 lit의 메뉴 → 설치한 위젯(또는 위젯 칸)에서 권한을 보고 승인해야 실행된다고 알려 준다.' : '꾸미기 → 내 위젯에서 언제든 다시 붙일 수 있다고 알려 준다.'};
+    });
+
+  tool('list_widgets', '사용자 lit 라이브러리의 내 위젯·저장한 위젯·페이지 틀·스킨 목록(설명서 포함).', {}, async (_a, owner) =>
+    (await listLibrary(owner)).map(i => ({id: i.id, kind: i.kind, name: i.name, enabled: i.enabled, approved: !!i.approved, source: i.source, ...(i.kind === 'custom' ? {manifest: (i.data as {manifest: unknown}).manifest} : {})})));
 
   tool('get_today', '사용자의 오늘(또는 지금) 상태: 할 일과 결과, 목표 진행률, 지금 집중 중인 일, 컨디션·수면.', {}, async (_a, owner) => {
     const settings = await getSettings(owner), spec = (await getSpec(owner))?.spec as PlannerSpec | undefined;

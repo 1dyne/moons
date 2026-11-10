@@ -486,6 +486,9 @@ importers:
       '@clerk/react':
         specifier: ^6.17.8
         version: 6.17.8(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@workspace/lit-widget-sdk':
+        specifier: workspace:*
+        version: link:../../lib/lit-widget-sdk
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -566,6 +569,12 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.6
+
+  lib/lit-widget-sdk:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

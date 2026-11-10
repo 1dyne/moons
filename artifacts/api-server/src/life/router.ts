@@ -8,6 +8,7 @@ import {limited} from '../moons/lib/server/http.ts';
 import {planGoal} from './milestones.ts';
 import {isOperator, withAi} from '../moons/lib/server/v5/ai-access.ts';
 import {accountId} from '../moons/lib/server/v5/identity.ts';
+import {createDevToken, deleteLibrary, listDevTokens, listLibrary, ownerOfDevToken, revokeDevToken, saveLibrary, setLibraryState} from './library.ts';
 import {allRecords, changesSince, deleteRecord, getSettings, getSpec, lastActivity, listRecords, putSettings, recordHistory, saveSpec, writeRecord} from './store.ts';
 
 // /api/life/v1 — the planner's own reads and writes (first-party session). Consumer access with
@@ -16,7 +17,7 @@ export function lifeRouter(checkOrigin: (req: Request) => void) {
   const router = Router();
   // A planner spec can carry small photos (decorations); everything else stays small.
   const small = body({limit: '200kb'}), large = body({limit: '3mb'});
-  router.use((req, res, next) => (req.path === '/spec' ? large : small)(req, res, next));
+  router.use((req, res, next) => (req.path === '/spec' || req.path.startsWith('/library') || req.path.startsWith('/dev/widgets') ? large : small)(req, res, next));
   const route = (fn: (req: Request, res: Response, owner: string) => Promise<unknown>) => async (req: Request, res: Response) => {
     try {
       res.set('Cache-Control', 'no-store');
@@ -43,6 +44,27 @@ export function lifeRouter(checkOrigin: (req: Request) => void) {
   router.put('/settings', route(async (req, _res, owner) => ({settings: await putSettings(owner, Settings.parse(req.body))})));
   router.get('/spec', route(async (_req, _res, owner) => ({planner: await getSpec(owner)})));
   router.put('/spec', route(async (req, _res, owner) => ({planner: await saveSpec(owner, req.body?.spec)})));
+
+  // 내 라이브러리: saved widgets, templates, skins and manifest widgets.
+  router.get('/library', route(async (_req, _res, owner) => ({items: await listLibrary(owner)})));
+  router.post('/library', route(async (req, res, owner) => { res.status(201); return {item: await saveLibrary(owner, req.body ?? {})}; }));
+  router.patch('/library/:id', route(async (req, _res, owner) => ({item: await setLibraryState(owner, String(req.params.id), {enabled: typeof req.body?.enabled === 'boolean' ? req.body.enabled : undefined, approve: typeof req.body?.approve === 'boolean' ? req.body.approve : undefined, name: typeof req.body?.name === 'string' ? req.body.name : undefined})})));
+  router.delete('/library/:id', route(async (req, _res, owner) => deleteLibrary(owner, String(req.params.id))));
+  // Developer tokens (made in the lit menu) and publishing a widget from the command line.
+  router.get('/dev/tokens', route(async (_req, _res, owner) => ({tokens: await listDevTokens(owner)})));
+  router.post('/dev/tokens', route(async (req, res, owner) => { res.status(201); return createDevToken(owner, String(req.body?.label ?? '')); }));
+  router.delete('/dev/tokens/:id', route(async (req, _res, owner) => revokeDevToken(owner, String(req.params.id))));
+  router.post('/dev/widgets', async (req, res) => {
+    try {
+      res.set('Cache-Control', 'no-store');
+      const token = /^Bearer\s+(litdev_[\w-]+)$/.exec(req.get('authorization') ?? '')?.[1];
+      if (!token) throw new WorkspaceError(401, 'Authorization: Bearer litdev_… 가 필요해요.');
+      const owner = await ownerOfDevToken(token);
+      if (limited(`litdev:${owner}`, 60)) throw new WorkspaceError(429, 'Please wait a minute.');
+      // Published code is never approved automatically: the user approves it in lit (권한 확인).
+      res.status(201).json({item: await saveLibrary(owner, {kind: 'custom', data: {manifest: req.body?.manifest ?? req.body}}, 'developer')});
+    } catch (e) { res.status(e instanceof WorkspaceError ? e.status : 500).json({error: {message: e instanceof WorkspaceError ? e.message : 'Publish failed.'}}); }
+  });
 
   router.get('/items', route(async (req, _res, owner) => {
     const basis = ['logical_day', 'due', 'occurred'].includes(String(req.query.basis)) ? req.query.basis as 'logical_day' : 'logical_day';

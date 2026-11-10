@@ -1,0 +1,9 @@
+{
+  "id": "__ID__",
+  "name": "__NAME__",
+  "description": "오늘 끝낸 할 일과 내가 적는 공부 점수를 한눈에",
+  "version": "1.0.0",
+  "permissions": ["table:read", "table:write", "tasks:read"],
+  "data": {"columns": [{"key": "label", "name": "회차", "type": "text"}, {"key": "score", "name": "점수", "type": "number"}], "scope": "all"},
+  "size": {"w": 6, "h": 8}
+}

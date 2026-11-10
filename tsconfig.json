@@ -20,6 +20,9 @@
     },
     {
       "path": "./lib/planner-spec"
+    },
+    {
+      "path": "./lib/lit-widget-sdk"
     }
   ]
 }

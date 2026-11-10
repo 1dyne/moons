@@ -12,6 +12,7 @@ import {useFontFamily} from '../fonts.ts';
 import {Gauge} from '../Gauge.tsx';
 import {LabelProvider} from '../labels.tsx';
 import {TableWidget} from './Table.tsx';
+import {CustomWidget} from './CustomWidget.tsx';
 import {Tip} from '../Tip.tsx';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
@@ -168,6 +169,7 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
     case 'focus': return ctx.timer ? <FocusBar p={p} day={today} timer={ctx.timer} color={colors(p, today)} /> : null;
     case 'tasks': return <Tasks m={asModule(w, 'tasks')} ctx={ctx} />;
     case 'table': return <TableWidget w={w} ctx={ctx} />;
+    case 'custom': return <CustomWidget w={w} ctx={ctx} />;
     case 'timetable': return <Timetable key={day} m={asModule(w, 'timer')} p={p} day={day} settings={settings} color={ctx.color} />;
     case 'receipt': return <Receipt p={p} day={day} routineRate={ofKind(p.records, 'routine').length ? routineRate(p.records, day) : null} />;
     case 'hourly': return <HourlyDay ctx={ctx} startHour={start} endHour={endHour} />;

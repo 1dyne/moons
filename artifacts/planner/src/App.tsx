@@ -11,6 +11,8 @@ import {Editor} from './screens/Editor.tsx';
 import {ConnectPage} from './screens/Connect.tsx';
 import {skinProps} from './screens/Canvas.tsx';
 import {PlannerView, currentTab} from './screens/PlannerView.tsx';
+import {MenuDrawer} from './screens/Menu.tsx';
+import {LibraryProvider, useLibraryState} from './library.tsx';
 import {Tip, setTipsOn, useTipsOn} from './Tip.tsx';
 
 type Loaded = {settings: Settings & {configured: boolean}; planner: {version: number; spec: PlannerSpec} | null; records: AnyRecord[]};
@@ -46,7 +48,8 @@ function Main() {
 function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Loaded['planner']>}; edit: () => void; reload: () => Promise<void>}) {
   const {spec} = loaded.planner;
   const p = usePlanner(httpBackend, loaded.records);
-  const [settingsOpen, setSettingsOpen] = useState(false), [decorating, setDecorating] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false), [decorating, setDecorating] = useState(false), [menu, setMenu] = useState(false);
+  const library = useLibraryState();
   const sp = skinProps(spec.skin);
   const sync = useSync(async () => p.setRecords(await api.recordsWithQueue()));
   return <div className={`app mood-${spec.mood} ${sp.className} ${decorating ? 'wide' : ''}`} style={{'--accent': CHIP_COLORS[spec.theme.accent], ...sp.style} as React.CSSProperties}>
@@ -58,10 +61,14 @@ function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Lo
       <InstallButton />
       <SleepingBadge p={p} settings={loaded.settings} />
       {!decorating && <button className="small" onClick={() => { setDecorating(true); setSettingsOpen(false); }}>꾸미기</button>}
-      <button className="ghost small" onClick={() => setSettingsOpen(!settingsOpen)} aria-expanded={settingsOpen}>설정</button>
+      {settingsOpen && <button className="ghost small" onClick={() => setSettingsOpen(false)}>‹ 플래너</button>}
+      <button className="menu-btn" onClick={() => setMenu(true)} aria-label="메뉴" aria-expanded={menu}><span /><span /><span /></button>
     </header>
+    <LibraryProvider value={library}>
+    <MenuDrawer open={menu} close={() => setMenu(false)} spec={spec} saveSpec={async next => { await api.putSpec(next); await reload(); }} openSettings={() => { setDecorating(false); setSettingsOpen(true); }} />
     <PlannerCtx.Provider value={p}>{decorating ? <Editor spec={spec} settings={loaded.settings} p={p} saveLabel="저장" onCancel={() => setDecorating(false)} pageId={tabsOf(spec).find(t => t.id === currentTab() && t.kind === 'page')?.id}
       onSave={async next => { await api.putSpec(next); setDecorating(false); await reload(); }} hint="지금 기록 그대로 보면서 꾸며요. 저장하면 새 버전이 되고 기록은 그대로예요." /> : settingsOpen ? <SettingsPanel loaded={loaded} edit={edit} close={() => setSettingsOpen(false)} reload={reload} /> : <PlannerView spec={spec} settings={loaded.settings} p={p} saveSpec={async change => { await api.putSpec(change(spec)); await reload(); }} />}</PlannerCtx.Provider>
+    </LibraryProvider>
   </div>;
 }
 

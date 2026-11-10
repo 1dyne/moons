@@ -1,9 +1,10 @@
 import {useMemo, useState} from 'react';
 import {logicalDay, type Settings} from '@workspace/life-contract';
-import {CHECKS, DONE_STYLES, FONTS, METRICS, WIDGET_LABELS, tabsOf, type PropDef, PALETTE, SKIN_PRESETS, Skin, WIDGETS, applyCanvas, fontInfo, isDecor, minSize, placeNew, settle, toFree, toGrid, widgetInfo, type CanvasMode, type PlannerSpec, type WidgetType, type Widget} from '@workspace/planner-spec';
+import {CHECKS, DONE_STYLES, FONTS, METRICS, isCode as isCodeManifest, type LibraryItem, WIDGET_LABELS, tabsOf, type PropDef, PALETTE, SKIN_PRESETS, Skin, WIDGETS, applyCanvas, fontInfo, isDecor, minSize, placeNew, settle, toFree, toGrid, widgetInfo, type CanvasMode, type PlannerSpec, type WidgetType, type Widget} from '@workspace/planner-spec';
 import {useFontFamily} from '../fonts.ts';
 import {ofKind, type Planner} from '../data.ts';
-import {DayCanvas, canvasOf, modeOf, skinProps} from './Canvas.tsx';
+import {DayCanvas, canvasOf, skinProps} from './Canvas.tsx';
+import {useLibrary} from '../library.tsx';
 import {GaugePicker, GaugeProvider} from '../Gauge.tsx';
 import {Tip} from '../Tip.tsx';
 
@@ -25,6 +26,11 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
   const change = (ws: Widget[]) => { setHistory(h => [...h.slice(-30), widgets]); setWidgets(ws); };
   const undo = () => { const prev = history.at(-1); if (prev) { setWidgets(prev); setHistory(h => h.slice(0, -1)); } };
   const add = (type: WidgetType) => { const w = placeNew(widgets, type, newId(type), mode); change([...widgets, w]); setSelected(w.id); };
+  // 내 라이브러리: saved widgets come back as copies; library widgets are placed by reference.
+  const lib = useLibrary(), [savedMsg, setSavedMsg] = useState('');
+  const addFrom = (base: Widget) => { const at = placeNew(widgets, base.type, newId(base.type), mode); const w = {...base, id: at.id, x: at.x, y: at.y}; change([...widgets, w]); setSelected(w.id); };
+  const addCustom = (it: LibraryItem<'custom'>) => { const m = it.data.manifest, at = placeNew(widgets, 'custom', newId('custom'), mode); addFrom({...at, w: m.size.w * 4, h: m.size.h * 3, title: m.name, options: {ref: it.id}}); };
+  const keep = async (item: Parameters<NonNullable<typeof lib>['save']>[0], what: string) => { if (!lib) return; try { await lib.save(item); setSavedMsg(`${what} 저장했어요 (메뉴 → 내 라이브러리)`); } catch (e) { setSavedMsg((e as Error).message); } setTimeout(() => setSavedMsg(''), 3000); };
   const sel = widgets.find(w => w.id === selected);
   const patch = (id: string, patch: Partial<Widget>) => change(settle(widgets.map(w => w.id === id ? {...w, ...patch} : w), id, mode));
   const opt = (id: string, key: string, value: unknown) => change(widgets.map(w => w.id === id ? {...w, options: {...w.options, [key]: value}} : w));
@@ -41,6 +47,8 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
       </div>
       {pageTab && <strong className="ed-page">{pageTab.name} 페이지</strong>}
       <span className="muted small ed-hint"><Tip id={hint ? `editor-${hint.slice(0, 12)}` : 'editor-drag'}>{hint ?? '위젯 머리(⠿)를 끌어 옮기고, 오른쪽 아래 모서리를 끌어 크기를 바꿔요.'}</Tip></span>
+      {savedMsg && <span className="small saved-msg" role="status">{savedMsg}</span>}
+      {lib && <button className="ghost small" onClick={() => void keep({kind: 'template', name: `${pageTab?.name ?? spec.name} 틀`, data: {widgets, skin}}, '페이지 틀을')}>틀로 저장</button>}
       <button className="ghost small" onClick={undo} disabled={!history.length}>되돌리기</button>
       {onCancel && <button className="ghost small" onClick={onCancel}>취소</button>}
       <button className="primary" disabled={busy} onClick={save}>{busy ? '저장 중…' : saveLabel}</button>
@@ -54,6 +62,11 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
               <strong>＋ {w.label}</strong><span>{w.desc}</span>{widgets.some(x => x.type === w.type) && <em>사용 중</em>}
             </button>)}
           </div>)}
+          {lib && <div className="ed-group"><span className="muted small">내 위젯</span>
+            {lib.items.filter((x): x is LibraryItem<'custom'> => x.kind === 'custom' && x.enabled).map(it => <button key={it.id} className="ed-widget" onClick={() => addCustom(it)}><strong>＋ {it.name}</strong><span>{it.data.manifest.description || (isCodeManifest(it.data.manifest) ? '코드 위젯' : '블록 위젯')}</span></button>)}
+            {lib.items.filter((x): x is LibraryItem<'widget'> => x.kind === 'widget').map(it => <button key={it.id} className="ed-widget" onClick={() => addFrom(it.data.widget)}><strong>＋ {it.name}</strong><span>저장한 {widgetInfo(it.data.widget.type).label}</span></button>)}
+            {!lib.items.some(x => x.kind === 'custom' || x.kind === 'widget') && <span className="muted small">메뉴 → 위젯 만들기, 또는 위젯을 고르고 "내 위젯으로 저장"</span>}
+          </div>}
         </> : <SkinPanel skin={skin} setSkin={setSkin} />}
       </aside>
       <div className={`ed-canvas ${sp.className}`} style={sp.style}><GaugeProvider value={skin.gauge ?? 'segment'}>
@@ -95,6 +108,7 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
         </details>}
         <div className="inline">
           <button className="small" onClick={() => { const c = {...sel, id: newId(sel.type), y: sel.y + sel.h}; change(settle([...widgets, c], c.id, mode)); setSelected(c.id); }}>복제</button>
+          {lib && sel.type !== 'custom' && <button className="small" onClick={() => void keep({kind: 'widget', name: sel.title || widgetInfo(sel.type).label, data: {widget: sel}}, '위젯을')}>내 위젯으로 저장</button>}
           <button className="small danger" onClick={() => { change(widgets.filter(w => w.id !== sel.id)); setSelected(null); }}>지우기</button>
         </div>
       </aside>}
@@ -150,10 +164,14 @@ function WidgetOptions({w, opt, goals, props}: {w: Widget; opt: (k: string, v: u
 }
 
 function SkinPanel({skin, setSkin}: {skin: Skin; setSkin: (s: Skin) => void}) {
+  const lib = useLibrary();
   const set = (p: Partial<Skin>) => setSkin({...skin, ...p});
   const color = (key: 'accent' | 'background' | 'surface' | 'ink', label: string) => <label className="sk-color">{label}<input type="color" value={skin[key]} onChange={e => set({[key]: e.target.value})} /></label>;
   return <div className="skin-panel">
     <span className="muted small">프리셋</span>
+    {lib && lib.items.some(x => x.kind === 'skin') && <><span className="muted small">내 스킨</span>
+      <div className="sk-presets">{lib.items.filter((x): x is LibraryItem<'skin'> => x.kind === 'skin').map(it => <button key={it.id} className="sk-preset" onClick={() => setSkin(it.data.skin)} style={{background: it.data.skin.background, color: it.data.skin.ink, borderColor: it.data.skin.accent}}><i style={{background: it.data.skin.accent}} />{it.name}</button>)}</div></>}
+    {lib && <button className="small" onClick={async () => { await lib.save({kind: 'skin', name: `내 스킨 ${lib.items.filter(x => x.kind === 'skin').length + 1}`, data: {skin}}); }}>지금 스킨 저장</button>}
     <div className="sk-presets">{SKIN_PRESETS.map(pr => <button key={pr.id} className="sk-preset" onClick={() => setSkin(pr.skin)} style={{background: pr.skin.background, color: pr.skin.ink, borderColor: pr.skin.accent}}><i style={{background: pr.skin.accent}} />{pr.name}</button>)}</div>
     <span className="muted small">진행률 모양 <Tip id="skin-gauge">목표·월간·진행률 위젯이 모두 이 모양으로 보여요</Tip></span>
     <GaugePicker value={skin.gauge ?? 'segment'} onChange={g => set({gauge: g})} />

@@ -11,5 +11,5 @@
     "types": ["node", "vite/client"],
     "paths": {"@/*": ["./src/*"]}
   },
-  "references": [{"path": "../../lib/life-contract"}, {"path": "../../lib/planner-spec"}]
+  "references": [{"path": "../../lib/life-contract"}, {"path": "../../lib/planner-spec"}, {"path": "../../lib/lit-widget-sdk"}]
 }

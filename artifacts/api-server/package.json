@@ -12,7 +12,7 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:life": "node ./scripts/run-integration.mjs src/life/life.integration.ts && node ./scripts/run-integration.mjs src/life/mcp.integration.ts"
+    "test:life": "node ./scripts/run-integration.mjs src/life/life.integration.ts && node ./scripts/run-integration.mjs src/life/mcp.integration.ts && node ./scripts/run-integration.mjs src/life/library.integration.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.2.0",

@@ -12,15 +12,16 @@ export const METRICS: Record<CanvasMode, {cols: number; row: number; gap: number
   free: {cols: 48, row: 10, gap: 0, kx: 4, ky: 3},
 };
 export const WIDGET_TYPES = ['focus', 'tasks', 'timetable', 'receipt', 'hourly', 'bullet', 'page', 'checkin', 'carry', 'routine', 'habits',
-  'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'table', 'text', 'sticker', 'tape', 'image', 'shape'] as const;
+  'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'table', 'custom', 'text', 'sticker', 'tape', 'image', 'shape'] as const;
 export type WidgetType = (typeof WIDGET_TYPES)[number];
 
-export type WidgetInfo = {type: WidgetType; label: string; desc: string; group: '기록' | '시간' | '목표' | '나' | '꾸미기'; w: number; h: number; minW: number; minH: number; module?: ModuleType};
+export type WidgetInfo = {type: WidgetType; label: string; desc: string; group: '기록' | '시간' | '목표' | '나' | '꾸미기' | '내 위젯'; w: number; h: number; minW: number; minH: number; module?: ModuleType};
 export const WIDGETS: WidgetInfo[] = [
   {type: 'tasks', label: '할 일', desc: '○△× 체크, 분량·예상 시간, 목표 연결', group: '기록', w: 7, h: 12, minW: 3, minH: 5, module: 'tasks'},
   {type: 'bullet', label: '빠른 기록', desc: '불렛저널처럼 • 할 일 ○ 일정 – 메모', group: '기록', w: 7, h: 12, minW: 3, minH: 5, module: 'memo'},
   {type: 'page', label: '자유 페이지', desc: '모눈 위에 자유롭게 쓰는 칸', group: '기록', w: 6, h: 10, minW: 3, minH: 4, module: 'memo'},
   {type: 'table', label: '표 (내가 만드는 DB)', desc: '열 이름·종류를 직접 정하는 표. 공부 기록, 지출, 독서…', group: '기록', w: 8, h: 8, minW: 3, minH: 4},
+  {type: 'custom', label: '내 위젯', desc: '내 라이브러리의 위젯(블록·코드)', group: '내 위젯', w: 6, h: 8, minW: 2, minH: 2},
   {type: 'carry', label: '어제 못 끝낸 일', desc: '오늘로 옮기기', group: '기록', w: 6, h: 4, minW: 3, minH: 3, module: 'tasks'},
   {type: 'review', label: '하루 돌아보기', desc: '한 줄 회고, 나만 보기', group: '기록', w: 6, h: 5, minW: 3, minH: 4, module: 'review'},
   {type: 'focus', label: '집중 타이머', desc: '지금 하는 일과 흐르는 시간, 오늘 순집중', group: '시간', w: 12, h: 3, minW: 4, minH: 3, module: 'timer'},

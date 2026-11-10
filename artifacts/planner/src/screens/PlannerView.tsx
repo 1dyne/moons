@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useState} from 'react';
 import {logicalDay, type Settings} from '@workspace/life-contract';
 import {BUILTIN_TABS, tabsOf, type PlannerSpec, type TabSpec} from '@workspace/planner-spec';
 import type {Planner} from '../data.ts';
@@ -25,10 +25,10 @@ export function PlannerView({spec, settings, p, saveSpec}: {spec: PlannerSpec; s
   const setDay = (d: string) => { memory.day = d; setDayState(d); };
   const tab = tabs.find(t => t.id === tabId) ?? tabs[0]!;
   const firstOf = (kind: TabSpec['kind']) => tabs.find(t => t.kind === kind);
-  const nav: Nav = {day, setDay: d => { setDay(d); const t = firstOf('today'); if (t) setTab(t.id); }, openGoal: id => { setGoalId(id); const t = firstOf('goals'); if (t) setTab(t.id); }};
+  const nav: Nav = {day, setDay: d => { setDay(d); const t = firstOf('today'); if (t) setTab(t.id); }, openGoal: id => { setGoalId(id); const t = firstOf('goals'); if (t) setTab(t.id); }, openTab: id => setTab(id)};
   return <GaugeProvider value={spec.skin?.gauge ?? 'segment'}><div className="planner-view">
     <TabBar tabs={tabs} active={tab.id} pick={id => { setTab(id); if (tabs.find(t => t.id === id)?.kind === 'goals') setGoalId(null); }} save={saveSpec ? next => saveSpec(s => ({...s, tabs: next})) : undefined} />
-    {p.error && <p className="error" role="alert">{p.error}</p>}
+    <Toast text={p.error} />
     {tab.kind === 'today' && <DayPage spec={spec} settings={settings} p={p} nav={nav} today={today} saveSpec={saveSpec} />}
     {tab.kind === 'page' && <DayPage spec={spec} settings={settings} p={p} nav={nav} today={today} saveSpec={saveSpec} page={tab.widgets ?? []} />}
     {tab.kind === 'week' && <Week spec={spec} settings={settings} p={p} nav={nav} today={today} />}
@@ -70,4 +70,11 @@ function TabBar({tabs, active, pick, save}: {tabs: TabSpec[]; active: string; pi
       </span>}
     </span>}
   </nav>;
+}
+
+/** Errors float over the page for a few seconds; they never push the layout around. */
+function Toast({text}: {text: string}) {
+  const [shown, setShown] = useState('');
+  useEffect(() => { if (!text) return; setShown(text); const t = setTimeout(() => setShown(''), 4000); return () => clearTimeout(t); }, [text]);
+  return shown ? <p className="toast" role="alert" onClick={() => setShown('')}>{shown}</p> : null;
 }

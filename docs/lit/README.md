@@ -6,6 +6,7 @@ MOONS 저장소 안에서 개발했지만 **MOONS와 별개인 앱**이다. 이 
 | 문서 | 내용 |
 | --- | --- |
 | [README.md](README.md) | 이 문서. lit이 무엇인지, 코드가 어디 있는지, 돌리고 배포하는 법, MOONS에서 떼어 내는 법 |
+| [AUTOMATION.md](AUTOMATION.md) | lit의 자동화 구조: 기록 하나, 위젯은 필터 보기, 무엇이 무엇을 바꾸는지 |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | 화면 구조, 데이터(기록·플래너 스펙·라이브러리), API, 계정, 커넥터 |
 | [WIDGET_PLATFORM.md](WIDGET_PLATFORM.md) | 내 라이브러리, 위젯 설명서, 블록, 코드 위젯, 보안, 메뉴 UI/UX 설계와 레퍼런스 |
 | [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) | 개발자용: `lit-widget` CLI, 위젯 API, 예제, 올리기 |

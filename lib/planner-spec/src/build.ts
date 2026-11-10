@@ -13,7 +13,7 @@ export function applyCanvas(spec: PlannerSpec, widgets: Widget[], skin: Skin, mo
 
 export type LooseWidget = {type: string; x?: number; y?: number; w?: number; h?: number; title?: string; font?: string; color?: string; background?: string; ink?: string; style?: string; options?: Record<string, unknown>};
 /** Fill sizes from the catalog, place widgets without a position below the others, clamp to the grid and settle overlaps. */
-export function normalizeWidgets(input: LooseWidget[]): {widgets: Widget[]; dropped: string[]} {
+export function normalizeWidgets(input: LooseWidget[], idPrefix = ''): {widgets: Widget[]; dropped: string[]} {
   const dropped: string[] = [];
   let out: Widget[] = [], n = 0;
   // Widgets the caller placed keep their spot; the ones without a position are stacked below them.
@@ -24,7 +24,7 @@ export function normalizeWidgets(input: LooseWidget[]): {widgets: Widget[]; drop
     const type = raw.type as WidgetType, info = widgetInfo(type);
     const w = Math.min(COLS, Math.max(info.minW, Math.round(raw.w ?? info.w))), h = Math.min(60, Math.max(info.minH, Math.round(raw.h ?? info.h)));
     const bottom = out.filter(x => !isDecor(x.type)).reduce((m, x) => Math.max(m, x.y + x.h), 0);
-    const candidate = {id: `${type}-${++n}`, type, w, h, x: Math.max(0, Math.min(COLS - w, Math.round(raw.x ?? 0))), y: Math.max(0, Math.round(raw.y ?? (isDecor(type) ? 0 : bottom))),
+    const candidate = {id: `${idPrefix}${type}-${++n}`, type, w, h, x: Math.max(0, Math.min(COLS - w, Math.round(raw.x ?? 0))), y: Math.max(0, Math.round(raw.y ?? (isDecor(type) ? 0 : bottom))),
       ...(raw.title !== undefined ? {title: raw.title} : {}), ...(raw.font ? {font: raw.font} : {}), ...(raw.color ? {color: raw.color} : {}),
       ...(raw.background ? {background: raw.background} : {}), ...(raw.ink ? {ink: raw.ink} : {}), ...(raw.style ? {style: raw.style} : {}), options: raw.options ?? {}};
     const parsed = Widget.safeParse(candidate);
@@ -43,4 +43,22 @@ export function buildSpec(current: PlannerSpec | null, input: {name?: string; wi
   const mode = input.mode ?? 'free';
   const spec = applyCanvas({...base, ...(input.name ? {name: input.name.slice(0, 40)} : {}), layout: {...base.layout, ...(input.weekLayout ? {week: input.weekLayout} : {})}, source: {kind: 'chat'}}, mode === 'free' ? toFree(widgets) : widgets, skin, mode);
   return {spec, dropped};
+}
+
+/** Every widget id must be unique across the day page and all page tabs (a table's rows are keyed by its widget id).
+ *  Returns the spec with later duplicates renamed, and what was renamed where. */
+export function dedupeWidgetIds(spec: PlannerSpec): {spec: PlannerSpec; renamed: {from: string; to: string; tabId: string; widget: Widget}[]} {
+  const seen = new Set<string>(), renamed: {from: string; to: string; tabId: string; widget: Widget}[] = [];
+  const fix = (ws: Widget[] | undefined, tabId: string) => ws?.map(w => {
+    if (!seen.has(w.id)) { seen.add(w.id); return w; }
+    let id = `${w.id}-${tabId}`.slice(0, 40), k = 1;
+    while (seen.has(id)) id = `${w.id}-${tabId}-${++k}`.slice(0, 40);
+    seen.add(id);
+    const next = {...w, id};
+    renamed.push({from: w.id, to: id, tabId, widget: next});
+    return next;
+  });
+  const day = fix(spec.canvas?.day, 'day');
+  const tabs = spec.tabs?.map(t => ({...t, widgets: fix(t.widgets, t.id)}));
+  return {spec: renamed.length ? {...spec, canvas: {...spec.canvas, day}, ...(tabs ? {tabs} : {})} : spec, renamed};
 }

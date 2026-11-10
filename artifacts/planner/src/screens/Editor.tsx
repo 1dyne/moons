@@ -18,7 +18,10 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
   const today = logicalDay(new Date(), settings);
   // A page tab is edited the same way. One placement mode (the fine lattice); old 정리형 pages arrive converted.
   const pageTab = pageId ? tabsOf(spec).find(t => t.id === pageId) : undefined;
-  const [widgets, setWidgets] = useState<Widget[]>(() => pageTab ? pageTab.widgets ?? [] : canvasOf(spec));
+  // A built-in tab (주간·월·목표·분석) becomes a page holding that view as a widget, so it can be decorated too.
+  const viewOf = {week: 'week-view', month: 'month-view', goals: 'goals-view', insights: 'insights-view'} as const;
+  const [widgets, setWidgets] = useState<Widget[]>(() => !pageTab ? canvasOf(spec) : pageTab.kind === 'page' ? pageTab.widgets ?? []
+    : [{id: newId(viewOf[pageTab.kind as keyof typeof viewOf]), type: viewOf[pageTab.kind as keyof typeof viewOf], x: 0, y: 0, w: 48, h: 72, options: {}}]);
   const mode: CanvasMode = 'free', M = METRICS[mode];
   const [skin, setSkin] = useState<Skin>(() => spec.skin ?? Skin.parse({}));
   const [selected, setSelected] = useState<string | null>(null), [panel, setPanel] = useState<'widgets' | 'skin'>(widgets.length ? 'skin' : 'widgets');
@@ -36,7 +39,7 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
   const opt = (id: string, key: string, value: unknown) => change(widgets.map(w => w.id === id ? {...w, options: {...w.options, [key]: value}} : w));
   const nav = useMemo(() => ({day: today, setDay: () => {}, openGoal: () => {}}), [today]);
   const sp = skinProps(skin);
-  const save = async () => { setBusy(true); setError(''); try { await onSave(pageTab ? {...spec, skin, tabs: tabsOf(spec).map(t => t.id === pageTab.id ? {...t, widgets} : t)} : applyCanvas(spec, widgets, skin, mode)); } catch (e) { setError((e as Error).message); setBusy(false); } };
+  const save = async () => { setBusy(true); setError(''); try { await onSave(pageTab ? {...spec, skin, tabs: tabsOf(spec).map(t => t.id === pageTab.id ? {...t, kind: 'page' as const, widgets} : t)} : applyCanvas(spec, widgets, skin, mode)); } catch (e) { setError((e as Error).message); setBusy(false); } };
   const goals = ofKind(p.records, 'goal');
 
   return <div className="editor">
@@ -57,7 +60,7 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
     <div className="ed-body">
       <aside className="ed-side" aria-label={panel === 'widgets' ? '위젯 고르기' : '스킨'}>
         {panel === 'widgets' ? <>
-          {(['기록', '시간', '목표', '나', '꾸미기'] as const).map(g => <div key={g} className="ed-group"><span className="muted small">{g}</span>
+          {(['기록', '시간', '목표', '나', '보기', '꾸미기'] as const).map(g => <div key={g} className="ed-group"><span className="muted small">{g}</span>
             {WIDGETS.filter(w => w.group === g).map(w => <button key={w.type} className="ed-widget" onClick={() => add(w.type)}>
               <strong>＋ {w.label}</strong><span>{w.desc}</span>{widgets.some(x => x.type === w.type) && <em>사용 중</em>}
             </button>)}
@@ -102,9 +105,9 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
         <div className="inline"><label>너비 <input type="number" min={minSize(sel.type, mode).w} max={M.cols} value={sel.w} onChange={e => patch(sel.id, {w: Number(e.target.value)})} className="num" /></label>
           <label>높이 <input type="number" min={minSize(sel.type, mode).h} max={240} value={sel.h} onChange={e => patch(sel.id, {h: Number(e.target.value)})} className="num" /></label></div>
         <WidgetOptions w={sel} opt={(k, v) => opt(sel.id, k, v)} goals={goals.map(g => ({id: g.id, title: g.body.title}))} props={spec.props?.task ?? []}
-          tables={[...widgets, ...(spec.canvas.day ?? []), ...(spec.tabs ?? []).flatMap(t => t.widgets ?? [])].filter((x, i, all) => x.type === 'table' && all.findIndex(y => y.id === x.id) === i).map(x => ({id: x.id, title: x.title || x.id}))} />
+          tables={[...widgets, ...(spec.canvas.day ?? []), ...(spec.tabs ?? []).flatMap(t => t.widgets ?? [])].filter((x, i, all) => (x.type === 'table' || x.type === 'wishes') && all.findIndex(y => y.id === x.id) === i).map(x => ({id: x.id, title: x.title || x.id}))} />
         {WIDGET_LABELS[sel.type] && <details className="ed-labels"><summary>버튼·칸 문구 바꾸기</summary>
-          {WIDGET_LABELS[sel.type]!.map(l => { const cur = (sel.options.labels as Record<string, string> | undefined) ?? {}; return <label key={l.key}>{l.def || '(빈 칸)'}
+          {WIDGET_LABELS[sel.type]!.map(l => { const cur = (sel.options.labels as Record<string, string> | undefined) ?? {}; return <label key={l.key}>{l.name ?? (l.def || '(빈 칸)')}
             <input value={cur[l.key] ?? ''} placeholder={l.def} maxLength={60} onChange={e => opt(sel.id, 'labels', {...cur, [l.key]: e.target.value})} /></label>; })}
         </details>}
         <div className="inline">
@@ -163,13 +166,39 @@ function WidgetOptions({w, opt, goals, props, tables}: {w: Widget; opt: (k: stri
       {o.autoLog ? <p className="muted small">열 이름으로 채워요: {o.autoLog === 'sessions' ? '날짜, 할 일, 페르소나, 시작, 끝, 분, 컨디션, 메모, 목표, 할 일 속성 이름' : o.autoLog === 'achievements' ? '목표, 완료일, 실제 시간(분), 실제 시간, 임팩트, ROI, 다음엔 누가, 메모, 페르소나' : '목표, 날짜, 메모, 상태, 페르소나'}</p> : null}
     </>;
     case 'energy': return <>
-      <label>경고 기준 (이하) <select value={String(o.warnAt ?? 6)} onChange={e => opt('warnAt', Number(e.target.value))}>{[3, 4, 5, 6, 7].map(n => <option key={n} value={n}>{n}점</option>)}</select></label>
-      <label>시작 시각 <select value={String(o.startHour ?? 6)} onChange={e => opt('startHour', Number(e.target.value))}>{[4, 5, 6, 7, 8, 9].map(h => <option key={h} value={h}>{h}시</option>)}</select></label></>;
+      <div className="inline"><label>파랑 (이상) <select value={String(o.greenAt ?? 7)} onChange={e => opt('greenAt', Number(e.target.value))}>{[5, 6, 7, 8, 9].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
+        <label>빨강 (이하) <select value={String(o.redAt ?? 3)} onChange={e => opt('redAt', Number(e.target.value))}>{[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}</select></label></div>
+      <label>알림 (이하) <select value={String(o.warnAt ?? Number(o.greenAt ?? 7) - 1)} onChange={e => opt('warnAt', Number(e.target.value))}>{[2, 3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
+      <label className="row-check"><input type="checkbox" checked={o.notify !== false} onChange={e => opt('notify', e.target.checked)} /> 알림 버튼 보이기</label>
+      <label className="row-check"><input type="checkbox" checked={o.timeline === true} onChange={e => opt('timeline', e.target.checked)} /> 시간대별 점도 보기</label>
+      <p className="muted small">문구는 아래 "버튼·칸 문구 바꾸기"에서 단계별로 정해요.</p></>;
     case 'mission': return <>
       <label>순집중 목표 (시간) <input className="num" inputMode="decimal" value={String(Number(o.focusTarget ?? 480) / 60)} onChange={e => opt('focusTarget', Math.max(30, Math.round((Number(e.target.value) || 8) * 60)))} /></label>
       <label>소원 표 <select value={String(o.wishTable ?? '')} onChange={e => opt('wishTable', e.target.value || undefined)}><option value="">없음</option>{tables.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}</select></label>
       {!!o.wishTable && <><label>상태 열 이름 <input value={String(o.statusColumn ?? '상태')} onChange={e => opt('statusColumn', e.target.value)} /></label>
         <div className="inline"><label>잠김 값 <input value={String(o.lockedValue ?? '잠김')} onChange={e => opt('lockedValue', e.target.value)} /></label><label>해금 값 <input value={String(o.unlockValue ?? '해금')} onChange={e => opt('unlockValue', e.target.value)} /></label></div></>}</>;
+    case 'focus': { const subs = (o.subjects as {name: string; color: string}[] | undefined) ?? []; return <>
+      <span className="muted small">과목</span>
+      {subs.map((sj, i) => <div key={i} className="inline"><input value={sj.name} onChange={e => opt('subjects', subs.map((x, j) => j === i ? {...x, name: e.target.value.slice(0, 40)} : x))} aria-label="과목 이름" />
+        <input type="color" value={sj.color} onChange={e => opt('subjects', subs.map((x, j) => j === i ? {...x, color: e.target.value} : x))} aria-label="과목 색" />
+        <button className="ghost small" onClick={() => opt('subjects', subs.filter((_, j) => j !== i))} aria-label="과목 빼기">×</button></div>)}
+      <button className="small" onClick={() => opt('subjects', [...subs, {name: `과목 ${subs.length + 1}`, color: SWATCHES[(subs.length * 5) % SWATCHES.length]}])}>+ 과목</button>
+      <label className="row-check"><input type="checkbox" checked={o.showTasks !== false} onChange={e => opt('showTasks', e.target.checked)} /> 오늘 할 일도 버튼으로</label>
+      <label className="row-check"><input type="checkbox" checked={o.askCondition !== false} onChange={e => opt('askCondition', e.target.checked)} /> 멈출 때 컨디션 묻기</label>
+      <span className="muted small">버튼 색</span>
+      <div className="swatches">{SWATCHES.map(c => <button key={c} className={`swatch ${o.buttonColor === c ? 'on' : ''}`} style={{background: c}} onClick={() => opt('buttonColor', c)} aria-label={`버튼 색 ${c}`} />)}
+        {!!o.buttonColor && <button className="ghost small" onClick={() => opt('buttonColor', undefined)}>기본</button>}</div></>; }
+    case 'list': return <>
+      <label>무엇을 <select value={String(o.source ?? 'tasks')} onChange={e => opt('source', e.target.value)}><option value="tasks">할 일</option><option value="goals">목표</option></select></label>
+      <label>기간 <select value={String(o.period ?? 'week')} onChange={e => opt('period', e.target.value)}><option value="today">보이는 날</option><option value="week">이번 주</option><option value="month">이번 달</option><option value="overdue">밀린 것</option><option value="all">전체</option></select></label>
+      <label>상태 <select value={String(o.status ?? 'open')} onChange={e => opt('status', e.target.value)}><option value="open">안 끝난 것</option><option value="done">끝낸 것</option><option value="all">전부</option></select></label>
+      {o.source !== 'goals' && <><label>분류 <select value={String(o.category ?? '')} onChange={e => opt('category', e.target.value || undefined)}><option value="">전부</option><option value="must">꼭</option><option value="want">하고 싶은</option><option value="leisure">여가</option></select></label>
+        <label>목표 <select value={String(o.goalId ?? '')} onChange={e => opt('goalId', e.target.value || undefined)}><option value="">전부</option>{goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>
+        {props.length > 0 && <div className="inline"><label>속성 <select value={String(o.propId ?? '')} onChange={e => opt('propId', e.target.value || undefined)}><option value="">없음</option>{props.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
+          {!!o.propId && <label>값 <input value={String(o.propValue ?? '')} onChange={e => opt('propValue', e.target.value)} list={`pv-${w.id}`} /><datalist id={`pv-${w.id}`}>{(props.find(d => d.id === o.propId)?.options ?? []).map(v => <option key={v} value={v} />)}</datalist></label>}</div>}</>}</>;
+    case 'personas': return <>
+      <label>보기 <select value={String(o.display ?? 'donut')} onChange={e => opt('display', e.target.value)}><option value="donut">원형 그래프</option><option value="top">가장 많이 산 페르소나 이름표만</option></select></label>
+      {props.length > 0 && <label>페르소나 속성 <select value={String(o.prop ?? '')} onChange={e => opt('prop', e.target.value || undefined)}><option value="">자동</option>{props.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>}</>;
     case 'persona-board': return <label>Deployed 한도 <input type="number" min={1} max={12} className="num" value={Number(o.limit ?? 3)} onChange={e => opt('limit', Math.max(1, Number(e.target.value) || 3))} /></label>;
     case 'checkin': return <div className="inline">
       <label>기상 <input type="time" value={String(o.wake ?? '07:00')} onChange={e => opt('wake', e.target.value)} /></label>

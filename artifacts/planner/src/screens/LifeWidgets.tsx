@@ -8,32 +8,42 @@ import {hm} from './Focus.tsx';
 import {abilitiesOf, deployedOver, energyPoints, goalActualMin, lightOf, missionState, roi} from '../lifeLogic.ts';
 export {abilitiesOf, deployedOver, energyPoints, focusReachedAt, goalActualMin, lightOf, missionState, roi} from '../lifeLogic.ts';
 import type {Ctx} from './day.ts';
+import {Wishes as WishBox} from './ViewWidgets.tsx';
 
 const mins = (a: string, b: string) => Math.max(0, (Date.parse(b) - Date.parse(a)) / 60000);
 const localHour = (iso: string) => { const d = new Date(iso); return d.getHours() + d.getMinutes() / 60; };
 
 // ── 에너지 신호등 ─────────────────────────────────────────────────────────────
 export function EnergyLight({w, ctx}: {w: Widget; ctx: Ctx}) {
-  const warnAt = Number(w.options.warnAt ?? 6), start = Number(w.options.startHour ?? 6), end = Number(w.options.endHour ?? 26);
-  const pts = energyPoints(ctx.p.records, ctx.day), last = pts.at(-1);
+  const L = useL();
+  // Levels the user sets: 파랑 at or above greenAt, 빨강 at or below redAt, 호박 in between. Messages per level are theirs (문구 바꾸기).
+  const greenAt = Number(w.options.greenAt ?? 7), redAt = Number(w.options.redAt ?? 3), warnAt = Number(w.options.warnAt ?? greenAt - 1);
+  const level = (n: number) => n >= greenAt ? 'blue' : n <= redAt ? 'red' : 'amber';
+  const pts = energyPoints(ctx.p.records, ctx.day), last = pts.at(-1), lit = last ? level(last.score) : null;
+  const msg = lit ? L(`msg.${lit}`, '') : '';
   const [perm, setPerm] = useState(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission);
   const [on, setOn] = useState(() => { try { return localStorage.getItem('lit.energyAlert') !== null; } catch { return false; } });
   const enable = async () => {
     const r = typeof Notification === 'undefined' ? 'denied' : await Notification.requestPermission();
     setPerm(r);
-    if (r === 'granted') { try { localStorage.setItem('lit.energyAlert', String(warnAt)); } catch { /* no storage */ } setOn(true); }
+    if (r === 'granted') { try { localStorage.setItem('lit.energyAlert', String(warnAt)); localStorage.setItem('lit.energyAlertText', L(`msg.${level(warnAt)}`, '')); } catch { /* no storage */ } setOn(true); }
   };
-  const W = 300, H = 64, x = (h: number) => 8 + (Math.min(end, Math.max(start, h < start ? h + 24 : h)) - start) / (end - start) * (W - 16), y = (n: number) => 6 + (10 - n) / 9 * (H - 22);
-  return <div className="energy-light">
-    {last && last.score <= warnAt && <p className={`energy-warn ${lightOf(last.score)}`} role="alert">에너지 {last.score}점 · {new Date(last.at).toTimeString().slice(0, 5)} {last.label}</p>}
-    <svg viewBox={`0 0 ${W} ${H}`} className="energy-svg" role="img" aria-label="시간대별 컨디션">
-      {[7, 4].map(n => <line key={n} x1={8} x2={W - 8} y1={y(n) + (n === 7 ? 4 : 4)} y2={y(n) + 4} className="energy-band" />)}
-      {Array.from({length: Math.floor((end - start) / 3) + 1}, (_, i) => start + i * 3).map(h => <text key={h} x={x(h)} y={H - 2} textAnchor="middle" className="energy-hour">{h % 24}</text>)}
-      {pts.map((p, i) => <g key={i}><circle cx={x(localHour(p.at))} cy={y(p.score)} r={5} className={`dot-${lightOf(p.score)}`}><title>{`${new Date(p.at).toTimeString().slice(0, 5)} ${p.label} · ${p.score}점`}</title></circle></g>)}
-    </svg>
-    {!pts.length && <p className="muted small">타이머를 멈출 때 컨디션을 남기면 점이 찍혀요.</p>}
-    {perm !== 'unsupported' && (on && perm === 'granted' ? <button className="ghost small" onClick={() => { try { localStorage.removeItem('lit.energyAlert'); } catch { /* */ } setOn(false); }}>{warnAt} 이하 알림 끄기</button>
-      : <button className="small" onClick={() => void enable()} disabled={perm === 'denied'}>{perm === 'denied' ? '브라우저에서 알림이 막혀 있어요' : `${warnAt} 이하면 알림 받기`}</button>)}
+  const start = Number(w.options.startHour ?? 6), end = start + 20, W = 300, H = 34, x = (h: number) => 6 + (Math.min(end, Math.max(start, h < start ? h + 24 : h)) - start) / (end - start) * (W - 12);
+  return <div className="tlight-wrap">
+    <div className="tlight" role="img" aria-label={last ? `에너지 ${last.score}점` : '아직 기록 없음'}>
+      {(['red', 'amber', 'blue'] as const).map(c => <i key={c} className={`lamp lamp-${c} ${lit === c ? 'lit' : ''}`} />)}
+    </div>
+    <div className="tlight-info">
+      {last ? <p className="tlight-score"><strong>{last.score}</strong> <span className="small">{new Date(last.at).toTimeString().slice(0, 5)} · {last.label}</span></p> : <p className="tlight-score"><strong>–</strong></p>}
+      {msg && <p className={`tlight-msg ${lit}`} role={last && last.score <= warnAt ? 'alert' : undefined}>{msg}</p>}
+      {w.options.timeline === true && pts.length > 0 && <svg viewBox={`0 0 ${W} ${H}`} className="energy-svg" aria-hidden="true">
+        {pts.map((p, i) => <circle key={i} cx={x(localHour(p.at))} cy={14} r={5} className={`dot-${level(p.score)}`} />)}
+        {[start, start + 5, start + 10, start + 15, start + 20].map(h => <text key={h} x={x(h)} y={H - 1} textAnchor="middle" className="energy-hour">{h % 24}</text>)}
+      </svg>}
+      {perm !== 'unsupported' && w.options.notify !== false && (on && perm === 'granted'
+        ? <button className="ghost small" onClick={() => { try { localStorage.removeItem('lit.energyAlert'); } catch { /* */ } setOn(false); }}>알림 끄기</button>
+        : perm !== 'denied' && <button className="ghost small" onClick={() => void enable()}>알림 받기</button>)}
+    </div>
   </div>;
 }
 
@@ -49,18 +59,19 @@ export function Mission({w, ctx}: {w: Widget; ctx: Ctx}) {
     <div className={`ms-bar ${m.winner === 'focus' ? 'won' : ''}`}><span className="k">{L('focus', '순집중')} {hm(m.focus)} / {hm(target)}</span><Gauge pct={pct(m.focus, target)} size="md" kind="bar" /></div>
     <div className={`ms-bar ${m.winner === 'plan' ? 'won' : ''}`}><span className="k">{L('plan', '일정 전부 완료')} {m.done}/{m.plan}</span><Gauge pct={m.plan ? pct(m.done, m.plan) : null} size="md" kind="bar" /></div>
     {m.wonAt ? <p className="ms-free"><strong>{L('free', '자유시간')} {hm(free)}</strong> <span className="muted small">{new Date(m.wonAt).toTimeString().slice(0, 5)}부터 · {m.winner === 'focus' ? '순집중' : '일정 완료'}이 먼저</span></p>
-      : <p className="muted small">둘 중 먼저 차는 쪽부터 자유시간이 시작돼요.</p>}
+      : null}
     <Wishes w={w} ctx={ctx} won={!!m.wonAt} unlock={L('unlock', '해금')} />
   </div>;
 }
 
 function wishTable(spec: PlannerSpec | undefined, ref: string) {
-  const all = [...(spec?.canvas?.day ?? []), ...(spec?.tabs ?? []).flatMap(t => t.widgets ?? [])].filter(x => x.type === 'table');
+  const all = [...(spec?.canvas?.day ?? []), ...(spec?.tabs ?? []).flatMap(t => t.widgets ?? [])].filter(x => x.type === 'table' || x.type === 'wishes');
   return all.find(x => x.id === ref) ?? all.find(x => (x.title ?? '') === ref) ?? null;
 }
 function Wishes({w, ctx, won, unlock}: {w: Widget; ctx: Ctx; won: boolean; unlock: string}) {
   const ref = String(w.options.wishTable ?? ''), table = ref ? wishTable(ctx.spec, ref) : null;
   if (!table) return null;
+  if (table.type === 'wishes') return <div className="wishes"><span className="k">소원</span><WishBox w={table} ctx={ctx} canUnlock={won} /></div>;
   const cols = (table.options.columns as PropDef[] | undefined) ?? [];
   const status = cols.find(c => c.name === String(w.options.statusColumn ?? '상태'));
   const locked = String(w.options.lockedValue ?? '잠김'), opened = String(w.options.unlockValue ?? '해금');
@@ -88,9 +99,9 @@ export function PersonaBoard({w, ctx}: {w: Widget; ctx: Ctx}) {
     return save(p, {months});
   };
   const [role, setRole] = useState<Record<string, string>>({});
-  if (!personas.length) return <p className="muted small">설정 → 페르소나에서 역할을 만들면 여기서 이번 달 배치를 정해요.</p>;
+  if (!personas.length) return null;
   return <div className="pboard">
-    <p className={`pb-count ${d.over ? 'over' : ''}`} role={d.over ? 'alert' : undefined}>{month.slice(5)}월 Deployed <strong>{d.count}</strong>/{limit}{d.over ? ' · 한도를 넘었어요' : ''} <span className="muted small">(Attached는 세지 않아요)</span></p>
+    <p className={`pb-count ${d.over ? 'over' : ''}`} role={d.over ? 'alert' : undefined}>{month.slice(5)}월 Deployed <strong>{d.count}</strong>/{limit}{d.over ? ' · 한도를 넘었어요' : ''}</p>
     <ul className="pb-list">{personas.map(p => { const m = p.body.months?.[month], ab = abilitiesOf(ctx.p.records, p.id);
       return <li key={p.id} className={`pb-item st-${m?.status ?? 'none'}`}>
         <div className="pb-head"><i className="dot" style={{background: p.body.color}} /><strong>{p.body.name}</strong>
@@ -113,11 +124,12 @@ export function GoalRetroForm({g, p, kind, done}: {g: LifeRecord<'goal'>; p: Pla
     setBusy(true);
     const retro = {kind, at: new Date().toISOString(), actualMin: actual, impact: kind === 'achieved' ? impact : null, roi: kind === 'achieved' ? roi(impact, actual) : null, nextOwner: kind === 'achieved' ? next : null, note: note.trim() || null};
     await p.write(g.id, {kind: 'goal', body: {...g.body, status: kind, retro} satisfies Goal, baseRevision: g.revision});
+    await p.refresh();
     setBusy(false); done();
   };
   return <section className="part retro"><h3>{kind === 'achieved' ? '성취 기록지' : '조정 기록지'}</h3>
     {kind === 'achieved' && <>
-      <p>실제 집중 <strong>{hm(actual)}</strong> <span className="muted small">(이 목표와 아래 마일스톤에 이어진 할 일의 타이머 합계)</span></p>
+      <p>실제 집중 <strong>{hm(actual)}</strong></p>
       <div className="inline"><span className="k">임팩트</span>{Array.from({length: 10}, (_, i) => i + 1).map(n => <button key={n} className={`scale-btn ${impact === n ? 'on' : ''}`} onClick={() => setImpact(n)} aria-pressed={impact === n}>{n}</button>)}</div>
       <p className="small">ROI (임팩트 ÷ 노력 시간) <strong>{roi(impact, actual) ?? '–'}</strong></p>
       <div className="inline"><span className="k">다음엔 누가</span>{([['me', '나'], ['ai', 'AI'], ['outsource', '외주']] as const).map(([k, v]) => <button key={k} className={`small ${next === k ? 'primary' : ''}`} onClick={() => setNext(k)} aria-pressed={next === k}>{v}</button>)}</div>
@@ -135,4 +147,19 @@ export function GoalRetroView({g}: {g: LifeRecord<'goal'>}) {
     {r.kind === 'achieved' && <p className="small">실제 {r.actualMin !== null ? hm(r.actualMin) : '–'} · 임팩트 {r.impact ?? '–'} · ROI {r.roi ?? '–'}{who ? ` · 다음엔 ${who}` : ''}</p>}
     {r.note && <p>{r.note}</p>}
   </section>;
+}
+
+/** 이뤘어요: a celebration first, then the record sheet; saving takes the user to where achievements are kept. */
+export function Celebrate({g, p, close, recorded}: {g: LifeRecord<'goal'>; p: Planner; close: () => void; recorded: () => void}) {
+  const [step, setStep] = useState<'party' | 'sheet'>('party');
+  return <div className="celebrate-wrap" role="dialog" aria-label="목표 달성">
+    <div className="celebrate">
+      {step === 'party' && <div className="confetti" aria-hidden="true">{Array.from({length: 28}, (_, i) => <i key={i} style={{'--i': i} as React.CSSProperties} />)}</div>}
+      {step === 'party' ? <>
+        <p className="cb-big">축하해요!</p>
+        <p className="cb-title">{g.body.title}</p>
+        <div className="inline"><button className="primary" onClick={() => setStep('sheet')}>기록하기</button><button className="ghost small" onClick={close}>나중에</button></div>
+      </> : <GoalRetroForm g={g} p={p} kind="achieved" done={recorded} />}
+    </div>
+  </div>;
 }

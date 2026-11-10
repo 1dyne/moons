@@ -15,6 +15,11 @@ const plannerUrl = () => (process.env.PLANNER_PUBLIC_URL ?? (process.env.RAILWAY
 const guide = () => `lit · 대화로 만들고 마음대로 꾸미는 나만의 다이어리 (MOONS의 다이어리)
 너는 lit의 플래너 문처럼 사용자와 대화하며 사용자의 하루에 맞는 플래너를 만든다. 순서:
 1. 묻기: 무엇을 관리하고 싶은지(할 일, 루틴, 공부 시간, 컨디션, 수면, 목표, 회고, 다꾸 꾸미기), 하루 리듬(기상·취침), 쓰는 기기(폰/PC), 좋아하는 느낌(색·글꼴·종이). 모르는 건 지어내지 않는다.
+꼭 지킬 것 (개인 공간이다):
+- 플래너 이름(name)·탭 이름·위젯 제목은 사용자가 직접 말한 것만 쓴다. 지어내지 않는다(사용자는 화면에서 두 번 눌러 고친다).
+- 설명·주석·안내 문장을 넣지 않는다: 안내용 text 위젯, 설명 열, 예시 문장, 플레이스홀더 금지. text 위젯은 사용자가 그 문구를 원할 때만.
+- 소원 상자는 wishes 위젯(표 아님). 같은 할 일·목표를 다르게 보려면 list 위젯(필터)으로. 표(table)는 사용자가 직접 기록할 칸이 필요할 때만.
+- 과목 타이머: focus{subjects:[{name,color}], showTasks, askCondition, buttonColor}. 에너지 신호등: energy{greenAt, redAt, warnAt, timeline, labels:{"msg.blue","msg.amber","msg.red"}(사용자가 준 문구만)}. 오늘의 나: personas{display:"donut"|"top", prop}. 목록 보기: list{source:"tasks"|"goals", period:"today"|"week"|"month"|"overdue"|"all", status:"open"|"done"|"all", category, goalId, propId, propValue}. 주간·월·목표·분석을 페이지에 넣을 때: week-view, month-view, goals-view, insights-view.
 2. 제안: 어떤 위젯을 어디에 둘지, 스킨(색·글꼴·종이)을 말로 짧게 보여 주고 사용자의 OK를 받는다.
 3. 만들기: build_planner. 기존 플래너가 있으면 get_planner로 먼저 보고, 바꾸는 것만 반영한다(바꿔도 기록은 그대로, 새 버전이 된다).
 4. 채우기(원하면): 큰 목표는 add_goal_plan(마일스톤에 끝낼 달·예상 시간), 할 일·루틴·페르소나는 add_items. 할 일은 goalId로 목표에 이어야 체크가 진행률이 된다.
@@ -90,7 +95,7 @@ export function registerPlannerTools(tool: Tool) {
       const {spec, dropped} = buildSpec(current ?? null, {name, widgets, skin: {...(preset ?? {}), ...(skin ?? {})}, weekLayout, mode: 'free'});
       if (taskProps) spec.props = {task: mergeProps(current?.props?.task ?? [], taskProps)};
       if (tabs) spec.tabs = tabs.map((t, i) => ({id: t.kind === 'page' ? `p-${i}-${Date.now().toString(36)}` : (tabs.findIndex(x => x.kind === t.kind) === i ? t.kind : `${t.kind}-${i}`), name: t.name, kind: t.kind,
-        ...(t.kind === 'page' ? {widgets: toFree(normalizeWidgets(t.widgets ?? []).widgets)} : {})}));
+        ...(t.kind === 'page' ? {widgets: toFree(normalizeWidgets(t.widgets ?? [], `p${i}${Date.now().toString(36).slice(-3)}-`).widgets)} : {})}));
       else if (current?.tabs) spec.tabs = current.tabs;
       fixGroupBy(spec);
       const saved = await saveSpec(owner, spec);

@@ -12,10 +12,10 @@ export const METRICS: Record<CanvasMode, {cols: number; row: number; gap: number
   free: {cols: 48, row: 10, gap: 0, kx: 4, ky: 3},
 };
 export const WIDGET_TYPES = ['focus', 'tasks', 'timetable', 'receipt', 'hourly', 'bullet', 'page', 'checkin', 'carry', 'routine', 'habits',
-  'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'table', 'custom', 'energy', 'mission', 'persona-board', 'text', 'sticker', 'tape', 'image', 'shape'] as const;
+  'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'table', 'custom', 'energy', 'mission', 'persona-board', 'wishes', 'list', 'week-view', 'month-view', 'goals-view', 'insights-view', 'text', 'sticker', 'tape', 'image', 'shape'] as const;
 export type WidgetType = (typeof WIDGET_TYPES)[number];
 
-export type WidgetInfo = {type: WidgetType; label: string; desc: string; group: '기록' | '시간' | '목표' | '나' | '꾸미기' | '내 위젯'; w: number; h: number; minW: number; minH: number; module?: ModuleType};
+export type WidgetInfo = {type: WidgetType; label: string; desc: string; group: '기록' | '시간' | '목표' | '나' | '꾸미기' | '내 위젯' | '보기'; w: number; h: number; minW: number; minH: number; module?: ModuleType};
 export const WIDGETS: WidgetInfo[] = [
   {type: 'tasks', label: '할 일', desc: '○△× 체크, 분량·예상 시간, 목표 연결', group: '기록', w: 7, h: 12, minW: 3, minH: 5, module: 'tasks'},
   {type: 'bullet', label: '빠른 기록', desc: '불렛저널처럼 • 할 일 ○ 일정 – 메모', group: '기록', w: 7, h: 12, minW: 3, minH: 5, module: 'memo'},
@@ -40,6 +40,12 @@ export const WIDGETS: WidgetInfo[] = [
   {type: 'goals', label: '이어진 목표', desc: '오늘 걸린 주간·월간·연간 목표와 %', group: '목표', w: 5, h: 6, minW: 3, minH: 3, module: 'goals'},
   {type: 'progress', label: '목표 진행률', desc: '고른 목표 하나를 크게', group: '목표', w: 4, h: 4, minW: 3, minH: 3, module: 'goals'},
   {type: 'dday', label: 'D-day', desc: '목표 마감까지 남은 날', group: '목표', w: 3, h: 3, minW: 2, minH: 2, module: 'goals'},
+  {type: 'wishes', label: '소원 상자', desc: '이루면 열리는 소원: 잠김 → 해금 → 사용함', group: '목표', w: 6, h: 6, minW: 3, minH: 3},
+  {type: 'list', label: '목록 보기', desc: '할 일·목표를 조건(기간·상태·분류·속성)으로 걸러 보는 칸', group: '기록', w: 8, h: 10, minW: 3, minH: 4},
+  {type: 'week-view', label: '주간 계획표', desc: '이번 주 7일', group: '보기', w: 12, h: 20, minW: 6, minH: 8},
+  {type: 'month-view', label: '월·년 보기', desc: '이달 한눈에와 달력', group: '보기', w: 12, h: 24, minW: 6, minH: 8},
+  {type: 'goals-view', label: '목표 보기', desc: '목표와 진행률', group: '보기', w: 12, h: 20, minW: 6, minH: 8},
+  {type: 'insights-view', label: '분석 보기', desc: '집중·컨디션·예상 대비 실제', group: '보기', w: 12, h: 20, minW: 6, minH: 8},
   {type: 'text', label: '문구', desc: '좌우명, 오늘의 다짐, 제목', group: '꾸미기', w: 6, h: 3, minW: 2, minH: 1},
   {type: 'sticker', label: '스티커', desc: '이모지·글자 스티커, 돌리고 겹치기', group: '꾸미기', w: 2, h: 3, minW: 1, minH: 1},
   {type: 'tape', label: '마스킹테이프', desc: '무늬·색·기울기를 고르는 테이프', group: '꾸미기', w: 4, h: 1, minW: 1, minH: 1},
@@ -60,13 +66,14 @@ export type PropDef = z.infer<typeof PropDef>;
 export const newPropId = () => Math.random().toString(36).slice(2, 10);
 
 /** Words on a widget's buttons and boxes the user may rename. key → default text. */
-export const WIDGET_LABELS: Partial<Record<WidgetType, {key: string; def: string}[]>> = {
+export const WIDGET_LABELS: Partial<Record<WidgetType, {key: string; def: string; name?: string}[]>> = {
   focus: [{key: 'ask', def: '지금 무엇에 집중하나요?'}, {key: 'other', def: '다른 일'}, {key: 'running', def: '지금 집중 중'}, {key: 'total', def: '오늘 순집중'}],
   tasks: [{key: 'placeholder', def: '할 일 · 예) 수학 20문제, 보고서 90분, 14:00-15:00 회의'}, {key: 'add', def: '추가'}, {key: 'cat.must', def: '꼭'}, {key: 'cat.want', def: '하고 싶은'}, {key: 'cat.leisure', def: '여가'}],
   routine: [{key: 'placeholder', def: '루틴 추가 (매일)'}, {key: 'add', def: '추가'}, {key: 'missed', def: '× 못 했어요'}],
   sleep: [{key: 'sleep', def: '☾ 잘게요'}, {key: 'wake', def: '일어났어요'}],
   review: [{key: 'placeholder', def: '오늘은 어땠나요? 한 줄이면 충분해요.'}],
   table: [{key: 'add', def: '+ 새 줄'}],
+  energy: [{key: 'msg.blue', def: '', name: '파랑일 때 문구'}, {key: 'msg.amber', def: '', name: '호박일 때 문구'}, {key: 'msg.red', def: '', name: '빨강일 때 문구'}],
   mission: [{key: 'focus', def: '순집중'}, {key: 'plan', def: '일정 전부 완료'}, {key: 'free', def: '자유시간'}, {key: 'unlock', def: '해금'}],
 };
 

@@ -4,7 +4,7 @@ import type {Planner} from '../data.ts';
 import type {Timer} from './Focus.tsx';
 
 // Shared by every day layout (no JSX, no imports back into the screens: keeps module init order safe).
-export type Nav = {day: string; setDay: (d: string) => void; openGoal: (id: string) => void};
+export type Nav = {day: string; setDay: (d: string) => void; openGoal: (id: string) => void; openTab?: (id: string) => void};
 export type Ctx = {p: Planner; day: string; nav: Nav; now: () => string; timer: Timer | null; color: (k: string) => string; settings?: Settings;
   // The page being shown and a way to change it in place (add a property, a table column…). Absent in read-only mockups.
   spec?: PlannerSpec; saveSpec?: (change: (s: PlannerSpec) => PlannerSpec) => Promise<void>;

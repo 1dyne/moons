@@ -17,11 +17,12 @@ const hms = (ms: number) => { const s = Math.max(0, Math.floor(ms / 1000)); retu
 const clock = (iso: string) => new Date(iso).toLocaleTimeString('ko-KR', {hour: '2-digit', minute: '2-digit', hour12: false});
 
 /** Stable colour per task (or free label) for the day: the order the day first saw it. */
-export function colors(p: Planner, day: string) {
+export function colors(p: Planner, day: string, fixed: Record<string, string> = {}) {
   const keys: string[] = [];
   for (const t of ofKind(p.records, 'task').filter(t => t.logicalDay === day).sort((a, b) => a.createdAt.localeCompare(b.createdAt))) keys.push(t.id);
   for (const s of ofKind(p.records, 'session').filter(s => s.logicalDay === day)) { const k = s.body.taskId ?? `label:${s.body.label}`; if (!keys.includes(k)) keys.push(k); }
-  return (key: string) => PALETTE[Math.max(0, keys.indexOf(key)) % PALETTE.length]!;
+  // Subjects keep the colour the user gave them in the timer.
+  return (key: string) => fixed[key] ?? PALETTE[Math.max(0, keys.indexOf(key)) % PALETTE.length]!;
 }
 export const sessionKey = (s: LifeRecord<'session'>) => s.body.taskId ?? `label:${s.body.label}`;
 
@@ -36,12 +37,14 @@ export function useTimer(p: Planner, settings: Settings) {
     if (end.getTime() - new Date(running.body.start).getTime() < 60_000) { await p.remove(running.id); return; }
     const saved = await p.write(running.id, {kind: 'session', logicalDay: running.logicalDay, body: {...running.body, end: end.toISOString()}, baseRevision: running.revision});
     if (saved) setStopped(saved as LifeRecord<'session'>);
+    void p.refresh();
   };
   const rate = async (condition: number | null, note: string) => {
     const s = stopped; setStopped(null);
     if (!s || (condition === null && !note.trim())) return;
     await p.write(s.id, {kind: 'session', logicalDay: s.logicalDay, body: {...s.body, condition, note: note.trim() || null}, baseRevision: s.revision});
     if (condition !== null) lowEnergyAlert(condition);
+    void p.refresh();
   };
   const start = async (target: {task?: LifeRecord<'task'>; label?: string}) => {
     await stop();
@@ -200,8 +203,47 @@ function SessionNote({s, p}: {s: LifeRecord<'session'>; p: Planner}) {
 export function lowEnergyAlert(score: number) {
   let at = NaN; try { at = Number(localStorage.getItem('lit.energyAlert')); } catch { /* no storage */ }
   if (!Number.isFinite(at) || score > at || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-  const body = `컨디션 ${score}점이 찍혔어요. 잠깐 쉬거나 가벼운 일로 바꿔 볼까요?`;
+  let own = ''; try { own = localStorage.getItem('lit.energyAlertText') ?? ''; } catch { /* */ }
+  const body = own ? `${score}점 · ${own}` : `컨디션 ${score}점`;
   const plain = () => { try { new Notification('lit · 에너지 낮음', {body}); } catch { /* not allowed here */ } };
   if (navigator.serviceWorker?.controller) void navigator.serviceWorker.ready.then(r => r.showNotification('lit · 에너지 낮음', {body, tag: 'lit-energy'})).catch(plain);
   else plain();
+}
+
+// ── 과목 타이머 (열품타처럼) ─────────────────────────────────────────────────
+// A list of subjects (and, if wanted, today's tasks), each with its own ▶ / ■. Pressing ▶ starts that one (and stops
+// whatever was running); pressing ■ stops it. Every stretch is a session, so the 10-minute timetable fills by itself.
+export type Subject = {name: string; color: string};
+export const SUBJECT_COLORS = ['#3a66b8', '#2f9585', '#e9a317', '#d0342c', '#7b6bc4', '#00838f', '#c4689a', '#5d5d57'];
+export function SubjectTimer({p, day, timer, subjects, showTasks, askCondition, onSubjects}: {p: Planner; day: string; timer: Timer; subjects: Subject[]; showTasks: boolean; askCondition: boolean; onSubjects?: (s: Subject[]) => void}) {
+  const now = useClock(1000), L = useL();
+  const [adding, setAdding] = useState(''), [note, setNote] = useState('');
+  const sessions = ofKind(p.records, 'session').filter(s => s.logicalDay === day);
+  const spent = (match: (s: LifeRecord<'session'>) => boolean) => sessions.filter(match).reduce((m, s) => m + Math.max(0, (new Date(s.body.end ?? now.toISOString()).getTime() - new Date(s.body.start).getTime()) / 60000), 0);
+  const total = spent(() => true), r = timer.running;
+  const tasks = showTasks ? ofKind(p.records, 'task').filter(t => t.logicalDay === day && !t.body.plan.fixed && !['cancelled', 'postponed'].includes(t.body.outcome.result)) : [];
+  const rows: {key: string; name: string; color: string; min: number; running: boolean; go: () => void}[] = [
+    ...subjects.map(sj => ({key: `label:${sj.name}`, name: sj.name, color: sj.color, min: spent(s => !s.body.taskId && s.body.label === sj.name), running: !!r && !r.body.taskId && r.body.label === sj.name, go: () => void timer.start({label: sj.name})})),
+    ...tasks.map(t => ({key: t.id, name: t.body.title, color: '', min: spent(s => s.body.taskId === t.id), running: r?.body.taskId === t.id, go: () => void timer.start({task: t})})),
+  ];
+  const done = timer.stopped;
+  return <div className="subj">
+    <div className="subj-head"><span className="k">{L('total', '오늘 순집중')}</span><strong>{hm(total)}</strong>
+      {r && <span className="subj-now">{r.body.label} · {hms(now.getTime() - new Date(r.body.start).getTime())}</span>}</div>
+    {done && askCondition && !r && <div className="subj-ask" role="group" aria-label="방금 컨디션">
+      <span className="small">{done.body.label} 컨디션</span>
+      <Scale value={null} onPick={n => { void timer.rate(n, note); setNote(''); }} label="방금 집중할 때 컨디션 1~10" />
+      <input className="subj-note" value={note} onChange={e => setNote(e.target.value)} placeholder="메모" aria-label="메모" />
+      <button className="ghost small" onClick={() => { void timer.rate(null, note); setNote(''); }}>건너뛰기</button>
+    </div>}
+    <ul className="subj-list">{rows.map(x => <li key={x.key} className={x.running ? 'on' : ''} style={x.color ? {'--sc': x.color} as React.CSSProperties : undefined}>
+      <i className="subj-dot" aria-hidden="true" />
+      <span className="subj-name">{x.name}</span>
+      <span className="subj-min">{hm(x.min)}</span>
+      <button className={`subj-btn ${x.running ? 'stop' : ''}`} onClick={x.running ? () => void timer.stop() : x.go} aria-label={`${x.name} ${x.running ? '멈추기' : '시작'}`}>{x.running ? '■' : '▶'}</button>
+      {onSubjects && !x.key.startsWith('label:') ? null : onSubjects && <button className="ghost small subj-del" onClick={() => onSubjects(subjects.filter(sj => `label:${sj.name}` !== x.key))} aria-label={`${x.name} 빼기`}>×</button>}
+    </li>)}</ul>
+    {onSubjects && <form className="inline subj-add" onSubmit={e => { e.preventDefault(); const n = adding.trim(); if (n && !subjects.some(sj => sj.name === n)) onSubjects([...subjects, {name: n.slice(0, 40), color: SUBJECT_COLORS[subjects.length % SUBJECT_COLORS.length]!}]); setAdding(''); }}>
+      <input value={adding} onChange={e => setAdding(e.target.value)} placeholder="과목" aria-label="과목 추가" maxLength={40} /><button className="small">추가</button></form>}
+  </div>;
 }

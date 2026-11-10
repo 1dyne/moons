@@ -10,7 +10,7 @@ export type Backend = {write: (id: string | null, w: Write) => Promise<AnyRecord
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api/life/v1${path}`, {credentials: 'include', ...init, headers: {'content-type': 'application/json', ...init?.headers}});
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error?.message ?? '저장하지 못했어요. 다시 시도해 주세요.');
+  if (!res.ok) throw Object.assign(new Error(data?.error?.message ?? '저장하지 못했어요. 다시 시도해 주세요.'), {status: res.status});
   return data as T;
 }
 export const api = {
@@ -66,7 +66,16 @@ export const httpBackend: Backend = {
     if (queued() > 0) { const r = queue(); void flushQueue(); return r; }
     try {
       return await call<{item: AnyRecord}>(id ? `/items/${id}` : '/items', {method: id ? 'PUT' : 'POST', body: JSON.stringify(w)}).then(r => r.item);
-    } catch (e) { if (isNetworkError(e)) return queue(); throw e; }
+    } catch (e) {
+      if (isNetworkError(e)) return queue();
+      // The record moved on elsewhere (Claude, another device, the timer): this is the user's own planner, so what they
+      // just did wins. Write again on top of the latest instead of showing an error.
+      if ((e as {status?: number}).status === 409 && id && w.baseRevision !== undefined && !/deleted/i.test((e as Error).message)) {
+        const {baseRevision: _stale, ...latest} = w;
+        return call<{item: AnyRecord}>(`/items/${id}`, {method: 'PUT', body: JSON.stringify(latest)}).then(r => r.item);
+      }
+      throw e;
+    }
   },
   async remove(id) {
     const gone = {id, deletedAt: new Date().toISOString()} as AnyRecord;
@@ -100,7 +109,9 @@ export function usePlanner(backend: Backend, initial: AnyRecord[]) {
   const remove = useCallback(async (id: string) => {
     try { setError(''); put(await backend.remove(id)); } catch (e) { setError((e as Error).message); }
   }, [backend]);
-  return {records, write, remove, error, setRecords};
+  // Rows the server adds by itself (log tables) after a session or goal write: pull them in (real planner only).
+  const refresh = useCallback(async () => { if (backend === httpBackend) { try { setRecords(await api.recordsWithQueue()); } catch { /* offline: next sync */ } } }, [backend]);
+  return {records, write, remove, error, setRecords, refresh};
 }
 export type Planner = ReturnType<typeof usePlanner>;
 export const ofKind = <K extends Kind>(records: AnyRecord[], kind: K) => records.filter(r => r.kind === kind && !r.deletedAt) as unknown as LifeRecord<K>[];

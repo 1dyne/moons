@@ -14,6 +14,7 @@ import {Tip} from '../Tip.tsx';
 import {useL} from '../labels.tsx';
 import {PropForm, PropInput, showValue} from './Table.tsx';
 import {roleGroups} from './Table.tsx';
+import {InlineEdit} from '../InlineEdit.tsx';
 export {parseEntry, parseTarget} from '../parse.ts';
 
 const CATEGORY: Record<string, string> = {must: '꼭', want: '하고 싶은', leisure: '여가'};
@@ -111,7 +112,7 @@ function TaskRow({t, ctx}: {t: LifeRecord<'task'>; ctx: Ctx}) {
   return <li className={`prow ${o.result} ${running ? 'running' : ''} ${hl ? 'hl' : ''}`} style={{'--c': color(t.id), ...(hl ? {'--hl': hl.color} : {})} as React.CSSProperties}>
     <button className="mark" disabled={fixed} onClick={() => set(NEXT[o.result] ?? 'unknown')} aria-label={`${t.body.title}: ${RESULT[o.result]}. 눌러서 바꾸기`}>{MARK[o.result]}</button>
     <span className="ptitle">
-      <span className="pname">{t.body.title}</span>
+      <InlineEdit className="pname" value={t.body.title} onSave={title => saveTask(ctx, t, {title})} />
       <span className="psub">
         {target && <span className="qty">{o.amount !== null && o.result !== 'done' ? `${o.amount}/` : ''}{target.amount}{target.unit}</span>}
         {goals.map(g => <button key={g.id} className="goal-chip" onClick={() => nav.openGoal(g.id)} title="이 할 일이 올리는 목표">→ {g.body.title} <b>{goalPercent(g.id, p.records).pct}%</b></button>)}
@@ -166,7 +167,7 @@ export function Routines({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
     <p className="tally"><strong>{rate.done}</strong>/{rate.of} <Tip id="routine-count">{pick ? '오늘 고른 루틴만 세요' : '정해 둔 루틴 전부를 세요'}</Tip></p>
     {pick && <div className="pick">
       {due.filter(r => !inst(r.id)).map(r => <button key={r.id} className="chip" onClick={() => commit(r)}>+ {r.body.title}</button>)}
-      {due.length > 0 && due.every(r => inst(r.id)) && <span className="muted small">오늘 할 루틴을 모두 골랐어요</span>}
+
       {due.length === 0 && <Tip id="routine-empty">루틴을 추가하면 여기서 오늘 할 것을 골라요</Tip>}
     </div>}
     <ul className="prows">{shown.map(r => {
@@ -212,12 +213,40 @@ export function DayGoals({ctx}: {ctx: Ctx}) {
   </li>)}</ul>;
 }
 
-export function PersonaToday({ctx}: {ctx: Ctx}) {
-  const share = personaShare(ctx.p.records, ctx.day, 1), recent = personaShare(ctx.p.records, ctx.day, 14);
-  if (!share.rows.length) return <Tip id="personas-empty" block>설정 → 페르소나에서 나의 역할을 만들면 할 일에 붙일 수 있어요.</Tip>;
-  return <div className="persona-today">
-    {share.rows.map(r => <span key={r.id} className="persona-chip big" style={{'--pc': r.color} as React.CSSProperties}>{r.name} <b>{hm(r.minutes)}</b> <small>할 일 {r.done}/{r.tasks}</small></span>)}
-    {recent.total > 0 && <p className="muted small">최근 2주: {recent.rows.filter(r => r.minutes).map(r => `${r.name} ${r.share}%`).join(' · ')}</p>}
+/** Who I was today, by focus time: persona records linked to tasks/sessions, or a task property named like a persona
+ *  ("페르소나", or the one chosen in the widget). Shown as a donut or just the top persona's name tag. */
+export function personaMinutes(ctx: Ctx, propId?: string) {
+  const rows = personaShare(ctx.p.records, ctx.day, 1).rows.filter(r => r.minutes > 0).map(r => ({name: r.name, color: r.color, minutes: r.minutes}));
+  if (rows.length) return rows;
+  const defs = ctx.spec?.props?.task ?? [], def = defs.find(d => d.id === propId) ?? defs.find(d => /페르소나|persona/i.test(d.name));
+  if (!def) return [];
+  const personas = ofKind(ctx.p.records, 'persona'), tasks = new Map(ofKind(ctx.p.records, 'task').map(t => [t.id, t]));
+  const by = new Map<string, number>();
+  for (const sn of ofKind(ctx.p.records, 'session')) {
+    if (sn.logicalDay !== ctx.day || !sn.body.taskId) continue;
+    const v = tasks.get(sn.body.taskId)?.body.props?.[def.id];
+    if (typeof v !== 'string' || !v) continue;
+    by.set(v, (by.get(v) ?? 0) + Math.max(0, (Date.parse(sn.body.end ?? new Date().toISOString()) - Date.parse(sn.body.start)) / 60000));
+  }
+  const pal = ['#3a66b8', '#2f9585', '#e9a317', '#d0342c', '#7b6bc4', '#00838f', '#c4689a', '#5d5d57'];
+  return [...by.entries()].sort((a, b) => b[1] - a[1]).map(([name, minutes], i) => ({name, minutes: Math.round(minutes), color: personas.find(x => x.body.name === name)?.body.color ?? pal[i % pal.length]!}));
+}
+
+export function PersonaToday({ctx, w}: {ctx: Ctx; w?: {options: Record<string, unknown>}}) {
+  const rows = personaMinutes(ctx, w?.options.prop as string | undefined).sort((a, b) => b.minutes - a.minutes);
+  if (!rows.length) return <Tip id="personas-empty" block>페르소나가 붙은 할 일로 타이머를 쓰면 보여요.</Tip>;
+  const top = rows[0]!, total = rows.reduce((m, r) => m + r.minutes, 0);
+  if (w?.options.display === 'top') return <div className="persona-top"><span className="persona-tag" style={{'--pc': top.color} as React.CSSProperties}>{top.name}</span><span className="small mono">{hm(top.minutes)}</span></div>;
+  // Donut: each persona's share of today's focus.
+  const R = 34, C = 2 * Math.PI * R;
+  let off = 0;
+  return <div className="persona-donut">
+    <svg viewBox="0 0 90 90" width="96" height="96" role="img" aria-label={rows.map(r => `${r.name} ${Math.round(r.minutes / total * 100)}%`).join(', ')}>
+      <circle cx="45" cy="45" r={R} fill="none" stroke="var(--line)" strokeWidth="12" />
+      {rows.map(r => { const len = C * r.minutes / total, el = <circle key={r.name} cx="45" cy="45" r={R} fill="none" stroke={r.color} strokeWidth="12" strokeDasharray={`${len} ${C}`} strokeDashoffset={-off} transform="rotate(-90 45 45)" />; off += len; return el; })}
+      <text x="45" y="49" textAnchor="middle" className="donut-mid">{hm(total)}</text>
+    </svg>
+    <ul className="donut-legend">{rows.slice(0, 5).map(r => <li key={r.name} className={r === top ? 'top' : ''}><i style={{background: r.color}} />{r.name}<span className="mono small">{Math.round(r.minutes / total * 100)}%</span></li>)}</ul>
   </div>;
 }
 

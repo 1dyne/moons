@@ -16,6 +16,7 @@ import {AvailabilityProvider} from './avail.tsx';
 import {AvailabilityEditor} from './screens/AvailabilityEditor.tsx';
 import {LibraryProvider, useLibraryState} from './library.tsx';
 import {Tip, setTipsOn, useTipsOn} from './Tip.tsx';
+import {InlineEdit} from './InlineEdit.tsx';
 
 type Loaded = {settings: Settings & {configured: boolean; availability?: Availability | null}; planner: {version: number; spec: PlannerSpec} | null; records: AnyRecord[]};
 const PlannerCtx = createContext<Planner | null>(null);
@@ -58,7 +59,7 @@ function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Lo
     <header className="top">
       <Moon size={34} />
       <span className="brand" aria-label="lit">lit</span>
-      <h1>{spec.name}</h1>
+      <InlineEdit as="h1" value={spec.name} max={40} placeholder="플래너 이름" onSave={async name => { await api.putSpec({...spec, name}); await reload(); }} />
       {(!sync.online || sync.waiting > 0) && <span className={`sync ${sync.online ? 'up' : 'off'}`} role="status">{sync.online ? `올리는 중 · ${sync.waiting}` : `오프라인${sync.waiting ? ` · 기록 ${sync.waiting}개 대기` : ''}`}</span>}
       <InstallButton />
       <SleepingBadge p={p} settings={loaded.settings} />
@@ -68,7 +69,7 @@ function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Lo
     </header>
     <LibraryProvider value={library}><AvailabilityProvider value={loaded.settings.availability ?? null}>
     <MenuDrawer open={menu} close={() => setMenu(false)} spec={spec} saveSpec={async next => { await api.putSpec(next); await reload(); }} openSettings={() => { setDecorating(false); setSettingsOpen(true); }} />
-    <PlannerCtx.Provider value={p}>{decorating ? <Editor spec={spec} settings={loaded.settings} p={p} saveLabel="저장" onCancel={() => setDecorating(false)} pageId={tabsOf(spec).find(t => t.id === currentTab() && t.kind === 'page')?.id}
+    <PlannerCtx.Provider value={p}>{decorating ? <Editor spec={spec} settings={loaded.settings} p={p} saveLabel="저장" onCancel={() => setDecorating(false)} pageId={tabsOf(spec).find(t => t.id === currentTab() && t.kind !== 'today')?.id}
       onSave={async next => { await api.putSpec(next); setDecorating(false); await reload(); }} hint="지금 기록 그대로 보면서 꾸며요. 저장하면 새 버전이 되고 기록은 그대로예요." /> : settingsOpen ? <SettingsPanel loaded={loaded} edit={edit} close={() => setSettingsOpen(false)} reload={reload} /> : <PlannerView spec={spec} settings={loaded.settings} p={p} saveSpec={async change => { await api.putSpec(change(spec)); await reload(); }} />}</PlannerCtx.Provider>
     </AvailabilityProvider></LibraryProvider>
   </div>;
@@ -91,8 +92,11 @@ function useSync(refresh: () => Promise<void>) {
     const down = () => setOnline(false);
     window.addEventListener('online', up); window.addEventListener('offline', down);
     const t = setInterval(() => { if (queued() && navigator.onLine) void up(); }, 30_000);
+    // Coming back to the tab: pick up what Claude or another device wrote meanwhile.
+    const back = () => { if (document.visibilityState === 'visible' && navigator.onLine && !queued()) void refresh(); };
+    document.addEventListener('visibilitychange', back);
     if (queued() && navigator.onLine) void up();
-    return () => { off(); window.removeEventListener('online', up); window.removeEventListener('offline', down); clearInterval(t); };
+    return () => { off(); window.removeEventListener('online', up); window.removeEventListener('offline', down); clearInterval(t); document.removeEventListener('visibilitychange', back); };
   }, []);
   return {waiting, online};
 }

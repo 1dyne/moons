@@ -4,7 +4,7 @@ import {METRICS, isDark, isDecor, minSize, settle, starterCanvas, toFree, widget
 import {ofKind, type Planner} from '../data.ts';
 import type {Ctx} from './day.ts';
 import {CarryOver, DayGoals, PersonaToday, ReviewBox, Routines, SleepBox, Tasks} from './Today.tsx';
-import {FocusBar, Receipt, Timetable, colors, useTimer} from './Focus.tsx';
+import {Receipt, SubjectTimer, Timetable, colors, useTimer, type Subject} from './Focus.tsx';
 import {CheckIn, ConditionDay} from './CheckIn.tsx';
 import {BulletDay, HourlyDay, OnePageDay} from './DayLayouts.tsx';
 import {HabitGrid} from './Habits.tsx';
@@ -15,6 +15,9 @@ import {TableWidget} from './Table.tsx';
 import {CustomWidget} from './CustomWidget.tsx';
 import {Tip} from '../Tip.tsx';
 import {EnergyLight, Mission, PersonaBoard} from './LifeWidgets.tsx';
+import {InlineEdit} from '../InlineEdit.tsx';
+import {patchWidget} from './Table.tsx';
+import {ListView, ViewWidget, Wishes} from './ViewWidgets.tsx';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
 /** A saved page keeps its placement; a page never arranged starts as 다꾸형 from the layout's starter. */
@@ -86,7 +89,10 @@ export type EditApi = {widgets: Widget[]; mode: CanvasMode; selected: string | n
 
 export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveSpec}: {spec: PlannerSpec; settings: Settings; p: Planner; today: string; day: string; nav: Ctx['nav']; edit?: EditApi; page?: Widget[]; saveSpec?: Ctx['saveSpec']}) {
   const widgets = edit?.widgets ?? page ?? canvasOf(spec), mode = edit?.mode ?? (page ? 'free' : modeOf(spec)), M = METRICS[mode];
-  const timer = useTimer(p, settings), color = colors(p, day);
+  const timer = useTimer(p, settings);
+  // Subject colours from the timer(s) on this page carry into the timetable and receipt.
+  const fixed = Object.fromEntries(widgets.filter(w => w.type === 'focus').flatMap(w => ((w.options.subjects as Subject[] | undefined) ?? []).map(sj => [`label:${sj.name}`, sj.color])));
+  const color = colors(p, day, fixed);
   const timed = widgets.some(w => ['focus', 'timetable', 'receipt', 'hourly'].includes(w.type));
   const ctx: Ctx = {p, day, nav, now: () => new Date().toISOString(), timer: timed ? timer : null, color, settings, spec, saveSpec: edit ? undefined : saveSpec, preview: !!edit};
   const grid = useRef<HTMLDivElement>(null);
@@ -147,14 +153,14 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveS
       const decor = isDecor(w.type), rot = Number(w.options.rotate ?? 0), dx = Number(w.options.dx ?? 0), dy = Number(w.options.dy ?? 0);
       const toggle = !decor && w.options.toggle === true, isFolded = toggle && fold.has(w.id);
       return <section key={w.id} data-id={w.id} data-toggle={toggle ? '1' : undefined} className={`wg ${decor ? 'wg-decor' : `wg-${w.style ?? spec.skin?.card ?? 'line'}`} wg-type-${w.type} ${sel ? 'selected' : ''} ${drag?.id === w.id ? 'dragging' : ''} ${isFolded ? 'folded' : ''}`}
-        style={{gridColumn: `${w.x + 1} / span ${w.w}`, gridRow: `${w.y + 1} / span ${w.h}`, order: w.y * M.cols + w.x, ...(w.color ? {'--accent': w.color} : {}),
+        style={{gridColumn: `${w.x + 1} / span ${w.w}`, gridRow: `${w.y + 1} / span ${w.h}`, order: w.y * M.cols + w.x, ...(w.color ? {'--accent': w.color} : {}), ...(w.options.buttonColor ? {'--btn': String(w.options.buttonColor)} : {}),
           ...(w.font ? {fontFamily: `var(--wfont-${w.id})`} : {}), ...(w.background ? {background: w.background, '--wg-bg': w.background} : {}), ...(w.ink ? {color: w.ink, '--ink': w.ink, '--wg-ink': w.ink} : {}),
           ...(decor || rot ? {transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)`} : {}), ...(decor || mode === 'free' ? {zIndex: (decor ? 20 : 1) + Number(w.options.layer ?? 0)} : {})} as React.CSSProperties}
         onClick={edit ? e => { e.stopPropagation(); edit.select(w.id); } : undefined}>
         {edit && <div className="wg-handle" onPointerDown={e => begin(e, w, 'move')} title="끌어서 옮기기">⠿ {widgetInfo(w.type).label}</div>}
         {w.font && <FontVar id={w.id} font={w.font} />}
         {toggle ? <h3 className="wg-title wg-toggle"><button className="link" onClick={edit ? undefined : () => toggleFold(w.id)} aria-expanded={!isFolded}>{isFolded ? '▸' : '▾'} {title || widgetInfo(w.type).label}</button></h3>
-          : title && !OWN_TITLE.includes(w.type) && !decor && <h3 className="wg-title">{title}</h3>}
+          : title && !OWN_TITLE.includes(w.type) && !decor && <InlineEdit as="h3" className="wg-title" value={title} max={40} disabled={!!edit || !saveSpec} onSave={t => saveSpec?.(s => patchWidget(s, w.id, x => ({...x, title: t})))} />}
         {!isFolded && <div className="wg-body" inert={edit ? true : undefined}>
           <LabelProvider value={(w.options.labels as Record<string, unknown> | undefined) ?? {}}><WidgetBody w={w} ctx={ctx} spec={spec} settings={settings} today={today} endHour={endHour} /></LabelProvider>
         </div>}
@@ -167,13 +173,17 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveS
 function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: Ctx; spec: PlannerSpec; settings: Settings; today: string; endHour: number}) {
   const {p, day} = ctx, start = Number(w.options.startHour ?? 6);
   switch (w.type) {
-    case 'focus': return ctx.timer ? <FocusBar p={p} day={today} timer={ctx.timer} color={colors(p, today)} /> : null;
+    case 'focus': return ctx.timer ? <SubjectTimer p={p} day={today} timer={ctx.timer} subjects={(w.options.subjects as Subject[] | undefined) ?? []} showTasks={w.options.showTasks !== false} askCondition={w.options.askCondition !== false}
+      onSubjects={ctx.saveSpec ? subjects => void ctx.saveSpec!(s => patchWidget(s, w.id, x => ({...x, options: {...x.options, subjects}}))) : undefined} /> : null;
     case 'tasks': return <Tasks m={asModule(w, 'tasks')} ctx={ctx} />;
     case 'table': return <TableWidget w={w} ctx={ctx} />;
     case 'custom': return <CustomWidget w={w} ctx={ctx} />;
     case 'energy': return <EnergyLight w={w} ctx={ctx} />;
     case 'mission': return <Mission w={w} ctx={ctx} />;
     case 'persona-board': return <PersonaBoard w={w} ctx={ctx} />;
+    case 'wishes': return <Wishes w={w} ctx={ctx} />;
+    case 'list': return <ListView w={w} ctx={ctx} />;
+    case 'week-view': case 'month-view': case 'goals-view': case 'insights-view': return <ViewWidget w={w} ctx={ctx} spec={spec} settings={settings} today={today} />;
     case 'timetable': return <Timetable key={day} m={asModule(w, 'timer')} p={p} day={day} settings={settings} color={ctx.color} />;
     case 'receipt': return <Receipt p={p} day={day} routineRate={ofKind(p.records, 'routine').length ? routineRate(p.records, day) : null} />;
     case 'hourly': return <HourlyDay ctx={ctx} startHour={start} endHour={endHour} />;
@@ -187,7 +197,7 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
     case 'condition': return <ConditionDay key={day} p={p} day={day} now={ctx.now} />;
     case 'sleep': return <SleepBox key={day} ctx={ctx} />;
     case 'review': return <ReviewBox key={day} ctx={ctx} />;
-    case 'personas': return <PersonaToday ctx={ctx} />;
+    case 'personas': return <PersonaToday ctx={ctx} w={w} />;
     case 'progress': {
       const goals = ofKind(p.records, 'goal'), g = goals.find(x => x.id === w.options.goalId) ?? goals.find(x => !x.body.parentGoalId && x.body.status === 'active');
       if (!g) return ctx.preview ? <div className="wg-progress"><span>예시 목표</span><Gauge pct={64} size="lg" /></div> : <Tip id="progress-empty" block>목표를 세우면 여기 크게 보여요.</Tip>;

@@ -9,6 +9,8 @@ import {Gauge} from '../Gauge.tsx';
 import {Tip} from '../Tip.tsx';
 import {usePerDay} from '../avail.tsx';
 import {GoalRetroForm, GoalRetroView} from './LifeWidgets.tsx';
+import {Celebrate} from './LifeWidgets.tsx';
+import {tabsOf} from '@workspace/planner-spec';
 
 // Long-term goals: write one naively, let MOONS split it into milestones, review, then live by the daily list.
 // Every task linked to a milestone moves the goal's overall percentage.
@@ -22,30 +24,37 @@ export function Goals({spec, p, nav, today, goalId, setGoalId}: {spec: PlannerSp
   const weeklyMin = weekly ?? weeklyFocus(p.records, today);
   const saveWeekly = (min: number) => { if (goalsModule) void api.putSpec({...spec, modules: spec.modules.map(m => m.type === 'goals' ? {...m, options: {...m.options, weeklyMin: min}} : m)}); };
   const goals = ofKind(p.records, 'goal');
-  const [view, setView] = useState<'ladder' | 'roadmap'>('ladder');
   const selected = goals.find(g => g.id === goalId);
-  if (selected) return <GoalDashboard g={selected} p={p} nav={nav} today={today} back={() => setGoalId(null)} open={setGoalId} weeklyMin={weeklyMin} />;
+  // Where achieved goals are recorded: the tab holding a 성취 기록 table (or a tab named 기록).
+  const recordTab = tabsOf(spec).find(t => (t.widgets ?? []).some(w => w.type === 'table' && w.options.autoLog === 'achievements')) ?? tabsOf(spec).find(t => /기록/.test(t.name));
+  if (selected) return <GoalDashboard g={selected} p={p} nav={nav} today={today} back={() => setGoalId(null)} open={setGoalId} weeklyMin={weeklyMin} recordTab={recordTab?.id} />;
   const levels = (spec.modules.find(m => m.type === 'goals')?.options.levels as Goal['horizon'][] | undefined) ?? ['year', 'month', 'week'];
   const roots = goals.filter(g => !g.body.parentGoalId || !goals.some(x => x.id === g.body.parentGoalId))
     .sort((a, b) => rank(a.body.horizon) - rank(b.body.horizon) || b.body.period.localeCompare(a.body.period));
-  const tree = (g: LifeRecord<'goal'>, depth: number): React.ReactNode => <li key={g.id} className={`goal-node ${g.body.status}`}>
-    <div className="row goal-row" style={{paddingLeft: depth * 18}}>
-      <button className="link" onClick={() => setGoalId(g.id)}><span className="horizon">{g.body.horizon === 'milestone' ? `◆ ~${g.body.period}` : `${horizonLabel(g.body.horizon)} · ${g.body.period}`}</span>{g.body.title}</button>
-      <GoalBar g={g} records={p.records} />
-    </div>
-    <ul>{goals.filter(c => c.body.parentGoalId === g.id).sort((a, b) => a.body.period.localeCompare(b.body.period)).map(c => tree(c, depth + 1))}</ul>
+  // One plain list: each big goal with its gauge, deadline and where it stands, its milestones underneath.
+  const perDay = usePerDay(), sched = goalSchedule(p.records, today, weeklyMin, perDay);
+  const kids = (id: string) => goals.filter(c => c.body.parentGoalId === id).sort((a, b) => a.body.period.localeCompare(b.body.period));
+  const active = roots.filter(g => g.body.status === 'active' || g.body.status === 'paused'), achieved = roots.filter(g => g.body.status === 'achieved'), dropped = roots.filter(g => g.body.status === 'dropped');
+  const standing = (g: LifeRecord<'goal'>) => {
+    const sg = sched.goals.find(x => x.id === g.id);
+    if (!sg?.projected) return g.body.deadline ? `마감 ${g.body.deadline}` : '';
+    return sg.lateDays ? `마감 ${g.body.deadline ?? ''} · 이대로면 ${sg.lateDays}일 늦어요` : `마감 ${g.body.deadline ?? '–'} · 이대로면 ${sg.projected.slice(5)} 끝`;
+  };
+  const card = (g: LifeRecord<'goal'>) => <li key={g.id} className={`gl-item ${g.body.status}`}>
+    <div className="gl-head"><button className="link gl-title" onClick={() => setGoalId(g.id)}>{g.body.title}</button><GoalBar g={g} records={p.records} /></div>
+    {standing(g) && <p className={`gl-stand ${sched.goals.find(x => x.id === g.id)?.lateDays ? 'late' : ''}`}>{standing(g)}</p>}
+    {kids(g.id).length > 0 && <ul className="gl-ms">{kids(g.id).map(c => <li key={c.id} className={c.body.status}>
+      <button className="mark mini" onClick={() => p.write(c.id, {kind: 'goal', body: {...c.body, status: c.body.status === 'achieved' ? 'active' : 'achieved'}, baseRevision: c.revision})} aria-label={`${c.body.title} 이룸 바꾸기`}>{c.body.status === 'achieved' ? '○' : ''}</button>
+      <button className="link" onClick={() => setGoalId(c.id)}>{c.body.title}</button><span className="gl-due">~{c.body.period.slice(2)}</span><GoalBar g={c} records={p.records} /></li>)}</ul>}
   </li>;
   return <div className="goals">
     <NewGoal p={p} today={today} weekly={weekly} onWeekly={saveWeekly} onDone={setGoalId} />
-    <Bottlenecks p={p} today={today} weeklyMin={weeklyMin} open={setGoalId} />
     <Unlinked p={p} today={today} />
-    <div className="seg" role="tablist">
-      <button role="tab" aria-selected={view === 'ladder'} className={view === 'ladder' ? 'on' : ''} onClick={() => setView('ladder')}>목표 사다리</button>
-      <button role="tab" aria-selected={view === 'roadmap'} className={view === 'roadmap' ? 'on' : ''} onClick={() => setView('roadmap')}>연간 로드맵</button>
-    </div>
-    {view === 'roadmap' ? <Roadmap p={p} today={today} open={setGoalId} /> : <section className="part"><h3>목표 사다리 <Tip id="goals-percent">퍼센트 = 이어진 할 일과 마일스톤으로 계산한 전체 진행률</Tip></h3>
-      {roots.length ? <ul className="tree">{roots.map(g => tree(g, 0))}</ul> : <p className="muted">아직 목표가 없어요. 위에 큰 목표를 대충 적어 보세요.</p>}
-    </section>}
+    <section className="part"><h3>진행 중</h3>
+      {active.length ? <ul className="gl">{active.map(card)}</ul> : <p className="muted">–</p>}
+    </section>
+    {achieved.length > 0 && <details className="part"><summary>이룬 목표 {achieved.length}</summary><ul className="gl">{achieved.map(card)}</ul></details>}
+    {dropped.length > 0 && <details className="part"><summary>포기한 목표 {dropped.length}</summary><ul className="gl">{dropped.map(card)}</ul></details>}
     <details className="part manual"><summary>기간 목표 직접 추가 (연간·월간·주간)</summary><GoalForm p={p} goals={goals} levels={levels} today={today} /></details>
   </div>;
 }
@@ -55,7 +64,7 @@ function Unlinked({p, today}: {p: Planner; today: string}) {
   const tasks = unlinkedDone(p.records, today);
   const goals = ofKind(p.records, 'goal').filter(g => g.body.status === 'active');
   if (!tasks.length || !goals.length) return null;
-  return <details className="part unlinked"><summary>목표에 안 이어진 끝낸 일 {tasks.length}개 — 이으면 진행률에 들어가요</summary>
+  return <details className="part unlinked"><summary>목표에 안 이어진 끝낸 일 {tasks.length}</summary>
     <ul className="prows">{tasks.slice(0, 20).map(t => { const s = suggestGoal(p.records, today, t.body.title); return <li key={t.id} className="prow">
       <span className="ptitle"><span className="pname">{t.body.title}</span><span className="psub">{t.logicalDay}</span></span>
       <select defaultValue={s?.id ?? ''} aria-label={`${t.body.title} 이을 목표`} onChange={e => e.target.value && p.write(t.id, {kind: 'task', logicalDay: t.logicalDay, body: {...t.body, goalIds: [e.target.value]}, baseRevision: t.revision})}>
@@ -127,7 +136,7 @@ function GoalForm({p, goals, levels, today}: {p: Planner; goals: LifeRecord<'goa
   </form>;
 }
 
-function GoalDashboard({g, p, nav, today, back, open, weeklyMin}: {g: LifeRecord<'goal'>; p: Planner; nav: Nav; today: string; back: () => void; open: (id: string) => void; weeklyMin: number}) {
+function GoalDashboard({g, p, nav, today, back, open, weeklyMin, recordTab}: {g: LifeRecord<'goal'>; p: Planner; nav: Nav; today: string; back: () => void; open: (id: string) => void; weeklyMin: number; recordTab?: string}) {
   const goals = ofKind(p.records, 'goal'), parent = goals.find(x => x.id === g.body.parentGoalId);
   const children = goals.filter(x => x.body.parentGoalId === g.id).sort((a, b) => a.body.period.localeCompare(b.body.period));
   const tasks = linkedTasks(g, p.records).sort((a, b) => (b.logicalDay ?? '').localeCompare(a.logicalDay ?? ''));
@@ -146,7 +155,8 @@ function GoalDashboard({g, p, nav, today, back, open, weeklyMin}: {g: LifeRecord
       return <button key={x.id} className={`small persona-pick ${on ? 'on' : ''}`} aria-pressed={on} style={{'--pc': x.body.color} as React.CSSProperties}
         onClick={() => p.write(g.id, {kind: 'goal', body: {...g.body, personaIds: on ? g.body.personaIds.filter(id => id !== x.id) : [...(g.body.personaIds ?? []), x.id]}, baseRevision: g.revision})}>{x.body.name}</button>; })}</div>}
     <GoalRetroView g={g} />
-    {retro && <GoalRetroForm g={g} p={p} kind={retro} done={() => setRetro(null)} />}
+    {retro === 'dropped' && <GoalRetroForm g={g} p={p} kind="dropped" done={() => setRetro(null)} />}
+    {retro === 'achieved' && <Celebrate g={g} p={p} close={() => setRetro(null)} recorded={() => { setRetro(null); if (recordTab && nav.openTab) nav.openTab(recordTab); }} />}
     {parent && <p className="muted">위 목표: <button className="link" onClick={() => open(parent.id)}>{parent.body.title}</button> ({goalPercent(parent.id, p.records).pct}%)</p>}
     {g.body.horizon !== 'milestone' && <section className="part"><h3>마일스톤 · 아래 목표</h3>
       <ul className="prows">{children.map(c => <li key={c.id} className={`prow ${c.body.status === 'achieved' ? 'done' : ''}`}>

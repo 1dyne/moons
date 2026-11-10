@@ -1,5 +1,5 @@
 import {Availability, WriteInput, parseBody, ulid, type AnyRecord, type Kind, type Settings} from '@workspace/life-contract';
-import {PlannerSpec} from '@workspace/planner-spec';
+import {PlannerSpec, dedupeWidgetIds} from '@workspace/planner-spec';
 import {q, transaction, json, type Driver} from '../moons/lib/server/db.ts';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 
@@ -178,16 +178,38 @@ export async function lastActivity(owner: string) {
   return (await q<{at: string | null}>(`select max(data->>'updatedAt') at from life_records where owner_id=$1`, [owner]))[0]?.at ?? null;
 }
 
-export async function getSpec(owner: string) {
+export async function getSpec(owner: string): Promise<{version: number; spec: PlannerSpec; savedAt: string} | null> {
   await initLife();
   const row = (await q<{version: number; spec: PlannerSpec; created_at: string}>('select version,spec,created_at::text from planner_specs where owner_id=$1 order by version desc limit 1', [owner]))[0];
-  return row ? {version: row.version, spec: row.spec, savedAt: row.created_at} : null;
+  if (!row) return null;
+  // Repair: pages built before ids were unique could share a table id, mixing their rows. Rename the later widget
+  // and move each row to the table whose columns it actually fills.
+  const {spec, renamed} = dedupeWidgetIds(row.spec);
+  if (renamed.length) {
+    const firstOf = (id: string) => [...(row.spec.canvas?.day ?? []), ...(row.spec.tabs ?? []).flatMap(t => t.widgets ?? [])].find(w => w.id === id);
+    const cols = (w: {options: Record<string, unknown>} | undefined) => new Set(((w?.options.columns as {id: string}[] | undefined) ?? []).map(c => c.id));
+    const rows = (await listRecords(owner, {kinds: ['note'], limit: 1000})).items.filter(r => r.kind === 'note' && (r.body as {signifier?: string}).signifier === 'row');
+    for (const rn of renamed) {
+      const a = cols(firstOf(rn.from)), b = cols(rn.widget);
+      for (const r of rows) {
+        const body = r.body as {table: string | null; cells: Record<string, unknown>};
+        if (body.table !== rn.from) continue;
+        const keys = Object.keys(body.cells).filter(k => k !== '__src');
+        const inB = keys.filter(k => b.has(k)).length, inA = keys.filter(k => a.has(k)).length;
+        if (inB > inA) await writeRecordOnly(owner, r.id, {kind: 'note', logicalDay: r.logicalDay, body: {...body, table: rn.to}});
+      }
+    }
+    return saveSpec(owner, spec).then(s2 => ({...s2, savedAt: new Date().toISOString()}));
+  }
+  return {version: row.version, spec: row.spec, savedAt: row.created_at};
 }
 /** Each save is a new version; records never move when the spec changes. */
 export async function saveSpec(owner: string, raw: unknown) {
   await initLife();
   const parsed = PlannerSpec.safeParse(raw);
   if (!parsed.success) throw new WorkspaceError(400, `Invalid planner spec: ${parsed.error.issues[0]?.message ?? 'unknown'}`);
+  // A duplicated tab or a copied widget must not share an id with another widget (its rows would be shared).
+  parsed.data = dedupeWidgetIds(parsed.data).spec as typeof parsed.data;
   return transaction(async db => {
     const v = ((await db.query('select coalesce(max(version),0)::int v from planner_specs where owner_id=$1', [owner])).rows[0] as {v: number}).v + 1;
     await db.query('insert into planner_specs(owner_id,version,spec) values($1,$2,$3)', [owner, v, json(parsed.data)]);

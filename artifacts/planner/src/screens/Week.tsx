@@ -6,6 +6,7 @@ import {parseEntry} from '../parse.ts';
 import {GoalBar} from './Today.tsx';
 import {MARK, NEXT, type Nav} from './day.ts';
 import {colors, hm, sessionKey} from './Focus.tsx';
+import {InlineEdit} from '../InlineEdit.tsx';
 
 // Weekly pages: horizontal (seven columns of tasks, drag between days) or vertical (seven columns with an hour grid).
 const DOW = ['월', '화', '수', '목', '금', '토', '일'];
@@ -46,7 +47,7 @@ function WeekHorizontal({p, days, today, nav}: {p: Planner; days: string[]; toda
       draggable={t.body.outcome.result !== 'done'} onDragStart={() => setDrag(t.id)} onDragEnd={() => setDrag(null)}>
       {t.body.plan.fixed ? <span className="wk-time">{t.body.plan.start ? new Date(t.body.plan.start.value).toTimeString().slice(0, 5) : '○'}</span>
         : <button className="mark mini" onClick={() => cycle(t)} aria-label={`${t.body.title} 바꾸기`}>{MARK[t.body.outcome.result]}</button>}
-      <span>{t.body.title}</span>
+      <InlineEdit value={t.body.title} onSave={title => p.write(t.id, {kind: 'task', logicalDay: t.logicalDay, body: {...t.body, title}, baseRevision: t.revision})} />
     </li>)}</ul>
     <form onSubmit={e => { e.preventDefault(); void add(d); }}><input value={text[d] ?? ''} onChange={e => setText({...text, [d]: e.target.value})} placeholder="+" aria-label={`${DOW[i]}요일 할 일 추가`} /></form>
   </div>)}</div>;

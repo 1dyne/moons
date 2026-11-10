@@ -128,3 +128,22 @@ test('P1/P2: goal achieve/drop writes retro rows, persona months warn over the l
   assert.ok((ins.lowConditionCount as number) >= 1);
   assert.equal((ins.personasThisMonth as {status: string | null}[]).filter(p => p.status === 'deployed').length >= 4, true);
 });
+
+test('repair: tables on different tabs that share an id are separated and each row goes back to its own table', async () => {
+  const {saveSpec: save, getSpec: get, writeRecord, allRecords: all} = await import('./store.ts');
+  const base = (await get(owner))!.spec;
+  const t = (id: string, title: string, col: string) => ({id, type: 'table', title, x: 0, y: 0, w: 24, h: 12, options: {columns: [{id: col, name: title, type: 'text', options: []}]}});
+  // Saved the old way (bypassing saveSpec's dedupe): two pages, both with "table-3".
+  const {q, json} = await import('../moons/lib/server/db.ts');
+  const broken = {...base, tabs: [{id: 'today', name: '오늘', kind: 'today'}, {id: 'p1', name: '페르소나', kind: 'page', widgets: [t('table-3', '페르소나 현황', 'aaa')]}, {id: 'p2', name: '상황판', kind: 'page', widgets: [t('table-3', '집중 로그', 'bbb')]}]};
+  await q('insert into planner_specs(owner_id,version,spec) values($1,$2,$3)', [owner, 999, json(broken)]);
+  await writeRecord(owner, null, {kind: 'note', body: {text: 'A', signifier: 'row', table: 'table-3', cells: {aaa: 'x'}}});
+  await writeRecord(owner, null, {kind: 'note', body: {text: 'B', signifier: 'row', table: 'table-3', cells: {bbb: 'y'}}});
+  const fixed = (await get(owner))!.spec;
+  const ids = fixed.tabs!.flatMap(x => x.widgets ?? []).map(w => w.id);
+  assert.equal(new Set(ids).size, ids.length, 'ids are unique after repair');
+  const rows = (await all(owner)).filter(r => r.kind === 'note' && ['A', 'B'].includes((r.body as {text: string}).text));
+  const tableOf = (text: string) => (rows.find(r => (r.body as {text: string}).text === text)!.body as {table: string}).table;
+  assert.equal(tableOf('A'), 'table-3'); assert.equal(tableOf('B'), 'table-3-p2');
+  void save;
+});

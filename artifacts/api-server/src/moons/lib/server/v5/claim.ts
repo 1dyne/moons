@@ -75,8 +75,22 @@ export async function claimWorkspace(user:string,email:string,source:string) {
     await query('update personal_workspaces set store=$2::jsonb where owner_id=$1',[target,json(merged)]);
    }
   }
-  return {ownerId:target,claimed:true,entries:merged.entries.length};
+  // lit (the diary): its data follows the account when the account has no diary of its own yet.
+  const lit=source!==target?await moveLit(query,source,target):'same';
+  return {ownerId:target,claimed:true,entries:merged.entries.length,lit};
  });
+}
+/** Moves this device's lit planner and records into the account's space, unless the account already has a planner
+ *  (then nothing moves and the account's own planner opens; the device copy stays where it was). */
+async function moveLit(query:<T=Record<string,unknown>>(sql:string,params?:unknown[])=>Promise<T[]>,source:string,target:string):Promise<'moved'|'kept'|'none'>{
+ const has=async(table:string)=>(await query<{t:string|null}>(`select to_regclass('${table}')::text t`))[0]?.t!=null;
+ if(!(await has('planner_specs'))||!(await has('life_records')))return 'none';
+ const count=async(table:string,owner:string)=>Number((await query<{n:string}>(`select count(*)::text n from ${table} where owner_id=$1`,[owner]))[0]?.n??0);
+ if(!(await count('planner_specs',source))&&!(await count('life_records',source)))return 'none';
+ if(await count('planner_specs',target)||await count('life_records',target))return 'kept';
+ for(const table of ['life_accounts','life_records','life_revisions','planner_specs'])await query(`update ${table} set owner_id=$1 where owner_id=$2`,[target,source]);
+ for(const table of ['lit_library','lit_dev_tokens'])if(await has(table))await query(`update ${table} set owner_id=$1 where owner_id=$2`,[target,source]);
+ return 'moved';
 }
 export async function ownsRecording(owner:string,path:string) {
  const storedOwner=/(?:^|[/:])moons\/([a-f0-9-]{36})\//.exec(path)?.[1];

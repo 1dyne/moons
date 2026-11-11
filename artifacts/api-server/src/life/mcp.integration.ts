@@ -73,7 +73,7 @@ test('P0: availability drives plans; tasks and table rows can be listed, edited,
     {type: 'table', title: '소원 상자', options: {scope: 'all', columns: [{name: '상태', type: 'select', options: ['잠김', '해금', '사용함']}]}}],
     taskProps: [{name: 'Role', type: 'select', options: ['Scholar', 'Speaker']}]});
   await call('add_items', {tasks: [{title: '기출 1세트', day: '2026-11-10', props: {Role: 'Scholar'}}, {title: '기출 2세트', day: '2026-11-10'}], rows: [{table: '소원 상자', name: '케이크', cells: {상태: '잠김'}}]});
-  const tasks = await call('list_tasks', {day: '2026-11-10'} as never) as unknown as {id: string; title: string; props: Record<string, unknown>}[];
+  const tasks = await call('list_tasks', {from: '2026-11-10', to: '2026-11-10'}) as unknown as {id: string; title: string; props: Record<string, unknown>}[];
   const t1 = tasks.find(t => t.title === '기출 1세트')!, t2 = tasks.find(t => t.title === '기출 2세트')!;
   assert.equal(t1.props.Role, 'Scholar');
   const moved = await call('update_task', {id: t2.id, day: '2026-11-11', result: 'done', props: {Role: 'Speaker'}});

@@ -1,6 +1,6 @@
 // Installable app shell. Pages and code are cached so the planner opens without a connection;
 // reads fall back to the last copy, and writes made offline wait in the page's queue (src/offline.ts).
-const CACHE = 'planner-v2';
+const CACHE = 'lit-v3';
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(c => c.addAll(['/', '/manifest.webmanifest', '/icon.svg'])).then(() => self.skipWaiting()));
 });

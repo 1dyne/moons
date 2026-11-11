@@ -74,3 +74,26 @@ test('connector: Claude creates a widget into the library and can place it on th
   const list = await (tools.get('list_widgets')!({} as never, owner)) as {id: string}[];
   assert.ok(list.some(i => i.id === 'w-claude-code'));
 });
+
+test('signing in: this device\'s diary joins an account that has none; an account with its own diary keeps it', async () => {
+  const {initV5} = await import('../moons/lib/server/v5/workspace-store.ts');
+  const {claimWorkspace} = await import('../moons/lib/server/v5/claim.ts');
+  const {q} = await import('../moons/lib/server/db.ts');
+  const {writeRecord} = await import('./store.ts');
+  await initV5();
+  const mk = async () => { const id = newId(); await q('insert into guests(id) values($1)', [id]); return id; };
+  // The account already has a (MOONS) space but no diary; this device made a diary as a guest.
+  const accountSpace = await mk(), device = await mk();
+  await claimWorkspace('lit-user', 'lit@example.invalid', accountSpace);
+  await saveSpec(device, TEMPLATES[0]!.spec);
+  await writeRecord(device, null, {kind: 'task', logicalDay: '2026-11-11', body: {title: '기기에서 만든 할 일'}});
+  const r = await claimWorkspace('lit-user', 'lit@example.invalid', device) as {lit: string};
+  assert.equal(r.lit, 'moved');
+  assert.ok(await getSpec(accountSpace), 'the diary now opens from the account');
+  // A second device with another diary does not overwrite it.
+  const other = await mk();
+  await saveSpec(other, {...TEMPLATES[0]!.spec, name: '다른 기기'});
+  const r2 = await claimWorkspace('lit-user', 'lit@example.invalid', other) as {lit: string};
+  assert.equal(r2.lit, 'kept');
+  assert.notEqual((await getSpec(accountSpace))!.spec.name, '다른 기기');
+});

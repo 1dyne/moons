@@ -27,7 +27,7 @@ export default function App() {
   // An AI connector's OAuth step lands here: /connect/<request id>.
   const connect = location.pathname.match(/^\/connect\/([\w-]+)$/)?.[1];
   if (connect) return <ConnectPage id={connect} />;
-  return <Main />;
+  return authEnabled ? <LoginGate><Main /></LoginGate> : <Main />;
 }
 
 function Main() {
@@ -195,4 +195,29 @@ function TipsReset() {
   return <section className="module"><h3>안내</h3>
     <label className="small-label"><input type="checkbox" checked={on} onChange={e => setTipsOn(e.target.checked)} /> 사용 안내 보기</label>
   </section>;
+}
+
+/** Sign in first, so a planner made on another device opens right away. After sign-in, this device's work (if any)
+ *  joins the account once; then the account's planner opens (or, with none yet, the blank-or-example choice). */
+function LoginGate({children}: {children: React.ReactNode}) {
+  const clerk = useClerk();
+  const [guest, setGuest] = useState(() => { try { return localStorage.getItem('lit.guest') === '1'; } catch { return false; } });
+  const [ready, setReady] = useState(false);
+  const user = clerk.loaded ? clerk.user : undefined;
+  useEffect(() => {
+    if (!user) return;
+    const key = `lit.claimed.${user.id}`;
+    let done = false; try { done = sessionStorage.getItem(key) === '1'; } catch { /* */ }
+    if (done) { setReady(true); return; }
+    void fetch('/api/account/claim', {method: 'POST', credentials: 'include', headers: {'content-type': 'application/json'}, body: '{}'})
+      .catch(() => null).finally(() => { try { sessionStorage.setItem(key, '1'); localStorage.removeItem('lit.guest'); } catch { /* */ } setReady(true); });
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!clerk.loaded || (user && !ready)) return <div className="center"><Moon size={72} /><p className="muted">불러오는 중…</p></div>;
+  if (!user && !guest) return <div className="center login">
+    <Moon size={96} />
+    <p className="brand big">lit</p>
+    <button className="primary login-btn" onClick={() => clerk.openSignIn({forceRedirectUrl: location.href})}>로그인</button>
+    <button className="link small muted" onClick={() => { try { localStorage.setItem('lit.guest', '1'); } catch { /* */ } setGuest(true); }}>로그인 없이 이 기기에서만 쓰기</button>
+  </div>;
+  return <>{children}</>;
 }

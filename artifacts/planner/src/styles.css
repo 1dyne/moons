@@ -1134,3 +1134,6 @@ h1.editable,.top input.inline-edit{font-size:20px;font-weight:700;flex:1}
 .confetti i{position:absolute;top:-12px;left:calc(var(--i) * 3.6%);width:8px;height:14px;background:hsl(calc(var(--i) * 47) 80% 55%);animation:fall 1.8s ease-in calc(var(--i) * 40ms) forwards}
 @keyframes fall{to{transform:translateY(420px) rotate(540deg);opacity:.2}}
 @media (prefers-reduced-motion:reduce){.confetti{display:none}}
+.center.login{gap:18px}
+.login-btn{min-width:220px;padding:12px 18px;font-size:16px}
+.update-bar{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:95;padding:10px 16px;border:1.5px solid #151515;background:#f2c230;color:#151515;font-weight:600;cursor:pointer}

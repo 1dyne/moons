@@ -1137,3 +1137,6 @@ h1.editable,.top input.inline-edit{font-size:20px;font-weight:700;flex:1}
 .center.login{gap:18px}
 .login-btn{min-width:220px;padding:12px 18px;font-size:16px}
 .update-bar{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:95;padding:10px 16px;border:1.5px solid #151515;background:#f2c230;color:#151515;font-weight:600;cursor:pointer}
+/* Taps act at once on phones (no double-tap zoom wait); no hover outlines on touch. */
+html{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+@media (hover:none){.editable:hover{outline:0}}

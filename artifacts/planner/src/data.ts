@@ -1,9 +1,9 @@
-import {useCallback, useState} from 'react';
+import {useCallback, useRef, useState} from 'react';
 import {parseBody, ulid, type AnyRecord, type Availability, type Kind, type LifeRecord, type Settings} from '@workspace/life-contract';
 import type {PlannerSpec} from '@workspace/planner-spec';
 import {enqueue, flush, isNetworkError, pending, queued} from './offline.ts';
 
-export type Write = {kind: Kind; logicalDay?: string | null; body: unknown; privateFields?: string[]; baseRevision?: number};
+export type Write = {kind: Kind; logicalDay?: string | null; body: unknown; privateFields?: string[]; baseRevision?: number; id?: string};
 /** Where records go. The real planner writes to the life hub; the mockup writes to memory. */
 export type Backend = {write: (id: string | null, w: Write) => Promise<AnyRecord>; remove: (id: string) => Promise<AnyRecord>};
 
@@ -59,7 +59,7 @@ const optimistic = (id: string, w: Write) => ({id, kind: w.kind, revision: 0, cr
 export const httpBackend: Backend = {
   async write(id, w) {
     const queue = () => {
-      const rid = id ?? ulid(), {baseRevision: _drop, ...rest} = w;
+      const rid = id ?? w.id ?? ulid(), {baseRevision: _drop, ...rest} = w;
       enqueue(id ? {method: 'PUT', path: `/items/${id}`, body: rest} : {method: 'POST', path: '/items', body: {...rest, id: rid}});
       return optimistic(rid, w);
     };
@@ -103,11 +103,40 @@ export function usePlanner(backend: Backend, initial: AnyRecord[]) {
   const [records, setRecords] = useState(initial);
   const [error, setError] = useState('');
   const put = (r: AnyRecord) => setRecords(list => r.deletedAt ? list.filter(x => x.id !== r.id) : [...list.filter(x => x.id !== r.id), r]);
+  // The screen changes the moment the user taps; the server's copy replaces it when it answers (or the change is
+  // undone with a message if it fails). New records get their id here, so the optimistic one and the saved one match.
+  // Writes to one record go out one after another (a check right after creating waits for the create), each on the
+  // latest saved revision, and only the newest answer is shown.
+  const chains = useRef(new Map<string, Promise<AnyRecord | null>>()), seq = useRef(new Map<string, number>());
   const write = useCallback(async (id: string | null, w: Write) => {
-    try { setError(''); const r = await backend.write(id, w); put(r); return r; } catch (e) { setError((e as Error).message); return null; }
+    setError('');
+    const live = backend === httpBackend, rid = id ?? w.id ?? ulid(), n = (seq.current.get(rid) ?? 0) + 1;
+    seq.current.set(rid, n);
+    let before: AnyRecord | undefined;
+    if (live) setRecords(list => {
+      before = list.find(x => x.id === rid);
+      try { const o = {...optimistic(rid, w), ...(before ? {createdAt: before.createdAt, revision: before.revision, source: before.source, privateFields: w.privateFields ?? before.privateFields} : {})} as AnyRecord; return [...list.filter(x => x.id !== rid), o]; }
+      catch { return list; }
+    });
+    const run = (chains.current.get(rid) ?? Promise.resolve(null)).then(last => {
+      let sent: Write = id ? w : {...w, id: rid};
+      if (last && sent.baseRevision !== undefined && last.revision > sent.baseRevision) sent = {...sent, baseRevision: last.revision};
+      // A record created just before (in this chain) now exists on the server: update it by id.
+      return backend.write(id ?? (last ? rid : null), sent);
+    });
+    chains.current.set(rid, run.catch(() => null));
+    try { const r = await run; if (seq.current.get(rid) === n) put(r); return r; }
+    catch (e) {
+      setError((e as Error).message);
+      if (live && seq.current.get(rid) === n) setRecords(list => before ? [...list.filter(x => x.id !== rid), before] : list.filter(x => x.id !== rid));
+      return null;
+    }
   }, [backend]);
   const remove = useCallback(async (id: string) => {
-    try { setError(''); put(await backend.remove(id)); } catch (e) { setError((e as Error).message); }
+    setError('');
+    let before: AnyRecord | undefined;
+    if (backend === httpBackend) setRecords(list => { before = list.find(x => x.id === id); return list.filter(x => x.id !== id); });
+    try { put(await backend.remove(id)); } catch (e) { setError((e as Error).message); if (before) { const b = before; setRecords(list => [...list, b]); } }
   }, [backend]);
   // Rows the server adds by itself (log tables) after a session or goal write: pull them in (real planner only).
   const refresh = useCallback(async () => { if (backend === httpBackend) { try { setRecords(await api.recordsWithQueue()); } catch { /* offline: next sync */ } } }, [backend]);

@@ -20,6 +20,7 @@ import {InlineEdit} from '../InlineEdit.tsx';
 import {patchWidget} from './Table.tsx';
 import {ListView, ViewWidget, Wishes} from './ViewWidgets.tsx';
 import {PageBox} from './PageBox.tsx';
+import {MadeWidget} from '../made/MadeWidget.tsx';
 import {useWidgetSettings} from './WidgetSettings.tsx';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
@@ -215,6 +216,7 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
     case 'tasks': return <Tasks m={asModule(w, 'tasks')} ctx={ctx} />;
     case 'table': return <TableWidget w={w} ctx={ctx} />;
     case 'custom': return <CustomWidget w={w} ctx={ctx} />;
+    case 'made': return <MadeWidget w={w} ctx={ctx} today={today} />;
     case 'energy': return <EnergyLight w={w} ctx={ctx} />;
     case 'mission': return <Mission w={w} ctx={ctx} />;
     case 'persona-board': return <PersonaBoard w={w} ctx={ctx} />;

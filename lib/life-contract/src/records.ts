@@ -177,7 +177,26 @@ export const SessionBody = z.object({
   personaIds: z.array(z.string()).max(10).default([]),
 }).refine(s => !s.end || s.end > s.start, {message: 'A session must end after it starts.'});
 
-export const BODIES = {goal: GoalBody, project: ProjectBody, task: TaskBody, routine: RoutineBody, sleep: SleepBody, condition: ConditionBody, review: ReviewBody, session: SessionBody, persona: PersonaBody, note: NoteBody} as const;
+// ── Entries: the record of user-made widgets (docs/lit/BLOCKS.md §2) ─────────────────────────────
+// One line = "at this time, this happened, with this result": type (the user's own name for the collection, e.g. 수면),
+// a verb from a small fixed vocabulary that machines and AI read, value with a unit, the user's fields, and typed links.
+export const VERBS = ['planned', 'started', 'ended', 'did', 'measured', 'felt', 'wished', 'noted'] as const;
+export type Verb = (typeof VERBS)[number];
+export const LINK_RELS = ['part_of', 'for', 'after', 'about'] as const;
+const cellValue = z.union([z.string().max(4000), z.number().finite(), z.boolean(), z.null(), z.array(z.string().max(200)).max(30)]);
+export const EntryBody = z.object({
+  type: z.string().regex(/^[a-z0-9]{1,24}$/),
+  verb: z.enum(VERBS).default('did'),
+  at: instant,
+  end: instant.nullable().default(null),
+  value: quantity.extend({amount: z.number().finite()}).nullable().default(null),
+  fields: z.record(z.string().regex(/^[a-z0-9]{1,24}$/), cellValue).default({}),
+  // to: another record's id ("goal:", "task:" or an entry id; the kind is read from the record itself).
+  links: z.array(z.object({rel: z.enum(LINK_RELS), to: z.string().min(1).max(40)})).max(20).default([]),
+}).refine(e => !e.end || e.end >= e.at, {message: 'An entry must end after it starts.'});
+export type Entry = z.infer<typeof EntryBody>;
+
+export const BODIES = {goal: GoalBody, project: ProjectBody, task: TaskBody, routine: RoutineBody, sleep: SleepBody, condition: ConditionBody, review: ReviewBody, session: SessionBody, persona: PersonaBody, note: NoteBody, entry: EntryBody} as const;
 export type Kind = keyof typeof BODIES;
 export const KINDS = Object.keys(BODIES) as Kind[];
 export type Bodies = {[K in Kind]: z.infer<(typeof BODIES)[K]>};
@@ -228,7 +247,7 @@ export const ALL_SCOPES: Scope[] = ['life.read.plan', 'life.read.outcome', 'life
 /** Drops what a grant does not cover: kinds out of scope, outcome without outcome scope, private fields always. */
 export function shareable(record: AnyRecord, scopes: Scope[]): AnyRecord | null {
   const has = (s: Scope) => scopes.includes(s);
-  const need: Record<Kind, Scope> = {goal: 'life.read.plan', project: 'life.read.plan', task: 'life.read.plan', routine: 'life.read.plan', sleep: 'life.read.condition', condition: 'life.read.condition', review: 'life.read.review', session: 'life.read.outcome', persona: 'life.read.plan', note: 'life.read.review'};
+  const need: Record<Kind, Scope> = {goal: 'life.read.plan', project: 'life.read.plan', task: 'life.read.plan', routine: 'life.read.plan', sleep: 'life.read.condition', condition: 'life.read.condition', review: 'life.read.review', entry: 'life.read.outcome', session: 'life.read.outcome', persona: 'life.read.plan', note: 'life.read.review'};
   if (!has(need[record.kind])) return null;
   const copy = structuredClone(record) as AnyRecord;
   delete copy.ext;

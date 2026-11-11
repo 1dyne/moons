@@ -52,7 +52,7 @@ const planGoalApi = (input: {goal: string; deadline: string; context: string; to
 const send = (op: {method: string; path: string; body?: unknown}) => fetch(`/api/life/v1${op.path}`, {method: op.method, credentials: 'include', headers: {'content-type': 'application/json'}, body: op.body === undefined ? undefined : JSON.stringify(op.body)});
 /** Push waiting offline writes; returns how many went up. */
 export const flushQueue = () => flush(send);
-const optimistic = (id: string, w: Write) => ({id, kind: w.kind, revision: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), deletedAt: null, logicalDay: w.logicalDay ?? null,
+const optimistic = (id: string, w: Write, at = new Date().toISOString()) => ({id, kind: w.kind, revision: 0, createdAt: at, updatedAt: at, deletedAt: null, logicalDay: w.logicalDay ?? null,
   tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', source: {type: 'planner', confirmed: true}, ...(w.privateFields ? {privateFields: w.privateFields} : {}), body: parseBody(w.kind, w.body)}) as AnyRecord;
 /** The hub, with an offline fallback: when the network is gone (or writes are already waiting), the write is queued
  *  and an optimistic record is returned so the day keeps working. */

@@ -4,6 +4,7 @@ import {libraryApi, useLibrary} from '../library.tsx';
 import {hiddenOnPhone, openByDefault, phoneOrder} from '../phone.tsx';
 import {currentTab} from './PlannerView.tsx';
 import {canvasOf} from './Canvas.tsx';
+import {openStudio} from '../made/Studio.tsx';
 
 // The menu (≡): everything that is not today's planner lives here, out of the way of daily use.
 // Sections follow plugin managers (Obsidian: installed list with toggles, code gated until approved;
@@ -29,8 +30,10 @@ export function MenuDrawer({open, close, spec, saveSpec, openSettings, openDecor
         <button onClick={() => setSection('mobile')}><b>모바일 배치</b><span>폰에서 보일 위젯과 순서, 처음에 펼칠 것</span></button>
         {openDecorate && <button onClick={() => { close(); openDecorate(); }}><b>꾸미기</b><span>PC 배치·스킨·위젯 설정</span></button>}
         <button onClick={() => setSection('library')}><b>내 라이브러리</b><span>저장한 위젯·페이지 틀·스킨</span></button>
-        <button onClick={() => setSection('make')}><b>위젯 만들기</b><span>블록을 조합하거나 설명서를 붙여 넣어요</span></button>
+        <button onClick={() => { close(); openStudio({pick: true}); }}><b>위젯 만들기</b><span>블록으로 조립하고, 기록·자동화·디자인을 정해요</span></button>
+        <button onClick={() => { close(); openStudio({logic: true}); }}><b>로직</b><span>기록 묶음(데이터 사전)과 자동화 전체, 내보내기</span></button>
         <button onClick={() => setSection('installed')}><b>설치한 위젯</b><span>켜고 끄기, 권한 확인</span></button>
+        <button onClick={() => setSection('make')}><b>설명서로 위젯 만들기</b><span>위젯 설명서(manifest)를 붙여 넣어요</span></button>
         <button onClick={() => setSection('dev')}><b>개발자</b><span>코드로 위젯 만들기, 개발자 토큰</span></button>
         <button onClick={() => { close(); openSettings(); }}><b>설정</b><span>하루 기준, 화면 구성, 계정</span></button>
       </nav>}

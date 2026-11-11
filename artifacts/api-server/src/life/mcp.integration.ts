@@ -147,3 +147,20 @@ test('repair: tables on different tabs that share an id are separated and each r
   assert.equal(tableOf('A'), 'table-3'); assert.equal(tableOf('B'), 'table-3-p2');
   void save;
 });
+
+test('logic layer: Claude makes a widget from blocks, writes entries, and automations run on the server', async () => {
+  const made = await call('make_widget', {type: {id: 'water', name: '물', unit: '잔', desc: '한 잔 마실 때마다 한 줄', fields: [{id: 'note', name: '메모', kind: 'text'}]},
+    blocks: [{kind: 'counter', target: 8}, {kind: 'stat', agg: 'sum', period: 'day'}],
+    flows: [{on: {type: 'water'}, ifAgg: [{type: 'water', agg: 'count', period: 'today', op: 'gte', value: 2}], do: [{do: 'create', type: 'water', verb: 'noted', fields: {note: {set: '두 잔 달성'}}}]}]});
+  assert.match((made.flows as string[])[0]!, /물 기록이 생기면/);
+  const logic = await call('get_logic', {});
+  assert.equal((logic.types as {id: string}[]).find(t => t.id === 'water')?.id, 'water');
+  assert.ok((logic.blocks as {kind: string}[]).some(b => b.kind === 'timer'));
+  await call('add_entries', {type: '물', entries: [{value: {amount: 1, unit: '잔'}, fields: {메모: '아침'}}, {value: {amount: 1, unit: '잔'}}]});
+  const got = await call('get_entries', {type: 'water'}) as unknown as {verb: string; fields: Record<string, unknown>}[];
+  assert.equal(got.length, 3, 'two written + one by the automation (which does not trigger itself again)');
+  assert.equal(got[0]!.fields['메모'], '아침');
+  assert.ok(got.some(e => e.verb === 'noted' && e.fields['메모'] === '두 잔 달성'));
+  const spec = (await getSpec(owner))!.spec;
+  assert.ok(spec.canvas.day!.some(w => w.type === 'made' && w.options.type === 'water'));
+});

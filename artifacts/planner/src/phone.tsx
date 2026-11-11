@@ -11,7 +11,7 @@ export function usePhone() {
 }
 
 /** Shown open on a phone unless the user decided otherwise in 모바일 배치. */
-const OPEN = new Set(['focus', 'tasks', 'mission', 'routine', 'energy', 'week-view', 'month-view', 'goals-view', 'insights-view', 'list', 'table', 'wishes', 'custom']);
+const OPEN = new Set(['focus', 'tasks', 'mission', 'routine', 'energy', 'week-view', 'month-view', 'goals-view', 'insights-view', 'list', 'table', 'wishes', 'custom', 'made', 'pagebox']);
 export const openByDefault = (w: Widget) => typeof w.options.mOpen === 'boolean' ? w.options.mOpen : OPEN.has(w.type);
 export const hiddenOnPhone = (w: Widget) => typeof w.options.mHide === 'boolean' ? w.options.mHide : isDecor(w.type);
 /** The phone order: the user's own (mOrder), else top-to-bottom, left-to-right of the PC page. */

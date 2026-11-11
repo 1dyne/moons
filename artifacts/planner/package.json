@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@clerk/react": "^6.17.8",
-    "@workspace/lit-widget-sdk": "workspace:*"
+    "@workspace/lit-widget-sdk": "workspace:*",
+    "lucide": "0.460.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",

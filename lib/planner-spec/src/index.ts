@@ -5,3 +5,5 @@ export * from './references.ts';
 export * from './canvas.ts';
 export * from './build.ts';
 export * from './widgets.ts';
+export * from './logic.ts';
+export * from './template.ts';

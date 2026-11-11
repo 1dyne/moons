@@ -1,5 +1,6 @@
 import {Router, json as body, type Request, type Response} from 'express';
 import './autolog.ts';
+import './flows.ts';
 import {createHash} from 'node:crypto';
 import {ALL_SCOPES, KINDS, Settings, buildNow, logicalDay, type Kind} from '@workspace/life-contract';
 import {uses, type PlannerSpec} from '@workspace/planner-spec';

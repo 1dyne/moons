@@ -5,6 +5,7 @@ import {ofKind} from '../data.ts';
 import type {Ctx} from './day.ts';
 import {patchWidget} from './Table.tsx';
 import {WidgetOptions} from './WidgetOptions.tsx';
+import {openStudio} from '../made/Studio.tsx';
 
 /** A widget's settings, opened from ⚙ or by tapping the widget twice (anywhere that is not a button, a field or editable text).
  *  Returns the ⚙ button, the panel (when open) and the pointer handler to put on the widget. */
@@ -12,13 +13,15 @@ export function useWidgetSettings(w: Widget, ctx: Ctx) {
   const [open, setOpen] = useState(false);
   const last = useRef<{t: number; x: number; y: number} | null>(null);
   if (!ctx.saveSpec) return {gear: null, panel: null, tap: undefined};
+  // A made widget's settings are its studio (logic, blocks, automations, design).
+  const show = () => w.type === 'made' ? openStudio({widgetId: w.id}) : setOpen(true);
   const tap = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('button,input,textarea,select,a,label,.editable,.inline-edit,[role=button],[contenteditable]')) { last.current = null; return; }
     const now = {t: e.timeStamp, x: e.clientX, y: e.clientY}, prev = last.current;
-    if (prev && now.t - prev.t < 350 && Math.hypot(now.x - prev.x, now.y - prev.y) < 24) { last.current = null; setOpen(true); }
+    if (prev && now.t - prev.t < 350 && Math.hypot(now.x - prev.x, now.y - prev.y) < 24) { last.current = null; show(); }
     else last.current = now;
   };
-  const gear = <button className="wg-gear" onClick={e => { e.stopPropagation(); setOpen(true); }} aria-label={`${w.title || widgetInfo(w.type).label} 설정`} title="설정 (위젯을 두 번 눌러도 열려요)">⚙</button>;
+  const gear = <button className="wg-gear" onClick={e => { e.stopPropagation(); show(); }} aria-label={`${w.title || widgetInfo(w.type).label} 설정`} title="설정 (위젯을 두 번 눌러도 열려요)">⚙</button>;
   const panel = open ? createPortal(<Panel w={w} ctx={ctx} close={() => setOpen(false)} />, document.body) : null;
   return {gear, panel, tap};
 }

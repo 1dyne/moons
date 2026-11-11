@@ -1517,3 +1517,32 @@ lit-block{display:block;min-width:0;max-width:100%}
   .studio-device{padding:12px}
 }
 .mf .inline{flex-wrap:nowrap}.mf .inline .num{flex:1;width:auto;min-width:0}
+
+/* Block versions of the earlier widgets */
+.mb-subjects{display:grid;gap:8px}
+.mb-subj-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.mb-subj-head strong{font-size:26px}
+.mb-ask{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 8px;border:1px dashed var(--ink);width:100%}
+.mb-ask .scale{display:grid;grid-template-columns:repeat(var(--n,10),minmax(0,1fr));gap:3px;flex:1;min-width:200px}
+.mb-ask .scale button{min-width:0;padding:6px 0}
+.mb-checks{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.mb-checks .mb-check{display:flex;align-items:center;gap:10px;min-height:38px}
+.mb-checks .mb-check.on span{text-decoration:line-through;color:var(--muted)}
+.mb-light{display:grid;gap:6px}
+.mb-light .tlight-top{gap:12px}
+.mb-light .tlight-msg{margin:0}
+.mb-breakdown{display:grid;gap:8px}
+.mb-breakdown.show-donut{grid-template-columns:auto 1fr;align-items:center;column-gap:14px}
+.mb-breakdown.show-donut > .mb-label{grid-column:1/-1}
+.mb-bd{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.mb-bd li{display:grid;grid-template-columns:10px minmax(60px,auto) 1fr auto;gap:8px;align-items:center;font-size:13px}
+.mb-bd li > i{width:10px;height:10px;border-radius:50%}
+.mb-bdbar{height:6px;background:color-mix(in srgb,var(--ink) 8%,transparent);border-radius:3px;overflow:hidden}
+.mb-bdbar b{display:block;height:100%}
+.mb-show-donut .mb-bdbar{display:none}
+.mb-breakdown.show-donut .mb-bdbar{display:none}
+.mb-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;margin-top:6px}
+.mb-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.picker-sec{max-width:960px;width:100%;margin:0 auto}
+.picker-sec h3{margin:18px 20px 0;font-size:14px;font-family:var(--mono);color:var(--muted);font-weight:500}
+.picker-sec .picker-grid{padding-top:10px}

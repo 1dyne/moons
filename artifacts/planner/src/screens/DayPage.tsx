@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import {addDays, dayCondition, type Settings} from '@workspace/life-contract';
-import type {PlannerSpec, Widget} from '@workspace/planner-spec';
+import {Logic, entryFocusMin, type PlannerSpec, type Widget} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
 import {usePhone} from '../phone.tsx';
 import type {Ctx, Nav} from './day.ts';
@@ -17,7 +17,7 @@ export function DayPage({spec, settings, p, nav, today, saveSpec, page}: {spec: 
   const dated = !page || page.some(w => DAILY.has(w.type) || (w.type === 'table' && w.options.scope !== 'all') || (w.type === 'list' && w.options.period === 'today'));
   const phone = usePhone();
   return <div className="sheet">
-    {dated && (phone ? <><WeekStrip nav={nav} today={today} /><Summary p={p} day={nav.day} /></> : <div className="day-nav">
+    {dated && (phone ? <><WeekStrip nav={nav} today={today} /><Summary p={p} day={nav.day} logic={Logic.parse(spec.logic ?? {})} /></> : <div className="day-nav">
       <button onClick={() => nav.setDay(addDays(nav.day, -1))} aria-label="전날">‹</button>
       <h2>{label(nav.day)}</h2>
       <button onClick={() => nav.setDay(addDays(nav.day, 1))} aria-label="다음 날">›</button>
@@ -43,8 +43,8 @@ function WeekStrip({nav, today}: {nav: Nav; today: string}) {
 }
 
 /** Phone: the day in one line — net focus, tasks done (want left out), condition. */
-function Summary({p, day}: {p: Planner; day: string}) {
-  const focus = Math.round(ofKind(p.records, 'session').filter(s => s.logicalDay === day).reduce((m, s) => m + Math.max(0, (Date.parse(s.body.end ?? new Date().toISOString()) - Date.parse(s.body.start)) / 60000), 0));
+function Summary({p, day, logic}: {p: Planner; day: string; logic: Logic}) {
+  const focus = Math.round(ofKind(p.records, 'session').filter(s => s.logicalDay === day).reduce((m, s) => m + Math.max(0, (Date.parse(s.body.end ?? new Date().toISOString()) - Date.parse(s.body.start)) / 60000), 0)) + entryFocusMin(p.records, logic, day);
   const tasks = ofKind(p.records, 'task').filter(t => t.logicalDay === day && t.body.category !== 'want' && !['cancelled', 'postponed'].includes(t.body.outcome.result));
   const done = tasks.filter(t => t.body.outcome.result === 'done').length, score = dayCondition(p.records, day).score;
   const light = score === null ? '' : score >= 7 ? 'blue' : score <= 3 ? 'red' : 'amber';

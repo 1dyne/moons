@@ -3,7 +3,7 @@ import {parseBody, ulid, type AnyRecord, type Availability, type Kind, type Life
 import type {PlannerSpec} from '@workspace/planner-spec';
 import {enqueue, flush, isNetworkError, pending, queued} from './offline.ts';
 
-export type Write = {kind: Kind; logicalDay?: string | null; body: unknown; privateFields?: string[]; baseRevision?: number; id?: string};
+export type Write = {kind: Kind; logicalDay?: string | null; body: unknown; privateFields?: string[]; baseRevision?: number; id?: string; ext?: Record<string, unknown>};
 /** Where records go. The real planner writes to the life hub; the mockup writes to memory. */
 export type Backend = {write: (id: string | null, w: Write) => Promise<AnyRecord>; remove: (id: string) => Promise<AnyRecord>};
 
@@ -53,7 +53,7 @@ const send = (op: {method: string; path: string; body?: unknown}) => fetch(`/api
 /** Push waiting offline writes; returns how many went up. */
 export const flushQueue = () => flush(send);
 const optimistic = (id: string, w: Write, at = new Date().toISOString()) => ({id, kind: w.kind, revision: 0, createdAt: at, updatedAt: at, deletedAt: null, logicalDay: w.logicalDay ?? null,
-  tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', source: {type: 'planner', confirmed: true}, ...(w.privateFields ? {privateFields: w.privateFields} : {}), body: parseBody(w.kind, w.body)}) as AnyRecord;
+  tz: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', source: {type: 'planner', confirmed: true}, ...(w.privateFields ? {privateFields: w.privateFields} : {}), ...(w.ext ? {ext: w.ext} : {}), body: parseBody(w.kind, w.body)}) as AnyRecord;
 /** The hub, with an offline fallback: when the network is gone (or writes are already waiting), the write is queued
  *  and an optimistic record is returned so the day keeps working. */
 export const httpBackend: Backend = {
@@ -92,7 +92,7 @@ export function memoryBackend(tz: string): Backend {
     async write(id, w) {
       const at = new Date().toISOString(), prior = id ? known.get(id) : undefined;
       const r = {id: id ?? ulid(), kind: w.kind, revision: ++revision, createdAt: prior?.createdAt ?? at, updatedAt: at, deletedAt: null, logicalDay: w.logicalDay ?? null, tz,
-        source: {type: 'planner', confirmed: true}, ...(w.privateFields ? {privateFields: w.privateFields} : {}), body: parseBody(w.kind, w.body)} as AnyRecord;
+        source: {type: 'planner', confirmed: true}, ...(w.privateFields ? {privateFields: w.privateFields} : {}), ...(w.ext ?? prior?.ext ? {ext: w.ext ?? prior?.ext} : {}), body: parseBody(w.kind, w.body)} as AnyRecord;
       known.set(r.id, r); return r;
     },
     async remove(id) { const r = {...known.get(id)!, deletedAt: new Date().toISOString(), revision: ++revision} as AnyRecord; known.set(id, r); return r; },
@@ -115,7 +115,7 @@ export function usePlanner(backend: Backend, initial: AnyRecord[]) {
     let before: AnyRecord | undefined;
     if (live) setRecords(list => {
       before = list.find(x => x.id === rid);
-      try { const o = {...optimistic(rid, w), ...(before ? {createdAt: before.createdAt, revision: before.revision, source: before.source, privateFields: w.privateFields ?? before.privateFields} : {})} as AnyRecord; return [...list.filter(x => x.id !== rid), o]; }
+      try { const o = {...optimistic(rid, w), ...(before ? {createdAt: before.createdAt, revision: before.revision, source: before.source, privateFields: w.privateFields ?? before.privateFields, ...(w.ext ?? before.ext ? {ext: w.ext ?? before.ext} : {})} : {})} as AnyRecord; return [...list.filter(x => x.id !== rid), o]; }
       catch { return list; }
     });
     const run = (chains.current.get(rid) ?? Promise.resolve(null)).then(last => {

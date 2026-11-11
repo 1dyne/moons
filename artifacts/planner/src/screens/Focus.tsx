@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react';
 import {actualMin, addDays, goalPercent, dayCondition, focusOf, logicalDay, personaShare, type LifeRecord, type Settings} from '@workspace/life-contract';
-import type {ModuleSpec, PropDef} from '@workspace/planner-spec';
+import {entryFocusMin, timeStretches, type Logic, type ModuleSpec, type PropDef, type Stretch} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
 import {Scale} from './Scale.tsx';
 import {useL} from '../labels.tsx';
@@ -101,23 +101,29 @@ const cellStart = (day: string, minuteOfDay: number) => {
   return new Date(`${d}T${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00`);
 };
 
-export function Timetable({m, p, day, settings, color}: {m: ModuleSpec; p: Planner; day: string; settings: Settings; color: (k: string) => string}) {
+export function Timetable({m, p, day, settings, color, logic}: {m: ModuleSpec; p: Planner; day: string; settings: Settings; color: (k: string) => string; logic?: Logic}) {
   const now = useClock(30_000);
   const startHour = Number(m.options.startHour ?? 6), endHour = Number(settings.dayBoundary.slice(0, 2)) + 24;
   const manual = m.options.input !== 'timer';
   const rangeFrom = cellStart(day, startHour * 60), rangeTo = cellStart(day, endHour * 60);
-  const sessions = ofKind(p.records, 'session').filter(s => new Date(s.body.start) < rangeTo && (s.body.end ? new Date(s.body.end) : now) > rangeFrom);
+  const copied = new Set(p.records.filter(r => r.kind === 'entry' && !r.deletedAt).map(r => (r.ext as {src?: string} | undefined)?.src).filter(Boolean));
+  const sessions = ofKind(p.records, 'session').filter(s => !copied.has(s.id) && new Date(s.body.start) < rangeTo && (s.body.end ? new Date(s.body.end) : now) > rangeFrom);
   const tasks = ofKind(p.records, 'task').filter(t => t.logicalDay === day && !['cancelled', 'postponed'].includes(t.body.outcome.result));
-  const [pick, setPick] = useState<{at: number; session?: LifeRecord<'session'>} | null>(null);
+  const [pick, setPick] = useState<{at: number; session?: LifeRecord<'session'>; entry?: Stretch} | null>(null);
   const [label, setLabel] = useState('');
+  // Time measured by block widgets (timers, start·end buttons, sleep…) is painted here too.
+  const stretches = logic ? timeStretches(p.records, logic, rangeFrom, rangeTo, now).filter(x => x.src === 'entry') : [];
   const owner = (from: Date, to: Date) => {
-    let best: LifeRecord<'session'> | undefined, overlap = 0;
-    for (const s of sessions) {
-      const a = Math.max(from.getTime(), new Date(s.body.start).getTime()), b = Math.min(to.getTime(), s.body.end ? new Date(s.body.end).getTime() : now.getTime());
+    let best: LifeRecord<'session'> | Stretch | undefined, overlap = 0;
+    for (const s of [...sessions, ...stretches]) {
+      const st = 'src' in s ? s.start : s.body.start, en = 'src' in s ? s.end : s.body.end;
+      const a = Math.max(from.getTime(), new Date(st).getTime()), b = Math.min(to.getTime(), en ? new Date(en).getTime() : now.getTime());
       if (b - a > overlap) { overlap = b - a; best = s; }
     }
     return overlap >= 4 * 60_000 ? best : undefined; // a cell is painted when it was mostly spent on one thing
   };
+  // The same subject has one colour whichever timer measured it (the old one or a block one).
+  const keyColor = (s: LifeRecord<'session'> | Stretch) => 'src' in s ? color(`label:${s.label}`) : color(sessionKey(s));
   const paint = async (minute: number, target: {task?: LifeRecord<'task'>; label?: string}) => {
     setPick(null); setLabel('');
     const from = cellStart(day, minute), to = cellStart(day, minute + 10);
@@ -134,18 +140,22 @@ export function Timetable({m, p, day, settings, color}: {m: ModuleSpec; p: Plann
         <span className="tt-hour">{String(h % 24).padStart(2, '0')}</span>
         {[0, 1, 2, 3, 4, 5].map(i => {
           const minute = h * 60 + i * 10, from = cellStart(day, minute), to = cellStart(day, minute + 10);
-          const s = owner(from, to), live = now >= from && now < to;
-          return <button key={i} role="gridcell" className={`tt-cell ${s ? 'filled' : ''} ${live ? 'now' : ''} ${s && !s.body.end ? 'running' : ''}`}
-            style={s ? {background: color(sessionKey(s))} : undefined}
-            title={s ? `${s.body.label} · ${clock(s.body.start)}–${s.body.end ? clock(s.body.end) : '지금'}` : `${clock(from.toISOString())}`}
-            aria-label={`${clock(from.toISOString())} ${s ? s.body.label : '비어 있음'}`}
-            onClick={() => (s || manual) && setPick({at: minute, session: s})} />;
+          const o = owner(from, to), live = now >= from && now < to;
+          const v = o ? ('src' in o ? {label: o.label, start: o.start, end: o.end} : {label: o.body.label, start: o.body.start, end: o.body.end}) : null;
+          return <button key={i} role="gridcell" className={`tt-cell ${o ? 'filled' : ''} ${live ? 'now' : ''} ${v && !v.end ? 'running' : ''}`}
+            style={o ? {background: keyColor(o)} : undefined}
+            title={v ? `${v.label} · ${clock(v.start)}–${v.end ? clock(v.end) : '지금'}` : `${clock(from.toISOString())}`}
+            aria-label={`${clock(from.toISOString())} ${v ? v.label : '비어 있음'}`}
+            onClick={() => (o || manual) && setPick(o && 'src' in o ? {at: minute, entry: o} : {at: minute, session: o as LifeRecord<'session'> | undefined})} />;
         })}
       </div>)}
     </div>
     {pick && <div className="tt-pop" role="dialog" aria-label="칸 기록">
       <div className="tt-pop-head"><strong>{clock(cellStart(day, pick.at).toISOString())}–{clock(cellStart(day, pick.at + 10).toISOString())}</strong><button className="ghost small" onClick={() => setPick(null)} aria-label="닫기">✕</button></div>
-      {pick.session ? <>
+      {pick.entry ? <>
+        <p>{pick.entry.label} <span className="muted">{clock(pick.entry.start)}–{pick.entry.end ? clock(pick.entry.end) : '지금'}</span></p>
+        <button className="small danger" onClick={async () => { await p.remove(pick.entry!.id); setPick(null); }}>이 기록 지우기</button>
+      </> : pick.session ? <>
         <p>{pick.session.body.label} <span className="muted">{clock(pick.session.body.start)}–{pick.session.body.end ? clock(pick.session.body.end) : '지금'} · {pick.session.body.source === 'timer' ? '스톱워치' : '직접 칠함'}</span></p>
         <SessionNote s={pick.session} p={p} />
         <button className="small danger" onClick={async () => { await p.remove(pick.session!.id); setPick(null); }}>이 기록 지우기</button>
@@ -158,12 +168,19 @@ export function Timetable({m, p, day, settings, color}: {m: ModuleSpec; p: Plann
   </div>;
 }
 
-export function Receipt({p, day, routineRate}: {p: Planner; day: string; routineRate: {done: number; of: number} | null}) {
+export function Receipt({p, day, routineRate, logic}: {p: Planner; day: string; routineRate: {done: number; of: number} | null; logic?: Logic}) {
   const cond = dayCondition(p.records, day), personas = personaShare(p.records, day, 1).rows.filter(r => r.minutes > 0);
   const estimated = ofKind(p.records, 'task').filter(t => t.logicalDay === day && t.body.plan.estimateMin && t.body.outcome.result === 'done');
   const estSum = estimated.reduce((s, t) => s + t.body.plan.estimateMin!, 0), actSum = estimated.reduce((s, t) => s + actualMin(p.records, t.id), 0);
   const now = useClock(60_000);
   const f = focusOf(p.records, day, now);
+  // Focus measured by block widgets (types marked as focus), by what was measured.
+  const extra = logic ? timeStretches(p.records, logic, new Date(`${day}T00:00:00`), new Date(Date.parse(`${day}T00:00:00`) + 30 * 3600_000), now)
+    .filter(x => { const r = p.records.find(y => y.id === x.id); return x.src === 'entry' && !!logic.types.find(t => t.id === x.type)?.focus && r?.logicalDay === day && !(r.ext as {src?: string} | undefined)?.src; }) : [];
+  const extraBy = [...new Set(extra.map(x => x.label))].map(l => ({title: l, minutes: extra.filter(x => x.label === l).reduce((a, x) => a + Math.max(0, ((x.end ? Date.parse(x.end) : now.getTime()) - Date.parse(x.start)) / 60000), 0)}));
+  const extraMin = logic ? entryFocusMin(p.records, logic, day, now.getTime()) : 0;
+  // One line per subject, whichever timer measured it.
+  const merged = [...f.byTask.map(r => ({title: r.title, minutes: r.minutes})), ...extraBy].reduce<{title: string; minutes: number}[]>((acc, r) => { const x = acc.find(a => a.title === r.title); if (x) x.minutes += r.minutes; else acc.push({...r}); return acc; }, []).filter(r => r.minutes >= 1);
   const tasks = ofKind(p.records, 'task').filter(t => t.logicalDay === day && !t.body.plan.fixed && !['cancelled', 'postponed'].includes(t.body.outcome.result) && t.body.plan.state !== 'dropped');
   const done = tasks.filter(t => t.body.outcome.result === 'done').length;
   const date = new Intl.DateTimeFormat('ko-KR', {year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short', timeZone: 'UTC'}).format(new Date(`${day}T00:00:00Z`));
@@ -174,10 +191,10 @@ export function Receipt({p, day, routineRate}: {p: Planner; day: string; routine
     <p className="r-line"><span>시작</span><span>{f.firstStart ? clock(f.firstStart) : '--:--'}</span></p>
     <p className="r-line"><span>마지막</span><span>{f.lastEnd ? (f.active ? '진행 중' : clock(f.lastEnd)) : '--:--'}</span></p>
     <hr />
-    {f.byTask.length === 0 && <p className="r-empty">아직 잰 시간이 없어요</p>}
-    {f.byTask.map(r => <p key={r.taskId ?? r.title} className="r-line item"><span>{r.title}</span><i /><span>{hm(r.minutes)}</span></p>)}
+    {merged.length === 0 && <p className="r-empty">아직 잰 시간이 없어요</p>}
+    {merged.map(r => <p key={r.title} className="r-line item"><span>{r.title}</span><i /><span>{hm(r.minutes)}</span></p>)}
     <hr />
-    <p className="r-line total"><span>순집중 합계</span><span>{hm(f.todayMinutes)}</span></p>
+    <p className="r-line total"><span>순집중 합계</span><span>{hm(f.todayMinutes + extraMin)}</span></p>
     <p className="r-line"><span>할 일 완료</span><span>{done}/{tasks.length}</span></p>
     {routineRate && routineRate.of > 0 && <p className="r-line"><span>루틴</span><span>{routineRate.done}/{routineRate.of}</span></p>}
     {estSum > 0 && <p className="r-line"><span>예상 → 실제</span><span>{hm(estSum)} → {hm(actSum)}</span></p>}

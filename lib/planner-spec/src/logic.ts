@@ -34,6 +34,10 @@ export const TypeDef = z.object({
   // The unit of an entry's value (h, 잔, 쪽…); a duration entry (start → end) has its length as value when unit is 'min'.
   unit: z.string().max(12).default(''),
   fields: z.array(FieldDef).max(30).default([]),
+  // Time in this type counts as focus (순집중, 영수증) — not, say, sleep.
+  focus: z.boolean().default(false),
+  // Records lit kept before blocks existed that can be copied into this type (메뉴 → 로직 → 예전 기록 가져오기).
+  from: z.enum(['', 'session', 'sleep', 'condition']).default(''),
 });
 export type TypeDef = z.infer<typeof TypeDef>;
 export const VERB_NAMES: Record<Verb, string> = {planned: '계획함', started: '시작함', ended: '끝냄', did: '했음', measured: '쟀음', felt: '느꼈음', wished: '바람', noted: '적음'};
@@ -54,7 +58,7 @@ export type SavedFilter = z.infer<typeof SavedFilter>;
 // ── Blocks: the pieces a widget is made of ───────────────────────────────────────────────────────
 export const BLOCK_GROUPS = {input: '입력', time: '시간', compute: '계산', view: '보기', deco: '꾸미기'} as const;
 export type BlockGroup = keyof typeof BLOCK_GROUPS;
-export const BLOCK_KINDS = ['button', 'toggle', 'counter', 'check', 'score', 'form', 'stopwatch', 'timer', 'stat', 'list', 'timeline', 'calendar', 'chart', 'gallery', 'table', 'heading', 'note'] as const;
+export const BLOCK_KINDS = ['button', 'toggle', 'counter', 'check', 'score', 'form', 'stopwatch', 'timer', 'stat', 'list', 'timeline', 'calendar', 'chart', 'gallery', 'table', 'grid10', 'breakdown', 'heading', 'note'] as const;
 export type BlockKind = (typeof BLOCK_KINDS)[number];
 export const LOGIC_BLOCKS: {kind: BlockKind; group: BlockGroup; name: string; desc: string}[] = [
   {kind: 'button', group: 'input', name: '버튼', desc: '누르면 그 시각이 한 줄 기록돼요 (기상, 약 먹음, 출근…)'},
@@ -72,6 +76,8 @@ export const LOGIC_BLOCKS: {kind: BlockKind; group: BlockGroup; name: string; de
   {kind: 'chart', group: 'view', name: '막대 차트', desc: '날마다 합계·개수·평균'},
   {kind: 'gallery', group: 'view', name: '카드', desc: '기록을 카드로'},
   {kind: 'table', group: 'view', name: '표', desc: '속성을 열로'},
+  {kind: 'grid10', group: 'view', name: '10분 타임테이블', desc: '하루를 10분 칸으로. 잰 시간이 저절로 칠해지고, 빈 칸을 눌러 직접 칠해요'},
+  {kind: 'breakdown', group: 'compute', name: '나눠 보기', desc: '선택 속성별 합계 (과목별 시간, 분류별 지출) — 목록 또는 원형'},
   {kind: 'heading', group: 'deco', name: '제목·문구', desc: '블록 사이의 글'},
   {kind: 'note', group: 'deco', name: '안내 없는 빈 줄', desc: '간격'},
 ];
@@ -99,7 +105,16 @@ export const LogicBlock = z.object({
   of: z.string().max(24).default(''), // 'value' | 'duration' | a number field id
   period: z.enum(PERIODS.map(p => p.id) as [Period, ...Period[]]).default('day'),
   target: z.number().finite().nullable().default(null),
-  show: z.enum(['number', 'gauge', 'ring', 'bar']).default('number'),
+  show: z.enum(['number', 'gauge', 'ring', 'bar', 'light', 'list', 'donut']).default('number'),
+  // 'light' (신호등): blue at or above green, red at or below red, amber between; a message per score.
+  green: z.number().default(7),
+  red: z.number().default(3),
+  msgs: z.record(z.string().max(4), z.string().max(160)).default({}),
+  // Toggles: a score field asked right after a stretch ends (컨디션 when the timer stops).
+  ask: z.string().max(24).default(''),
+  // 10-minute grid: this type only, or every measured time (all types and timer sessions).
+  scope: z.enum(['type', 'all']).default('type'),
+  startHour: z.number().int().min(0).max(23).default(6),
   conds: z.array(Cond).max(8).default([]),
   filters: z.array(SavedFilter).max(8).default([]),
   sort: z.enum(['new', 'old', 'value']).default('new'),
@@ -286,4 +301,36 @@ export function suggestLinks(title: string, candidates: {id: string; title: stri
   for (const h of history) { const s = [...grams(h.title)].filter(x => g.has(x)).length / Math.max(1, g.size); if (s >= 0.5) score.set(h.to, (score.get(h.to) ?? 0) + 2 * s); }
   for (const c of candidates) { const shared = [...grams(c.title)].filter(x => g.has(x)).length; if (shared >= 2) score.set(c.id, (score.get(c.id) ?? 0) + shared / Math.max(1, g.size)); }
   return candidates.filter(c => score.has(c.id)).sort((a, b) => score.get(b.id)! - score.get(a.id)!);
+}
+
+// ── Measured time, from every source (the 10-minute grid, receipts) ──────────────────────────────
+export type Stretch = {id: string; src: 'session' | 'entry'; type: string; start: string; end: string | null; label: string; key: string};
+/** Every stretch of time that overlaps [from, to): timer sessions and entries that have an end (or are running).
+ *  Entries copied from a session (ext.src) are not shown twice. */
+export function timeStretches(records: AnyRecord[], logic: Logic, from: Date, to: Date, now = new Date()): Stretch[] {
+  const out: Stretch[] = [], copied = new Set<string>();
+  const overlaps = (a: string, b: string | null) => Date.parse(a) < to.getTime() && (b ? Date.parse(b) : now.getTime()) > from.getTime();
+  for (const r of records) {
+    if (r.deletedAt || r.kind !== 'entry') continue;
+    const e = r as E, ext = e.ext as {open?: boolean; src?: string} | undefined;
+    if (ext?.src) copied.add(ext.src);
+    if (e.body.verb === 'planned' || !(e.body.end || ext?.open) || !overlaps(e.body.at, e.body.end)) continue;
+    const t = logic.types.find(x => x.id === e.body.type);
+    const choice = t?.fields.find(f => f.kind === 'choice' && typeof e.body.fields[f.id] === 'string' && e.body.fields[f.id]);
+    const sub = choice ? String(e.body.fields[choice.id]) : '';
+    out.push({id: e.id, src: 'entry', type: e.body.type, start: e.body.at, end: e.body.end, label: sub || t?.name || e.body.type, key: `${e.body.type}:${sub}`});
+  }
+  for (const r of records) {
+    if (r.deletedAt || r.kind !== 'session' || copied.has(r.id)) continue;
+    const s = r.body as {start: string; end: string | null; label: string; taskId: string | null};
+    if (!overlaps(s.start, s.end)) continue;
+    out.push({id: r.id, src: 'session', type: '', start: s.start, end: s.end, label: s.label, key: s.taskId ?? `label:${s.label}`});
+  }
+  return out;
+}
+/** Minutes of focus on a day from entries of focus types (copies of old timer sessions are already counted as sessions). */
+export function entryFocusMin(records: AnyRecord[], logic: Logic, day: string, now = Date.now()) {
+  const focus = new Set(logic.types.filter(t => t.focus).map(t => t.id));
+  return Math.round(records.filter((r): r is E => r.kind === 'entry' && !r.deletedAt && r.logicalDay === day && focus.has((r.body as Entry).type) && !(r.ext as {src?: string} | undefined)?.src && (r.body as Entry).verb !== 'planned' && (!!(r.body as Entry).end || (r.ext as {open?: boolean} | undefined)?.open === true))
+    .reduce((m, e) => m + durationMin(e.body, now), 0));
 }

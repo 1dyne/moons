@@ -1,7 +1,7 @@
 import {createElement, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {createRoot, type Root} from 'react-dom/client';
 import {logicalDay, type AnyRecord, type Entry} from '@workspace/life-contract';
-import {Logic, MadeOptions, aggregate, checkTemplate, cleanCss, durationMin, entriesOf, inRange, matches, periodRange, read, renderTemplate, runFlows, suggestLinks,
+import {Logic, MadeOptions, aggregate, timeStretches, type Stretch, checkTemplate, cleanCss, durationMin, entriesOf, inRange, matches, periodRange, read, renderTemplate, runFlows, suggestLinks,
   type E, type FieldDef, type LogicBlock, type TypeDef} from '@workspace/planner-spec';
 import {ofKind} from '../data.ts';
 import type {Ctx} from '../screens/day.ts';
@@ -55,18 +55,23 @@ const ofPeriod = (m: M, b: LogicBlock) => entries(m).filter(e => inRange(e, peri
 const fieldOf = (m: M, id: string) => m.type?.fields.find(f => f.id === id);
 
 /** What a block's main button does — shared by the drawn block and data-lit-press in HTML designs. */
-export async function press(m: M, b: LogicBlock) {
+export async function press(m: M, b: LogicBlock, opt?: string) {
   const list = entries(m);
+  // A choice field on a toggle or check makes one row per option (과목별 타이머, 루틴 항목); opt is the row.
+  const tag = b.field && opt !== undefined ? {[b.field]: opt} : {};
   switch (b.kind) {
     case 'button': return write(m, null, {verb: b.verb ?? 'did', at: new Date().toISOString(), ...(b.field ? {fields: {[b.field]: true}} : {})});
     case 'toggle': case 'stopwatch': {
       const open = list.find(isOpen);
-      if (open) return write(m, open.id, {end: new Date().toISOString(), value: m.type?.unit === 'min' || m.type?.unit === '분' ? {amount: Math.round(durationMin(open.body)), unit: m.type.unit} : open.body.value}, {open: false}, open);
-      return write(m, null, {verb: b.verb ?? 'did', at: new Date().toISOString()}, {open: true});
+      const end = (e: E) => write(m, e.id, {end: new Date().toISOString(), value: m.type?.unit === 'min' || m.type?.unit === '분' ? {amount: Math.round(durationMin(e.body)), unit: m.type.unit} : e.body.value}, {open: false}, e);
+      // Starting one row stops the one running (one stretch at a time, like a subject timer).
+      if (open) { const ended = await end(open); if (opt === undefined || open.body.fields[b.field] === opt) return ended; }
+      return write(m, null, {verb: b.verb ?? 'did', at: new Date().toISOString(), fields: tag}, {open: true});
     }
     case 'counter': return write(m, null, {verb: b.verb ?? 'did', at: atFor(m), value: {amount: b.amount, unit: m.type?.unit ?? ''}});
     case 'check': {
-      const done = list.find(e => e.logicalDay === m.ctx.day);
+      const done = list.find(e => e.logicalDay === m.ctx.day && (opt === undefined || e.body.fields[b.field] === opt));
+      if (opt !== undefined) { if (done) return m.ctx.p.remove(done.id); return write(m, null, {verb: b.verb ?? 'did', at: atFor(m), fields: tag}); }
       if (done) return m.ctx.p.remove(done.id);
       return write(m, null, {verb: b.verb ?? 'did', at: atFor(m), ...(b.field ? {fields: {[b.field]: true}} : {})});
     }
@@ -90,6 +95,8 @@ function BlockView({b, m}: {b: LogicBlock; m: M}) {
     case 'timeline': return <div className="mb mb-timeline">{head}<TimelineBlock b={b} m={m} /></div>;
     case 'calendar': return <div className="mb mb-calendar">{head}<CalendarBlock b={b} m={m} /></div>;
     case 'chart': return <div className="mb mb-chart">{head}<ChartBlock b={b} m={m} /></div>;
+    case 'grid10': return <Grid10Block b={b} m={m} />;
+    case 'breakdown': return <BreakdownBlock b={b} m={m} />;
     case 'heading': return <p className={`mb mb-heading ${b.style || 'm'}`}>{b.icon && <Icon name={b.icon} size={18} />}{b.text}</p>;
     case 'note': return <div className="mb mb-space" aria-hidden="true" />;
   }
@@ -104,15 +111,34 @@ function ButtonBlock({b, m}: {b: LogicBlock; m: M}) {
   </div>;
 }
 function useTick(on: boolean, ms = 1000) { const [, set] = useState(0); useEffect(() => { if (!on) return; const t = setInterval(() => set(n => n + 1), ms); return () => clearInterval(t); }, [on, ms]); }
+const optionsOf = (m: M, b: LogicBlock) => { const f = fieldOf(m, b.field); return f && (f.kind === 'choice' || f.kind === 'multi') && f.options.length ? f.options : null; };
 function ToggleBlock({b, m}: {b: LogicBlock; m: M}) {
-  const open = entries(m).find(isOpen);
-  useTick(!!open, b.kind === 'stopwatch' ? 1000 : 30_000);
-  const today = entries(m).filter(e => e.logicalDay === m.ctx.day && e.body.end), total = today.reduce((s, e) => s + durationMin(e.body), 0);
+  const all = entries(m), open = all.find(isOpen), opts = optionsOf(m, b);
+  useTick(!!open, b.kind === 'stopwatch' || opts ? 1000 : 30_000);
+  const [asked, setAsked] = useState<string | null>(null);
+  const go = async (opt?: string) => { const was = open; const r = await press(m, b, opt); if (b.ask && was && r && (r as E).id === was.id) setAsked(was.id); };
+  const today = all.filter(e => e.logicalDay === m.ctx.day && e.body.end), total = today.reduce((s, e) => s + durationMin(e.body), 0);
   const ms = open ? Date.now() - Date.parse(open.body.at) : 0, s = Math.floor(ms / 1000);
+  const hms = `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  const ask = asked ? all.find(e => e.id === asked) : undefined, af = fieldOf(m, b.ask);
+  const rate = ask && af && <div className="mb-ask" role="group" aria-label={`${af.name} 남기기`}><span className="small">{af.name}</span>
+    <div className="scale" style={{'--n': af.max} as React.CSSProperties}>{Array.from({length: af.max}, (_, i) => i + 1).map(n => <button key={n} onClick={() => { setAsked(null); void write(m, ask.id, {fields: {...ask.body.fields, [af.id]: n}}, undefined, ask); }} style={{'--lv': Math.round(n / af.max * 10)} as React.CSSProperties}>{n}</button>)}</div>
+    <button className="ghost small" onClick={() => setAsked(null)}>건너뛰기</button></div>;
+  if (opts) {
+    const spent = (o: string) => all.filter(e => e.logicalDay === m.ctx.day && e.body.fields[b.field] === o).reduce((x, e) => x + durationMin(e.body), 0);
+    return <div className="mb mb-subjects">
+      <div className="mb-subj-head"><span className="mb-label">{b.icon && <Icon name={b.icon} size={16} />}{b.label || '오늘'}</span><strong className="mono">{hm(total + (open ? durationMin(open.body) : 0))}</strong>{open && <span className="mono small">{String(open.body.fields[b.field] ?? '')} · {hms}</span>}</div>
+      {rate}
+      <ul className="subj-list">{opts.map(o => { const on = !!open && open.body.fields[b.field] === o; return <li key={o} className={on ? 'on' : ''} style={{'--sc': colorFor(m, opts)(o)} as React.CSSProperties}>
+        <i className="subj-dot" aria-hidden="true" /><span className="subj-name">{o}</span><span className="subj-min">{hm(spent(o))}</span>
+        <button className={`subj-btn ${on ? 'stop' : ''}`} onClick={() => void go(o)} aria-label={`${o} ${on ? '멈추기' : '시작'}`}>{on ? '■' : '▶'}</button></li>; })}</ul>
+    </div>;
+  }
   return <div className={`mb mb-toggle ${open ? 'on' : ''} st-${b.style || (b.kind === 'stopwatch' ? 'big' : 'pill')}`}>
-    {b.kind === 'stopwatch' && <span className="mb-clock mono" aria-live="off">{open ? `${String(Math.floor(s / 3600)).padStart(2, '0')}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : hm(total)}</span>}
-    <button className="mb-btn" onClick={() => void press(m, b)} aria-pressed={!!open}>{b.icon && <Icon name={b.icon} />}<span>{open ? b.endLabel || '끝' : b.startLabel || '시작'}</span></button>
+    {b.kind === 'stopwatch' && <span className="mb-clock mono" aria-live="off">{open ? hms : hm(total)}</span>}
+    <button className="mb-btn" onClick={() => void go()} aria-pressed={!!open}>{b.icon && <Icon name={b.icon} />}<span>{open ? b.endLabel || '끝' : b.startLabel || '시작'}</span></button>
     {open ? <span className="mb-last mono">{clock(open.body.at)}~</span> : today.length > 0 && b.kind === 'toggle' && <span className="mb-last mono">{today.map(e => `${clock(e.body.at)}–${clock(e.body.end!)}`).slice(-2).join(' · ')}</span>}
+    {rate}
   </div>;
 }
 function CounterBlock({b, m}: {b: LogicBlock; m: M}) {
@@ -126,6 +152,12 @@ function CounterBlock({b, m}: {b: LogicBlock; m: M}) {
   </div>;
 }
 function CheckBlock({b, m}: {b: LogicBlock; m: M}) {
+  const opts = optionsOf(m, b);
+  if (opts) {
+    const today = entries(m).filter(e => e.logicalDay === m.ctx.day);
+    return <ul className="mb mb-checks">{b.label && <li className="mb-label">{b.label}</li>}{opts.map(o => { const on = today.some(e => e.body.fields[b.field] === o); return <li key={o} className={`mb-check ${on ? 'on' : ''}`}>
+      <button className="mark" onClick={() => void press(m, b, o)} aria-pressed={on} aria-label={o}>{on ? '○' : ''}</button><span>{o}</span></li>; })}</ul>;
+  }
   const done = entries(m).some(e => e.logicalDay === m.ctx.day);
   return <label className={`mb mb-check ${done ? 'on' : ''}`}><button className="mark" onClick={() => void press(m, b)} aria-pressed={done} aria-label={b.label || '오늘 체크'}>{done ? '○' : ''}</button>{b.icon && <Icon name={b.icon} size={16} />}<span>{b.label}</span></label>;
 }
@@ -232,11 +264,80 @@ export function statOf(m: M, b: LogicBlock) {
 }
 function StatBlock({b, m}: {b: LogicBlock; m: M}) {
   const s = statOf(m, b), R = 30, C = 2 * Math.PI * R;
+  if (b.show === 'light') return <LightStat b={b} m={m} v={s.value} />;
   return <div className={`mb mb-stat show-${b.show}`}>
     <span className="mb-label">{b.icon && <Icon name={b.icon} size={16} />}{b.label}</span>
     {b.show === 'ring' && s.pct !== null ? <svg viewBox="0 0 80 80" className="mb-statring" role="img" aria-label={`${s.text} ${s.pct}%`}><circle cx="40" cy="40" r={R} className="ring-bg" /><circle cx="40" cy="40" r={R} className="ring-fg" strokeDasharray={`${C * s.pct / 100} ${C}`} transform="rotate(-90 40 40)" /><text x="40" y="45" textAnchor="middle">{s.pct}%</text></svg> : null}
     <strong className="mb-num mono">{s.text}{b.target ? <small>/{b.of === 'duration' ? hm(b.target) : b.target}</small> : null}</strong>
     {(b.show === 'gauge' || b.show === 'bar') && s.pct !== null && <span className="mb-bar"><i style={{width: `${s.pct}%`}} /></span>}
+  </div>;
+}
+
+/** 신호등: the value as three lamps, and the user's message for that score (phones: behind the i button). */
+function LightStat({b, m, v}: {b: LogicBlock; m: M; v: number | null}) {
+  const [info, setInfo] = useState(false), phone = typeof matchMedia !== 'undefined' && matchMedia('(max-width: 700px)').matches;
+  const lit = v === null ? null : v >= b.green ? 'blue' : v <= b.red ? 'red' : 'amber', msg = v === null ? '' : b.msgs[String(Math.round(v))] ?? '';
+  return <div className="mb mb-light">
+    <span className="mb-label">{b.icon && <Icon name={b.icon} size={16} />}{b.label}</span>
+    <div className="tlight-top"><div className="tlight" role="img" aria-label={v === null ? '아직 기록 없음' : `${b.label} ${v}`}>{(['red', 'amber', 'blue'] as const).map(c => <i key={c} className={`lamp lamp-${c} ${lit === c ? 'lit' : ''}`} />)}</div>
+      <strong className="mb-num mono">{v ?? '–'}</strong>{phone && msg && <button className="info-btn" onClick={() => setInfo(!info)} aria-expanded={info} aria-label="이 점수가 뜻하는 상태">i</button>}</div>
+    {msg && (!phone || info) && <p className={`tlight-msg ${lit}`}>{msg}</p>}
+  </div>;
+}
+
+/** 나눠 보기: one number per option of a choice field (과목별 시간, 분류별 지출). */
+const PAL = ['#3a66b8', '#2f9585', '#e9a317', '#d0342c', '#7b6bc4', '#00838f', '#c4689a', '#5d5d57'];
+/** Colours the user gave subjects in timer widgets, so a subject looks the same everywhere. */
+function subjectColors(m: M) {
+  const ws = [...(m.ctx.spec?.canvas?.day ?? []), ...(m.ctx.spec?.tabs ?? []).flatMap(t => t.widgets ?? [])];
+  return new Map(ws.filter(w => w.type === 'focus').flatMap(w => ((w.options.subjects as {name: string; color: string}[] | undefined) ?? []).map(sj => [sj.name, sj.color] as const)));
+}
+const colorFor = (m: M, keys: string[]) => { const own = subjectColors(m); return (k: string) => own.get(k) ?? PAL[keys.indexOf(k) % PAL.length]!; };
+function BreakdownBlock({b, m}: {b: LogicBlock; m: M}) {
+  const f = fieldOf(m, b.field), list = ofPeriod(m, b);
+  const keys = f ? [...new Set([...f.options, ...list.flatMap(e => { const v = e.body.fields[f.id]; return Array.isArray(v) ? v : typeof v === 'string' && v ? [v] : []; })])] : [];
+  const col = colorFor(m, keys), rows = keys.map(k => ({k, c: col(k), v: aggregate(list.filter(e => { const v = e.body.fields[f!.id]; return Array.isArray(v) ? v.includes(k) : v === k; }), b.agg, b.of, m.ctx.day) ?? 0})).filter(r => r.v > 0).sort((x, y) => y.v - x.v);
+  const total = rows.reduce((a, r) => a + r.v, 0), fmt = (v: number) => b.of === 'duration' && b.agg !== 'count' ? hm(v) : `${v}${b.of && b.of !== 'duration' ? fieldOf(m, b.of)?.unit ?? '' : ''}`;
+  if (!f) return <p className="muted small">나눌 선택 속성을 고르세요</p>;
+  const R = 34, C = 2 * Math.PI * R; let off = 0;
+  return <div className={`mb mb-breakdown show-${b.show}`}>
+    {b.label && <span className="mb-label">{b.label}</span>}
+    {b.show === 'donut' && total > 0 && <svg viewBox="0 0 90 90" width="96" height="96" role="img" aria-label={rows.map(r => `${r.k} ${Math.round(r.v / total * 100)}%`).join(', ')}>
+      <circle cx="45" cy="45" r={R} fill="none" stroke="var(--line)" strokeWidth="12" />
+      {rows.map(r => { const len = C * r.v / total, el = <circle key={r.k} cx="45" cy="45" r={R} fill="none" stroke={r.c} strokeWidth="12" strokeDasharray={`${len} ${C}`} strokeDashoffset={-off} transform="rotate(-90 45 45)" />; off += len; return el; })}
+      <text x="45" y="49" textAnchor="middle" className="donut-mid">{fmt(total)}</text></svg>}
+    <ul className="mb-bd">{rows.map(r => <li key={r.k}><i style={{background: r.c}} /><span>{r.k}</span><span className="mb-bdbar"><b style={{width: `${total ? r.v / rows[0]!.v * 100 : 0}%`, background: r.c}} /></span><span className="mono">{fmt(r.v)}</span></li>)}
+      {!rows.length && <li className="muted small mb-none">–</li>}</ul>
+  </div>;
+}
+
+/** 10분 타임테이블: every measured stretch paints its 10-minute cells; an empty cell can be painted into this type. */
+function Grid10Block({b, m}: {b: LogicBlock; m: M}) {
+  const now = new Date(); useTick(true, 30_000);
+  const boundary = Number(m.ctx.settings?.dayBoundary.slice(0, 2) ?? 4), start = b.startHour, end = boundary + 24;
+  const cell = (min: number) => { const d = min >= 1440 ? new Date(Date.parse(`${m.ctx.day}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10) : m.ctx.day, mm = min % 1440; return new Date(`${d}T${String(Math.floor(mm / 60)).padStart(2, '0')}:${String(mm % 60).padStart(2, '0')}:00`); };
+  const from = cell(start * 60), to = cell(end * 60);
+  const all = timeStretches(m.ctx.p.records, m.logic, from, to, now).filter(x => b.scope === 'all' || x.type === m.opts.type);
+  const keys = [...new Set(all.map(x => x.label))], color = colorFor(m, keys);
+  const owner = (a: Date, z: Date) => { let best: Stretch | undefined, ov = 0; for (const x of all) { const o = Math.min(z.getTime(), x.end ? Date.parse(x.end) : now.getTime()) - Math.max(a.getTime(), Date.parse(x.start)); if (o > ov) { ov = o; best = x; } } return ov >= 4 * 60_000 ? best : undefined; };
+  const [pick, setPick] = useState<{min: number; s?: Stretch} | null>(null);
+  const opts = (m.type?.fields.find(f => f.kind === 'choice' && f.options.length)) ?? null;
+  const paint = (min: number, opt?: string) => { setPick(null); return write(m, null, {verb: 'did', at: cell(min).toISOString(), end: cell(min + 10).toISOString(), ...(opts && opt ? {fields: {[opts.id]: opt}} : {})}); };
+  const hours = Array.from({length: Math.max(1, end - start)}, (_, i) => start + i);
+  return <div className="mb mb-grid10 timetable">
+    {b.label && <span className="mb-label">{b.label}</span>}
+    <div className="tt-grid" role="grid" aria-label="10분 타임테이블">{hours.map(h => <div key={h} className="tt-row" role="row"><span className="tt-hour">{String(h % 24).padStart(2, '0')}</span>
+      {[0, 1, 2, 3, 4, 5].map(i => { const min = h * 60 + i * 10, a = cell(min), z = cell(min + 10), x = owner(a, z), live = now >= a && now < z;
+        return <button key={i} role="gridcell" className={`tt-cell ${x ? 'filled' : ''} ${live ? 'now' : ''} ${x && !x.end ? 'running' : ''}`} style={x ? {background: color(x.label)} : undefined}
+          title={x ? `${x.label} · ${clock(x.start)}–${x.end ? clock(x.end) : '지금'}` : clock(a.toISOString())} aria-label={`${clock(a.toISOString())} ${x ? x.label : '비어 있음'}`} onClick={() => setPick({min, s: x})} />; })}</div>)}</div>
+    {keys.length > 0 && <div className="mb-legend">{keys.map(k => <span key={k}><i style={{background: color(k)}} />{k}</span>)}</div>}
+    {pick && <div className="tt-pop" role="dialog" aria-label="칸">
+      <div className="tt-pop-head"><strong>{clock(cell(pick.min).toISOString())}–{clock(cell(pick.min + 10).toISOString())}</strong><button className="ghost small" onClick={() => setPick(null)} aria-label="닫기">✕</button></div>
+      {pick.s ? <><p>{pick.s.label} <span className="muted">{clock(pick.s.start)}–{pick.s.end ? clock(pick.s.end) : '지금'}</span></p>
+        <button className="small danger" onClick={() => { const id = pick.s!.id; setPick(null); void m.ctx.p.remove(id); }}>이 기록 지우기</button></>
+        : opts ? <div className="chips">{opts.options.map(o => <button key={o} className="chip" onClick={() => void paint(pick.min, o)}>{o}</button>)}</div>
+        : <button className="small" onClick={() => void paint(pick.min)}>{m.type?.name ?? ''} 칠하기</button>}
+    </div>}
   </div>;
 }
 

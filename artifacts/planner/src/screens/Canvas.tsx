@@ -20,7 +20,7 @@ import {InlineEdit} from '../InlineEdit.tsx';
 import {patchWidget} from './Table.tsx';
 import {ListView, ViewWidget, Wishes} from './ViewWidgets.tsx';
 import {PageBox} from './PageBox.tsx';
-import {MadeWidget} from '../made/MadeWidget.tsx';
+import {MadeWidget, logicOf} from '../made/MadeWidget.tsx';
 import {useWidgetSettings} from './WidgetSettings.tsx';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
@@ -224,8 +224,8 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
     case 'pagebox': return <PageBox w={w} ctx={ctx} />;
     case 'list': return <ListView w={w} ctx={ctx} />;
     case 'week-view': case 'month-view': case 'goals-view': case 'insights-view': return <ViewWidget w={w} ctx={ctx} spec={spec} settings={settings} today={today} />;
-    case 'timetable': return <Timetable key={day} m={asModule(w, 'timer')} p={p} day={day} settings={settings} color={ctx.color} />;
-    case 'receipt': return <Receipt p={p} day={day} routineRate={ofKind(p.records, 'routine').length ? routineRate(p.records, day) : null} />;
+    case 'timetable': return <Timetable key={day} m={asModule(w, 'timer')} p={p} day={day} settings={settings} color={ctx.color} logic={logicOf(ctx)} />;
+    case 'receipt': return <Receipt p={p} day={day} routineRate={ofKind(p.records, 'routine').length ? routineRate(p.records, day) : null} logic={logicOf(ctx)} />;
     case 'hourly': return <HourlyDay ctx={ctx} startHour={start} endHour={endHour} />;
     case 'bullet': return <BulletDay ctx={ctx} />;
     case 'page': return <OnePageDay key={day} ctx={ctx} startHour={start} endHour={endHour} />;

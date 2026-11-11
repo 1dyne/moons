@@ -8,7 +8,8 @@ import type {Ctx, Nav} from '../screens/day.ts';
 import {MadeWidget} from './MadeWidget.tsx';
 import {CondsEditor, FlowEditor, newFlow} from './FlowEditor.tsx';
 import {ICON_NAMES, Icon} from './icons.tsx';
-import {PRESETS} from './presets.ts';
+import {PRESETS, type Seed} from './presets.ts';
+import {importLegacy, legacyCount} from './legacy.ts';
 import {THEMES, starterHtml} from './themes.ts';
 
 // The studio (docs/lit/BLOCKS.md §6): where a widget's logic and design are made, next to a live preview
@@ -33,7 +34,10 @@ export function StudioHost({spec, settings, p, nav, today, tab, saveSpec}: {spec
   const close = () => { setOpen(null); setDraft(null); };
   const ctxBase = {p, nav, now: () => new Date().toISOString(), timer: null, color: () => '#888', settings} as const;
   if ('logic' in open) return createPortal(<LogicPage spec={spec} p={p} saveSpec={saveSpec} close={close} />, document.body);
-  if (!draft) return createPortal(<Picker logic={logic} pick={pr => { const made = pr.make(logic); setDraft({widgetId: null, title: made.title, options: made.options, types: [...logic.types, ...made.types.filter(t => !logic.types.some(x => x.id === t.id))], flows: [...logic.flows, ...made.flows]}); }} close={close} />, document.body);
+  // The user's own subjects (from timer widgets) and routines, so block versions start with them.
+  const seed: Seed = {subjects: [...new Set(allWidgets(spec).filter(x => x.w.type === 'focus').flatMap(x => ((x.w.options.subjects as {name: string}[] | undefined) ?? []).map(sj => sj.name)))].slice(0, 60),
+    routines: [...new Set(p.records.filter(r => r.kind === 'routine' && !r.deletedAt && (r.body as {active: boolean}).active).map(r => (r.body as {title: string}).title.slice(0, 30)))].slice(0, 60)};
+  if (!draft) return createPortal(<Picker logic={logic} pick={pr => { const made = pr.make(logic, seed); setDraft({widgetId: null, title: made.title, options: made.options, types: [...logic.types, ...made.types.filter(t => !logic.types.some(x => x.id === t.id))], flows: [...logic.flows, ...made.flows]}); }} close={close} />, document.body);
   const save = async (d: Draft) => {
     await saveSpec(s => {
       const next: PlannerSpec = {...s, logic: {types: d.types, flows: d.flows}};
@@ -52,7 +56,8 @@ function Picker({logic, pick, close}: {logic: Logic; pick: (p: (typeof PRESETS)[
   return <div className="studio-wrap" onClick={e => { if (e.target === e.currentTarget) close(); }}>
     <div className="picker" role="dialog" aria-label="위젯 만들기">
       <header className="studio-bar"><button className="ghost" onClick={close} aria-label="닫기">←</button><h2>위젯 만들기</h2></header>
-      <ul className="picker-grid">{PRESETS.map(pr => <li key={pr.id}><button className="picker-card" onClick={() => pick(pr)}><Icon name={pr.icon} size={26} /><b>{pr.name}</b><span>{pr.desc}</span></button></li>)}</ul>
+      {([['old', '기존 위젯을 블록으로'], ['new', '새로 만들기']] as const).map(([g, n]) => <section key={g} className="picker-sec"><h3>{n}</h3>
+        <ul className="picker-grid">{PRESETS.filter(pr => pr.group === g || (g === 'new' && pr.id === 'blank' && false)).map(pr => <li key={pr.id}><button className="picker-card" onClick={() => pick(pr)}><Icon name={pr.icon} size={26} /><b>{pr.name}</b><span>{pr.desc}</span></button></li>)}</ul></section>)}
       {logic.types.length > 0 && <p className="muted small">지금 있는 기록 묶음: {logic.types.map(t => t.name).join(' · ')}</p>}
     </div>
   </div>;
@@ -165,6 +170,22 @@ function BlockConfig({b, type, setType, set}: {b: LogicBlock; type: TypeDef; set
     {input && <label className="inline"><span className="k">기록할 동작</span><select value={b.verb ?? ''} onChange={e => set({verb: (e.target.value || undefined) as LogicBlock['verb']})}><option value="">기본</option>{VERBS.map(v => <option key={v} value={v}>{VERB_NAMES[v]}</option>)}</select></label>}
     {(b.kind === 'toggle' || b.kind === 'stopwatch') && <div className="inline"><label><span className="k">시작 버튼</span><input value={b.startLabel} maxLength={20} onChange={e => set({startLabel: e.target.value})} placeholder="시작" /></label><label><span className="k">끝 버튼</span><input value={b.endLabel} maxLength={20} onChange={e => set({endLabel: e.target.value})} placeholder="끝" /></label></div>}
     {(b.kind === 'button' || b.kind === 'toggle' || b.kind === 'counter' || b.kind === 'stopwatch') && <label className="inline"><span className="k">모양</span><select value={b.style} onChange={e => set({style: e.target.value})}><option value="">기본</option><option value="pill">알약</option><option value="big">크게</option><option value="round">동그랗게</option><option value="flat">납작하게</option></select></label>}
+    {(b.kind === 'toggle' || b.kind === 'stopwatch' || b.kind === 'check') && <label className="inline"><span className="k">{b.kind === 'check' ? '항목별로 (선택 속성)' : '과목별로 나누기 (선택 속성)'}</span>
+      <select value={b.field} onChange={e => set({field: e.target.value === '+' ? addField('choice', b.kind === 'check' ? '항목' : '과목') : e.target.value})}><option value="">하나로</option>{fs.filter(f => f.kind === 'choice').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}<option value="+">+ 새 선택 속성</option></select></label>}
+    {(b.kind === 'toggle' || b.kind === 'stopwatch') && <label className="inline"><span className="k">끝나면 물어볼 점수</span>
+      <select value={b.ask} onChange={e => set({ask: e.target.value === '+' ? addField('score', '컨디션') : e.target.value})}><option value="">묻지 않기</option>{fs.filter(f => f.kind === 'score').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}<option value="+">+ 새 점수 속성</option></select></label>}
+    {b.kind === 'stat' && b.show === 'light' && <><div className="inline"><label><span className="k">파랑 (이상)</span><input className="num" value={b.green} onChange={e => set({green: Number(e.target.value) || 0})} /></label>
+      <label><span className="k">빨강 (이하)</span><input className="num" value={b.red} onChange={e => set({red: Number(e.target.value) || 0})} /></label></div>
+      <details><summary>점수별 메시지</summary>{Array.from({length: fs.find(f => f.id === b.of)?.max ?? 10}, (_, i) => (fs.find(f => f.id === b.of)?.max ?? 10) - i).map(n => <label key={n} className="score-msg"><span className={`m-light ${n >= b.green ? 'blue' : n <= b.red ? 'red' : 'amber'}`} />{n}
+        <input value={b.msgs[String(n)] ?? ''} maxLength={160} onChange={e => set({msgs: {...b.msgs, [String(n)]: e.target.value}})} aria-label={`${n}점 메시지`} /></label>)}</details></>}
+    {b.kind === 'grid10' && <div className="inline"><select value={b.scope} onChange={e => set({scope: e.target.value as LogicBlock['scope']})} aria-label="무엇을 칠할지"><option value="all">잰 시간 전부 (타이머·다른 위젯 포함)</option><option value="type">이 기록 묶음만</option></select>
+      <label><span className="k">시작 시각</span><select value={b.startHour} onChange={e => set({startHour: Number(e.target.value)})}>{[0, 4, 5, 6, 7, 8, 9, 10].map(h => <option key={h} value={h}>{h}시</option>)}</select></label></div>}
+    {b.kind === 'breakdown' && <div className="inline wrap">
+      <select value={b.field} onChange={e => set({field: e.target.value})} aria-label="무엇으로 나눌지"><option value="">나눌 속성</option>{fs.filter(f => f.kind === 'choice' || f.kind === 'multi').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
+      <select value={b.agg} onChange={e => set({agg: e.target.value as LogicBlock['agg']})} aria-label="계산">{AGGS.filter(a => ['count', 'sum', 'avg', 'max', 'min'].includes(a.id)).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select>
+      {b.agg !== 'count' && ofSel}
+      <select value={b.period} onChange={e => set({period: e.target.value as LogicBlock['period']})} aria-label="기간">{PERIODS.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+      <select value={b.show} onChange={e => set({show: e.target.value as LogicBlock['show']})} aria-label="모양"><option value="list">막대 목록</option><option value="donut">원형</option></select></div>}
     {b.kind === 'counter' && <div className="inline"><label><span className="k">한 번에</span><input className="num" value={b.amount} onChange={e => set({amount: Number(e.target.value) || 1})} /></label><label><span className="k">하루 목표</span><input className="num" value={b.target ?? ''} onChange={e => set({target: e.target.value ? Number(e.target.value) : null})} /></label></div>}
     {b.kind === 'score' && <label className="inline"><span className="k">점수 속성</span><select value={b.field} onChange={e => set({field: e.target.value === '+' ? addField('score', '점수') : e.target.value})}><option value="">값으로</option>{fs.filter(f => f.kind === 'score' || f.kind === 'number').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}<option value="+">+ 새 점수 속성</option></select></label>}
     {b.kind === 'form' && <div className="checks"><span className="k">칸</span>{fs.map(f => <label key={f.id} className="row-check"><input type="checkbox" checked={b.fields.includes(f.id)} onChange={e => set({fields: e.target.checked ? [...b.fields, f.id] : b.fields.filter(x => x !== f.id)})} /> {f.name}</label>)}{!fs.length && <span className="muted small">데이터에서 속성을 먼저 만들어요</span>}</div>}
@@ -181,7 +202,7 @@ function BlockConfig({b, type, setType, set}: {b: LogicBlock; type: TypeDef; set
       {!['count', 'streak', 'days'].includes(b.agg) && ofSel}
       {b.kind !== 'calendar' && <select value={b.period} onChange={e => set({period: e.target.value as LogicBlock['period']})} aria-label="기간">{PERIODS.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}
       {b.kind !== 'calendar' && <label><span className="k">목표</span><input className="num" value={b.target ?? ''} onChange={e => set({target: e.target.value ? Number(e.target.value) : null})} /></label>}
-      {b.kind === 'stat' && <select value={b.show} onChange={e => set({show: e.target.value as LogicBlock['show']})} aria-label="모양"><option value="number">숫자</option><option value="gauge">게이지</option><option value="ring">원</option><option value="bar">막대</option></select>}
+      {b.kind === 'stat' && <select value={b.show} onChange={e => set({show: e.target.value as LogicBlock['show']})} aria-label="모양"><option value="number">숫자</option><option value="gauge">게이지</option><option value="ring">원</option><option value="bar">막대</option><option value="light">신호등</option></select>}
     </div>}
     {view && <div className="inline">
       <select value={b.period} onChange={e => set({period: e.target.value as LogicBlock['period']})} aria-label="기간">{PERIODS.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
@@ -277,6 +298,7 @@ export function LogicPage({spec, p, saveSpec, close}: {spec: PlannerSpec; p: Pla
         <div className="dict-head">{t.icon && <Icon name={t.icon} size={18} />}<b>{t.name}</b><span className="mono muted small">{t.id} · {count(t.id)}줄</span>
           <span className="muted small">{allWidgets(spec).filter(x => x.w.type === 'made' && x.w.options.type === t.id).map(x => x.w.title || '만든 위젯').join(', ')}</span></div>
         {t.desc && <p className="small">{t.desc}</p>}
+        {t.from && legacyCount(p.records, t) > 0 && <ImportButton t={t} p={p} />}
         <ul className="dict-fields">{t.fields.map(f => <li key={f.id}><b>{f.name}</b> <span className="muted">{FIELD_KINDS.find(k => k.id === f.kind)?.name}{f.unit ? ` · ${f.unit}` : ''}{f.options.length ? ` · ${f.options.join('/')}` : ''}</span>{f.desc && <span className="small"> — {f.desc}</span>}</li>)}</ul>
       </li>)}{!logic.types.length && <li className="muted">아직 만든 기록 묶음이 없어요.</li>}</ul>}
       {tab === 'flows' && <><ul className="sp-flows">{logic.flows.map(f => <li key={f.id} className={f.enabled ? '' : 'off'}>
@@ -286,4 +308,12 @@ export function LogicPage({spec, p, saveSpec, close}: {spec: PlannerSpec; p: Pla
         {logic.types.length > 0 && <button className="small" onClick={() => { const f = newFlow(logic.types[0]!.id); put({...logic, flows: [...logic.flows, f]}); setEdit(f.id); }}>+ 자동화</button>}</>}
     </div>
   </div></div>;
+}
+
+/** Copies records lit kept before blocks (timer sessions, sleep, condition checks) into a type, once. */
+function ImportButton({t, p}: {t: TypeDef; p: Planner}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const n = legacyCount(p.records, t);
+  return <div className="inline"><button className="small" disabled={!!busy} onClick={async () => { setBusy('0'); const done = await importLegacy(p, t, k => setBusy(String(k))); setBusy(null); alert(`${done}개를 가져왔어요`); }}>
+    {busy ? `가져오는 중 ${busy}/${n}` : `예전 기록 ${n}개 가져오기`}</button></div>;
 }

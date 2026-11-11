@@ -9,6 +9,7 @@ import {Month} from './Month.tsx';
 import {Insights} from './Insights.tsx';
 import {Week} from './Week.tsx';
 import {GaugeProvider} from '../Gauge.tsx';
+import {usePhone} from '../phone.tsx';
 
 // Where the user is survives a save (the page remounts with the new version).
 const memory: {tab?: string; day?: string} = {};
@@ -23,11 +24,13 @@ export function PlannerView({spec, settings, p, saveSpec}: {spec: PlannerSpec; s
   const [day, setDayState] = useState(memory.day ?? today), [goalId, setGoalId] = useState<string | null>(null), [month, setMonth] = useState(today.slice(0, 7));
   const setTab = (id: string) => { memory.tab = id; setTabIdState(id); };
   const setDay = (d: string) => { memory.day = d; setDayState(d); };
-  const tab = tabs.find(t => t.id === tabId) ?? tabs[0]!;
+  const tab = tabs.find(t => t.id === tabId) ?? tabs[0]!, phone = usePhone();
+  const pickTab = (id: string) => { setTab(id); if (tabs.find(t => t.id === id)?.kind === 'goals') setGoalId(null); };
   const firstOf = (kind: TabSpec['kind']) => tabs.find(t => t.kind === kind);
   const nav: Nav = {day, setDay: d => { setDay(d); const t = firstOf('today'); if (t) setTab(t.id); }, openGoal: id => { setGoalId(id); const t = firstOf('goals'); if (t) setTab(t.id); }, openTab: id => setTab(id)};
   return <GaugeProvider value={spec.skin?.gauge ?? 'segment'}><div className="planner-view">
-    <TabBar tabs={tabs} active={tab.id} pick={id => { setTab(id); if (tabs.find(t => t.id === id)?.kind === 'goals') setGoalId(null); }} save={saveSpec ? next => saveSpec(s => ({...s, tabs: next})) : undefined} />
+    {phone ? <BottomTabs tabs={tabs} active={tab.id} pick={pickTab} save={saveSpec ? next => saveSpec(s => ({...s, tabs: next})) : undefined} />
+      : <TabBar tabs={tabs} active={tab.id} pick={pickTab} save={saveSpec ? next => saveSpec(s => ({...s, tabs: next})) : undefined} />}
     <Toast text={p.error} />
     {tab.kind === 'today' && <DayPage spec={spec} settings={settings} p={p} nav={nav} today={today} saveSpec={saveSpec} />}
     {tab.kind === 'page' && <DayPage spec={spec} settings={settings} p={p} nav={nav} today={today} saveSpec={saveSpec} page={tab.widgets ?? []} />}
@@ -77,4 +80,23 @@ function Toast({text}: {text: string}) {
   const [shown, setShown] = useState('');
   useEffect(() => { if (!text) return; setShown(text); const t = setTimeout(() => setShown(''), 4000); return () => clearTimeout(t); }, [text]);
   return shown ? <p className="toast" role="alert" onClick={() => setShown('')}>{shown}</p> : null;
+}
+
+/** Phone: the first four tabs at the thumb, the rest (and tab editing) under 더보기. */
+function BottomTabs({tabs, active, pick, save}: {tabs: TabSpec[]; active: string; pick: (id: string) => void; save?: (tabs: TabSpec[]) => Promise<void>}) {
+  const [more, setMore] = useState(false);
+  const main = tabs.slice(0, 4), rest = tabs.slice(4), inRest = rest.some(t => t.id === active);
+  return <>
+    <nav className="bottom-tabs" role="tablist">
+      {main.map(t => <button key={t.id} role="tab" aria-selected={t.id === active} className={t.id === active ? 'on' : ''} onClick={() => pick(t.id)}>{t.name}</button>)}
+      <button className={inRest ? 'on' : ''} onClick={() => setMore(true)} aria-expanded={more}>{inRest ? tabs.find(t => t.id === active)!.name : '더보기'}</button>
+    </nav>
+    {more && <div className="sheet-wrap" onClick={e => { if (e.target === e.currentTarget) setMore(false); }}>
+      <div className="bottom-sheet">
+        <ul className="more-list">{rest.map(t => <li key={t.id}><button className={t.id === active ? 'on' : ''} onClick={() => { pick(t.id); setMore(false); }}>{t.name}</button></li>)}</ul>
+        {save && <details className="more-edit"><summary>탭 편집</summary><TabBar tabs={tabs} active={active} pick={pick} save={save} /></details>}
+        <button className="ghost" onClick={() => setMore(false)}>닫기</button>
+      </div>
+    </div>}
+  </>;
 }

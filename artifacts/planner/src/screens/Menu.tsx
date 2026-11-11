@@ -1,20 +1,23 @@
 import {useEffect, useState} from 'react';
-import {BLOCKS, PERMISSIONS, PROP_TYPES, WidgetManifest, codeHash, isCode, placeNew, type Block, type Column, type LibraryItem, type PlannerSpec, type Widget} from '@workspace/planner-spec';
+import {BLOCKS, PERMISSIONS, PROP_TYPES, WidgetManifest, codeHash, isCode, placeNew, tabsOf, widgetInfo, type Block, type Column, type LibraryItem, type PlannerSpec, type Widget} from '@workspace/planner-spec';
 import {libraryApi, useLibrary} from '../library.tsx';
+import {hiddenOnPhone, openByDefault, phoneOrder} from '../phone.tsx';
+import {currentTab} from './PlannerView.tsx';
+import {canvasOf} from './Canvas.tsx';
 
 // The menu (≡): everything that is not today's planner lives here, out of the way of daily use.
 // Sections follow plugin managers (Obsidian: installed list with toggles, code gated until approved;
 // Figma: manifest permissions, sandboxed frame) and Notion's sidebar (templates and settings tucked aside).
-type Section = 'home' | 'library' | 'make' | 'installed' | 'dev';
+type Section = 'home' | 'library' | 'make' | 'installed' | 'dev' | 'mobile';
 const KIND_NAME = {widget: '저장한 위젯', template: '페이지 틀', skin: '스킨', custom: '내 위젯'} as const;
 
-export function MenuDrawer({open, close, spec, saveSpec, openSettings}: {open: boolean; close: () => void; spec: PlannerSpec; saveSpec: (s: PlannerSpec) => Promise<void>; openSettings: () => void}) {
+export function MenuDrawer({open, close, spec, saveSpec, openSettings, openDecorate}: {open: boolean; close: () => void; spec: PlannerSpec; saveSpec: (s: PlannerSpec) => Promise<void>; openSettings: () => void; openDecorate?: () => void}) {
   const [section, setSection] = useState<Section>('home'), lib = useLibrary();
   // Widgets can arrive from elsewhere (Claude, the developer CLI): read the library again whenever the menu opens.
   useEffect(() => { if (!open) setSection('home'); else void lib?.reload(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); }; if (open) addEventListener('keydown', k); return () => removeEventListener('keydown', k); }, [open, close]);
   if (!open) return null;
-  const title = {home: '메뉴', library: '내 라이브러리', make: '위젯 만들기', installed: '설치한 위젯', dev: '개발자'}[section];
+  const title = {home: '메뉴', library: '내 라이브러리', make: '위젯 만들기', installed: '설치한 위젯', dev: '개발자', mobile: '모바일 배치'}[section];
   return <div className="drawer-wrap" onClick={e => { if (e.target === e.currentTarget) close(); }}>
     <aside className="drawer" role="dialog" aria-label={title}>
       <header className="drawer-head">
@@ -23,6 +26,8 @@ export function MenuDrawer({open, close, spec, saveSpec, openSettings}: {open: b
         <button className="ghost small" onClick={close} aria-label="닫기">✕</button>
       </header>
       {section === 'home' && <nav className="drawer-nav">
+        <button onClick={() => setSection('mobile')}><b>모바일 배치</b><span>폰에서 보일 위젯과 순서, 처음에 펼칠 것</span></button>
+        {openDecorate && <button onClick={() => { close(); openDecorate(); }}><b>꾸미기</b><span>PC 배치·스킨·위젯 설정</span></button>}
         <button onClick={() => setSection('library')}><b>내 라이브러리</b><span>저장한 위젯·페이지 틀·스킨</span></button>
         <button onClick={() => setSection('make')}><b>위젯 만들기</b><span>블록을 조합하거나 설명서를 붙여 넣어요</span></button>
         <button onClick={() => setSection('installed')}><b>설치한 위젯</b><span>켜고 끄기, 권한 확인</span></button>
@@ -33,6 +38,7 @@ export function MenuDrawer({open, close, spec, saveSpec, openSettings}: {open: b
       {section === 'make' && <MakeWidget done={() => setSection('installed')} />}
       {section === 'installed' && <Installed spec={spec} saveSpec={saveSpec} />}
       {section === 'dev' && <DevView />}
+      {section === 'mobile' && <MobileArrange spec={spec} saveSpec={saveSpec} />}
     </aside>
   </div>;
 }
@@ -188,3 +194,33 @@ node ../lib/lit-widget-sdk/bin/lit-widget.mjs publish --url ${origin} --token <�
   </div>;
 }
 
+
+/** 모바일 배치: which widgets a phone shows, in what order, and which start open. Per page (오늘 or the open page tab). */
+function MobileArrange({spec, saveSpec}: {spec: PlannerSpec; saveSpec: (s: PlannerSpec) => Promise<void>}) {
+  const tabs = tabsOf(spec), cur = tabs.find(t => t.id === currentTab());
+  const pageTab = cur && cur.kind === 'page' ? cur : undefined;
+  const source = pageTab ? pageTab.widgets ?? [] : canvasOf(spec);
+  const [list, setList] = useState(() => phoneOrder(source)), [busy, setBusy] = useState(false), [msg, setMsg] = useState('');
+  const set = (id: string, patch: Record<string, unknown>) => setList(l => l.map(w => w.id === id ? {...w, options: {...w.options, ...patch}} : w));
+  const move = (i: number, d: number) => setList(l => { const n = [...l], j = i + d; if (j < 0 || j >= n.length) return l; [n[i], n[j]] = [n[j]!, n[i]!]; return n; });
+  const save = async () => {
+    setBusy(true);
+    const ordered = list.map((w, i) => ({...w, options: {...w.options, mOrder: i}}));
+    const byId = new Map(ordered.map(w => [w.id, w]));
+    const apply = (ws: Widget[]) => ws.map(w => byId.get(w.id) ?? w);
+    try {
+      await saveSpec(pageTab ? {...spec, tabs: tabs.map(t => t.id === pageTab.id ? {...t, widgets: apply(t.widgets ?? [])} : t)} : {...spec, canvas: {...spec.canvas, day: apply(canvasOf(spec)), mode: 'free'}});
+      setMsg('저장했어요');
+    } catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
+  };
+  return <div className="drawer-body">
+    <p className="small"><b>{pageTab ? pageTab.name : '오늘'}</b> 페이지</p>
+    <ul className="m-arrange">{list.map((w, i) => <li key={w.id} className={hiddenOnPhone(w) ? 'off' : ''}>
+      <span className="m-name">{w.title || widgetInfo(w.type).label}</span>
+      <label className="small-label"><input type="checkbox" checked={!hiddenOnPhone(w)} onChange={e => set(w.id, {mHide: !e.target.checked})} /> 보이기</label>
+      <label className="small-label"><input type="checkbox" checked={openByDefault(w)} disabled={hiddenOnPhone(w)} onChange={e => set(w.id, {mOpen: e.target.checked})} /> 펼침</label>
+      <span className="m-move"><button className="ghost small" disabled={i === 0} onClick={() => move(i, -1)} aria-label="위로">↑</button><button className="ghost small" disabled={i === list.length - 1} onClick={() => move(i, 1)} aria-label="아래로">↓</button></span>
+    </li>)}</ul>
+    <div className="inline"><button className="primary" disabled={busy} onClick={() => void save()}>저장</button>{msg && <span className="small muted">{msg}</span>}</div>
+  </div>;
+}

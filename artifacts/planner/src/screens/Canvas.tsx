@@ -11,6 +11,7 @@ import {HabitGrid} from './Habits.tsx';
 import {useFontFamily} from '../fonts.ts';
 import {Gauge} from '../Gauge.tsx';
 import {LabelProvider} from '../labels.tsx';
+import {hiddenOnPhone, openByDefault, phoneOrder, setFold, useFold, usePhone} from '../phone.tsx';
 import {TableWidget} from './Table.tsx';
 import {CustomWidget} from './CustomWidget.tsx';
 import {Tip} from '../Tip.tsx';
@@ -89,7 +90,7 @@ export type EditApi = {widgets: Widget[]; mode: CanvasMode; selected: string | n
 
 export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveSpec}: {spec: PlannerSpec; settings: Settings; p: Planner; today: string; day: string; nav: Ctx['nav']; edit?: EditApi; page?: Widget[]; saveSpec?: Ctx['saveSpec']}) {
   const widgets = edit?.widgets ?? page ?? canvasOf(spec), mode = edit?.mode ?? (page ? 'free' : modeOf(spec)), M = METRICS[mode];
-  const timer = useTimer(p, settings);
+  const timer = useTimer(p, settings), phone = usePhone();
   // Subject colours from the timer(s) on this page carry into the timetable and receipt.
   const fixed = Object.fromEntries(widgets.filter(w => w.type === 'focus').flatMap(w => ((w.options.subjects as Subject[] | undefined) ?? []).map(sj => [`label:${sj.name}`, sj.color])));
   const color = colors(p, day, fixed);
@@ -145,6 +146,7 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveS
   const shown = edit ? base : fitLayout(base, need, fold, M.row + M.gap);
   const rows = shown.reduce((m, w) => Math.max(m, w.y + w.h), 0) + (edit ? 6 * M.ky : 0);
 
+  if (phone && !edit) return <PhoneStack widgets={widgets} ctx={ctx} spec={spec} settings={settings} today={today} endHour={endHour} />;
   return <div ref={grid} className={`canvas mode-${mode} ${edit ? 'editing' : ''}`} style={{gridTemplateColumns: `repeat(${M.cols}, minmax(0, 1fr))`, gap: `${M.gap}px`, gridTemplateRows: `repeat(${Math.max(rows, edit ? 12 * M.ky : 1)}, ${M.row}px)`}}
     onPointerMove={move} onPointerUp={end} onPointerCancel={end} onClick={e => { if (edit && e.target === e.currentTarget) edit.select(null); }}>
     {shown.length === 0 && edit && <p className="canvas-empty">빈 화면이에요. 왼쪽에서 위젯을 골라 넣고, 끌어서 배치하세요.</p>}
@@ -168,6 +170,20 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveS
       </section>;
     })}
   </div>;
+}
+
+/** Phone: one column in the user's mobile order; each card folds by tapping its title. */
+function PhoneStack({widgets, ctx, spec, settings, today, endHour}: {widgets: Widget[]; ctx: Ctx; spec: PlannerSpec; settings: Settings; today: string; endHour: number}) {
+  const folds = useFold();
+  const list = phoneOrder(widgets.filter(w => !hiddenOnPhone(w)));
+  return <div className="m-stack">{list.map(w => {
+    const decor = isDecor(w.type), title = w.title || widgetInfo(w.type).label, open = decor || (folds[w.id] ?? openByDefault(w));
+    return <section key={w.id} className={`m-card wg-type-${w.type} ${open ? 'open' : ''} ${decor ? 'm-decor' : ''}`}
+      style={{...(w.color ? {'--accent': w.color} : {}), ...(w.options.buttonColor ? {'--btn': String(w.options.buttonColor)} : {}), ...(w.background ? {background: w.background, '--wg-bg': w.background} : {}), ...(w.ink ? {color: w.ink, '--ink': w.ink, '--wg-ink': w.ink} : {})} as React.CSSProperties}>
+      {!decor && <button className="m-head" onClick={() => setFold(w.id, !open)} aria-expanded={open}><span>{title}</span><i aria-hidden="true">{open ? '−' : '+'}</i></button>}
+      {open && <div className="m-body"><LabelProvider value={(w.options.labels as Record<string, unknown> | undefined) ?? {}}><WidgetBody w={w} ctx={ctx} spec={spec} settings={settings} today={today} endHour={endHour} /></LabelProvider></div>}
+    </section>;
+  })}</div>;
 }
 
 function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: Ctx; spec: PlannerSpec; settings: Settings; today: string; endHour: number}) {

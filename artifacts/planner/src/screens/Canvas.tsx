@@ -20,7 +20,7 @@ import {InlineEdit} from '../InlineEdit.tsx';
 import {patchWidget} from './Table.tsx';
 import {ListView, ViewWidget, Wishes} from './ViewWidgets.tsx';
 import {PageBox} from './PageBox.tsx';
-import {WidgetGear} from './WidgetSettings.tsx';
+import {useWidgetSettings} from './WidgetSettings.tsx';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
 /** A saved page keeps its placement; a page never arranged starts as 다꾸형 from the layout's starter. */
@@ -132,7 +132,7 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveS
       const next: Record<string, number> = {};
       grid.current?.querySelectorAll<HTMLElement>('section.wg[data-id]').forEach(sec => {
         const body = sec.querySelector<HTMLElement>(':scope > .wg-body'), id = sec.dataset.id!;
-        const title = sec.querySelector<HTMLElement>(':scope > .wg-title');
+        const title = sec.querySelector<HTMLElement>(':scope > .wg-head');
         // + borders and a little air, so text never touches the edge.
         next[id] = body && !(fold.has(id) && sec.dataset.toggle) ? body.offsetTop + body.offsetHeight + 10 : (title ? title.offsetTop + title.offsetHeight + 8 : 40);
       });
@@ -160,12 +160,11 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveS
         style={{gridColumn: `${w.x + 1} / span ${w.w}`, gridRow: `${w.y + 1} / span ${w.h}`, order: w.y * M.cols + w.x, ...(w.color ? {'--accent': w.color} : {}), ...(w.options.buttonColor ? {'--btn': String(w.options.buttonColor)} : {}),
           ...(w.font ? {fontFamily: `var(--wfont-${w.id})`} : {}), ...(w.background ? {background: w.background, '--wg-bg': w.background} : {}), ...(w.ink ? {color: w.ink, '--ink': w.ink, '--wg-ink': w.ink} : {}),
           ...(decor || rot ? {transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)`} : {}), ...(decor || mode === 'free' ? {zIndex: (decor ? 20 : 1) + Number(w.options.layer ?? 0)} : {})} as React.CSSProperties}
-        onClick={edit ? e => { e.stopPropagation(); edit.select(w.id); } : undefined}>
+        onClick={edit ? e => { e.stopPropagation(); edit.select(w.id); } : undefined} onPointerUp={edit || decor ? undefined : e => tapOpen(w.id, e)}>
         {edit && <div className="wg-handle" onPointerDown={e => begin(e, w, 'move')} title="끌어서 옮기기">⠿ {widgetInfo(w.type).label}</div>}
         {w.font && <FontVar id={w.id} font={w.font} />}
-        {toggle ? <h3 className="wg-title wg-toggle"><button className="link" onClick={edit ? undefined : () => toggleFold(w.id)} aria-expanded={!isFolded}>{isFolded ? '▸' : '▾'} {title || widgetInfo(w.type).label}</button></h3>
-          : title && !OWN_TITLE.includes(w.type) && !decor && <InlineEdit as="h3" className="wg-title" value={title} max={40} disabled={!!edit || !saveSpec} onSave={t => saveSpec?.(s => patchWidget(s, w.id, x => ({...x, title: t})))} />}
-        {!edit && !decor && <WidgetGear w={w} ctx={ctx} />}
+        <WidgetHead w={w} ctx={ctx} on={!edit && !decor}>{toggle ? <h3 className="wg-title wg-toggle"><button className="link" onClick={edit ? undefined : () => toggleFold(w.id)} aria-expanded={!isFolded}>{isFolded ? '▸' : '▾'} {title || widgetInfo(w.type).label}</button></h3>
+          : title && !OWN_TITLE.includes(w.type) && !decor && <InlineEdit as="h3" className="wg-title" value={title} max={40} disabled={!!edit || !saveSpec} onSave={t => saveSpec?.(s => patchWidget(s, w.id, x => ({...x, title: t})))} />}</WidgetHead>
         {!isFolded && <div className="wg-body" inert={edit ? true : undefined}>
           <LabelProvider value={(w.options.labels as Record<string, unknown> | undefined) ?? {}}><WidgetBody w={w} ctx={ctx} spec={spec} settings={settings} today={today} endHour={endHour} /></LabelProvider>
         </div>}
@@ -173,6 +172,23 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveS
       </section>;
     })}
   </div>;
+}
+
+/** The widget's title row with ⚙ at its right end (they share the row, so ⚙ never sits on the content).
+ *  Tapping the widget twice also opens the settings: the handler is put on the widget section. */
+const taps = new Map<string, (e: React.PointerEvent) => void>();
+const tapOpen = (id: string, e: React.PointerEvent) => taps.get(id)?.(e);
+function WidgetHead({w, ctx, on, children}: {w: Widget; ctx: Ctx; on: boolean; children: React.ReactNode}) {
+  const s = useWidgetSettings(w, ctx);
+  if (on && s.tap) taps.set(w.id, s.tap); else taps.delete(w.id);
+  const has = !!children;
+  if (!has && !(on && s.gear)) return null;
+  return <div className={`wg-head ${has ? '' : 'bare'}`}>{children}{on && s.gear}{on && s.panel}</div>;
+}
+function PhoneHead({w, ctx, title, open}: {w: Widget; ctx: Ctx; title: string; open: boolean}) {
+  const s = useWidgetSettings(w, ctx);
+  if (s.tap) taps.set(w.id, s.tap); else taps.delete(w.id);
+  return <div className="m-headrow"><button className="m-head" onClick={() => setFold(w.id, !open)} aria-expanded={open}><span>{title}</span><i aria-hidden="true">{open ? '−' : '+'}</i></button>{s.gear}{s.panel}</div>;
 }
 
 /** Phone: one column in the user's mobile order; each card folds by tapping its title. */
@@ -183,8 +199,8 @@ function PhoneStack({widgets, ctx, spec, settings, today, endHour}: {widgets: Wi
     const decor = isDecor(w.type), title = w.title || widgetInfo(w.type).label, open = decor || (folds[w.id] ?? openByDefault(w));
     return <section key={w.id} className={`m-card wg-type-${w.type} ${open ? 'open' : ''} ${decor ? 'm-decor' : ''}`}
       style={{...(w.color ? {'--accent': w.color} : {}), ...(w.options.buttonColor ? {'--btn': String(w.options.buttonColor)} : {}), ...(w.background ? {background: w.background, '--wg-bg': w.background} : {}), ...(w.ink ? {color: w.ink, '--ink': w.ink, '--wg-ink': w.ink} : {})} as React.CSSProperties}>
-      {!decor && <div className="m-headrow"><button className="m-head" onClick={() => setFold(w.id, !open)} aria-expanded={open}><span>{title}</span><i aria-hidden="true">{open ? '−' : '+'}</i></button><WidgetGear w={w} ctx={ctx} /></div>}
-      {open && <div className="m-body"><LabelProvider value={(w.options.labels as Record<string, unknown> | undefined) ?? {}}><WidgetBody w={w} ctx={ctx} spec={spec} settings={settings} today={today} endHour={endHour} /></LabelProvider></div>}
+      {!decor && <PhoneHead w={w} ctx={ctx} title={title} open={open} />}
+      {open && <div className="m-body" onPointerUp={e => tapOpen(w.id, e)}><LabelProvider value={(w.options.labels as Record<string, unknown> | undefined) ?? {}}><WidgetBody w={w} ctx={ctx} spec={spec} settings={settings} today={today} endHour={endHour} /></LabelProvider></div>}
     </section>;
   })}</div>;
 }

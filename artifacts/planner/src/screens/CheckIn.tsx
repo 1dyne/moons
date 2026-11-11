@@ -5,6 +5,7 @@ import {ofKind, type Planner} from '../data.ts';
 import {hm} from './Focus.tsx';
 import {Scale} from './Scale.tsx';
 import {Tip} from '../Tip.tsx';
+import {InlineEdit} from '../InlineEdit.tsx';
 import {lowEnergyAlert} from './Focus.tsx';
 export {Scale};
 
@@ -30,7 +31,7 @@ export function CheckIn({m, p, day, now}: {m: ModuleSpec; p: Planner; day: strin
       <span className="ck-q">오늘 고정 일정</span>
       <ul className="prows">{fixed.map(t => <li key={t.id} className="prow">
         <span className="time-tag">{t.body.plan.start ? new Date(t.body.plan.start.value).toTimeString().slice(0, 5) : ''}–{t.body.plan.end ? new Date(t.body.plan.end.value).toTimeString().slice(0, 5) : ''}</span>
-        <span className="ptitle">{t.body.title}</span><button className="ghost small" onClick={() => p.remove(t.id)} aria-label={`${t.body.title} 지우기`}>✕</button></li>)}</ul>
+        <InlineEdit className="ptitle" value={t.body.title} onSave={title => p.write(t.id, {kind: 'task', logicalDay: t.logicalDay, body: {...t.body, title}, baseRevision: t.revision})} /><button className="ghost small" onClick={() => p.remove(t.id)} aria-label={`${t.body.title} 지우기`}>✕</button></li>)}</ul>
       <form className="padd" onSubmit={e => { e.preventDefault(); void addFixed(); }}>
         <input type="time" value={from} onChange={e => setFrom(e.target.value)} aria-label="시작" className="time-in" />–<input type="time" value={to} onChange={e => setTo(e.target.value)} aria-label="끝" className="time-in" />
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="고정 일정" aria-label="고정 일정" /><button className="small">추가</button>

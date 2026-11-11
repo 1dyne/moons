@@ -12,7 +12,7 @@ export const METRICS: Record<CanvasMode, {cols: number; row: number; gap: number
   free: {cols: 48, row: 10, gap: 0, kx: 4, ky: 3},
 };
 export const WIDGET_TYPES = ['focus', 'tasks', 'timetable', 'receipt', 'hourly', 'bullet', 'page', 'checkin', 'carry', 'routine', 'habits',
-  'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'table', 'custom', 'energy', 'mission', 'persona-board', 'wishes', 'list', 'week-view', 'month-view', 'goals-view', 'insights-view', 'text', 'sticker', 'tape', 'image', 'shape'] as const;
+  'goals', 'progress', 'dday', 'condition', 'sleep', 'review', 'personas', 'table', 'custom', 'energy', 'mission', 'persona-board', 'wishes', 'pagebox', 'list', 'week-view', 'month-view', 'goals-view', 'insights-view', 'text', 'sticker', 'tape', 'image', 'shape'] as const;
 export type WidgetType = (typeof WIDGET_TYPES)[number];
 
 export type WidgetInfo = {type: WidgetType; label: string; desc: string; group: '기록' | '시간' | '목표' | '나' | '꾸미기' | '내 위젯' | '보기'; w: number; h: number; minW: number; minH: number; module?: ModuleType};
@@ -41,6 +41,7 @@ export const WIDGETS: WidgetInfo[] = [
   {type: 'progress', label: '목표 진행률', desc: '고른 목표 하나를 크게', group: '목표', w: 4, h: 4, minW: 3, minH: 3, module: 'goals'},
   {type: 'dday', label: 'D-day', desc: '목표 마감까지 남은 날', group: '목표', w: 3, h: 3, minW: 2, minH: 2, module: 'goals'},
   {type: 'wishes', label: '소원 상자', desc: '이루면 열리는 소원: 잠김 → 해금 → 사용함', group: '목표', w: 6, h: 6, minW: 3, minH: 3},
+  {type: 'pagebox', label: '메모·소원 상자', desc: '아이콘을 누르면 새 페이지가 열려요. 페이지마다 자유롭게 꾸며요', group: '기록', w: 6, h: 8, minW: 3, minH: 3},
   {type: 'list', label: '목록 보기', desc: '할 일·목표를 조건(기간·상태·분류·속성)으로 걸러 보는 칸', group: '기록', w: 8, h: 10, minW: 3, minH: 4},
   {type: 'week-view', label: '주간 계획표', desc: '이번 주 7일', group: '보기', w: 12, h: 20, minW: 6, minH: 8},
   {type: 'month-view', label: '월·년 보기', desc: '이달 한눈에와 달력', group: '보기', w: 12, h: 24, minW: 6, minH: 8},
@@ -74,6 +75,7 @@ export const WIDGET_LABELS: Partial<Record<WidgetType, {key: string; def: string
   review: [{key: 'placeholder', def: '오늘은 어땠나요? 한 줄이면 충분해요.'}],
   table: [{key: 'add', def: '+ 새 줄'}],
   energy: [{key: 'msg.blue', def: '', name: '파랑일 때 문구'}, {key: 'msg.amber', def: '', name: '호박일 때 문구'}, {key: 'msg.red', def: '', name: '빨강일 때 문구'}],
+  pagebox: [{key: 'ask', def: '새 페이지를 만들까요?', name: '카드 문구'}, {key: 'go', def: '이동'}, {key: 'cancel', def: '취소'}],
   mission: [{key: 'focus', def: '순집중'}, {key: 'plan', def: '일정 전부 완료'}, {key: 'free', def: '자유시간'}, {key: 'unlock', def: '해금'}],
 };
 

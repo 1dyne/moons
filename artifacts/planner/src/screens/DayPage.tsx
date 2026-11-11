@@ -8,6 +8,7 @@ import {label} from './Today.tsx';
 import {DayCanvas} from './Canvas.tsx';
 import {hm} from './Focus.tsx';
 import {parseEntry} from '../parse.ts';
+import {at, fromClock, minuteOf} from '../schedule.ts';
 
 // A day: the date line, then the user's own widget page (the day page, or a page tab's widgets).
 // Widgets that show one day; a page without any of them (views, tables of all days, decorations) needs no date line.
@@ -56,18 +57,21 @@ function Summary({p, day}: {p: Planner; day: string}) {
 
 /** Phone: one + button; adding happens in a sheet from the bottom instead of input boxes inside every card. */
 function AddButton({p, day}: {p: Planner; day: string}) {
-  const [open, setOpen] = useState(false), [text, setText] = useState(''), [cat, setCat] = useState('must');
+  const [open, setOpen] = useState(false), [text, setText] = useState(''), [cat, setCat] = useState('must'), [time, setTime] = useState('');
   const add = async () => {
     const parsed = parseEntry(text, day);
     if (!parsed.title.trim()) return;
-    await p.write(null, {kind: 'task', logicalDay: day, body: {title: parsed.title, category: parsed.fixed ? null : cat, plan: {state: 'committed', target: parsed.target, estimateMin: parsed.estimateMin, ...(parsed.fixed ? {fixed: true, ...parsed.fixed} : {})}}});
-    setText('');
+    const start = parsed.time?.start ?? (time ? fromClock(day, time) : null);
+    const end = parsed.time?.end ?? (start && parsed.estimateMin ? at(day, minuteOf(day, start.value) + parsed.estimateMin) : null);
+    await p.write(null, {kind: 'task', logicalDay: day, body: {title: parsed.title, category: cat, plan: {state: 'committed', target: parsed.target, estimateMin: parsed.estimateMin, ...(start ? {start, end} : {})}}});
+    setText(''); setTime('');
   };
   return <>
     <button className="fab" onClick={() => setOpen(true)} aria-label="할 일 추가">＋</button>
     {open && <div className="sheet-wrap" onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}>
       <form className="bottom-sheet" onSubmit={e => { e.preventDefault(); void add(); }}>
-        <input value={text} onChange={e => setText(e.target.value)} placeholder="할 일" aria-label="할 일" autoFocus />
+        <div className="inline sheet-row"><input type="time" className="time-in" value={time} onChange={e => setTime(e.target.value)} aria-label="시작 시각" />
+          <input value={text} onChange={e => setText(e.target.value)} placeholder="할 일" aria-label="할 일" autoFocus /></div>
         <div className="seg" role="radiogroup" aria-label="분류">{([['must', '꼭'], ['want', '하고 싶은'], ['leisure', '여가']] as const).map(([k, v]) =>
           <button key={k} type="button" role="radio" aria-checked={cat === k} className={cat === k ? 'on' : ''} onClick={() => setCat(k)}>{v}</button>)}</div>
         <div className="inline"><button className="primary" disabled={!text.trim()}>추가</button><button type="button" className="ghost" onClick={() => setOpen(false)}>닫기</button></div>

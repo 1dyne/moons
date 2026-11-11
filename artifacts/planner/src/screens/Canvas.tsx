@@ -19,6 +19,8 @@ import {EnergyLight, Mission, PersonaBoard} from './LifeWidgets.tsx';
 import {InlineEdit} from '../InlineEdit.tsx';
 import {patchWidget} from './Table.tsx';
 import {ListView, ViewWidget, Wishes} from './ViewWidgets.tsx';
+import {PageBox} from './PageBox.tsx';
+import {WidgetGear} from './WidgetSettings.tsx';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
 /** A saved page keeps its placement; a page never arranged starts as 다꾸형 from the layout's starter. */
@@ -163,6 +165,7 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveS
         {w.font && <FontVar id={w.id} font={w.font} />}
         {toggle ? <h3 className="wg-title wg-toggle"><button className="link" onClick={edit ? undefined : () => toggleFold(w.id)} aria-expanded={!isFolded}>{isFolded ? '▸' : '▾'} {title || widgetInfo(w.type).label}</button></h3>
           : title && !OWN_TITLE.includes(w.type) && !decor && <InlineEdit as="h3" className="wg-title" value={title} max={40} disabled={!!edit || !saveSpec} onSave={t => saveSpec?.(s => patchWidget(s, w.id, x => ({...x, title: t})))} />}
+        {!edit && !decor && <WidgetGear w={w} ctx={ctx} />}
         {!isFolded && <div className="wg-body" inert={edit ? true : undefined}>
           <LabelProvider value={(w.options.labels as Record<string, unknown> | undefined) ?? {}}><WidgetBody w={w} ctx={ctx} spec={spec} settings={settings} today={today} endHour={endHour} /></LabelProvider>
         </div>}
@@ -180,7 +183,7 @@ function PhoneStack({widgets, ctx, spec, settings, today, endHour}: {widgets: Wi
     const decor = isDecor(w.type), title = w.title || widgetInfo(w.type).label, open = decor || (folds[w.id] ?? openByDefault(w));
     return <section key={w.id} className={`m-card wg-type-${w.type} ${open ? 'open' : ''} ${decor ? 'm-decor' : ''}`}
       style={{...(w.color ? {'--accent': w.color} : {}), ...(w.options.buttonColor ? {'--btn': String(w.options.buttonColor)} : {}), ...(w.background ? {background: w.background, '--wg-bg': w.background} : {}), ...(w.ink ? {color: w.ink, '--ink': w.ink, '--wg-ink': w.ink} : {})} as React.CSSProperties}>
-      {!decor && <button className="m-head" onClick={() => setFold(w.id, !open)} aria-expanded={open}><span>{title}</span><i aria-hidden="true">{open ? '−' : '+'}</i></button>}
+      {!decor && <div className="m-headrow"><button className="m-head" onClick={() => setFold(w.id, !open)} aria-expanded={open}><span>{title}</span><i aria-hidden="true">{open ? '−' : '+'}</i></button><WidgetGear w={w} ctx={ctx} /></div>}
       {open && <div className="m-body"><LabelProvider value={(w.options.labels as Record<string, unknown> | undefined) ?? {}}><WidgetBody w={w} ctx={ctx} spec={spec} settings={settings} today={today} endHour={endHour} /></LabelProvider></div>}
     </section>;
   })}</div>;
@@ -190,7 +193,9 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
   const {p, day} = ctx, start = Number(w.options.startHour ?? 6);
   switch (w.type) {
     case 'focus': return ctx.timer ? <SubjectTimer p={p} day={today} timer={ctx.timer} subjects={(w.options.subjects as Subject[] | undefined) ?? []} showTasks={w.options.showTasks !== false} askCondition={w.options.askCondition !== false}
-      onSubjects={ctx.saveSpec ? subjects => void ctx.saveSpec!(s => patchWidget(s, w.id, x => ({...x, options: {...x.options, subjects}}))) : undefined} /> : null;
+      onSubjects={ctx.saveSpec ? subjects => void ctx.saveSpec!(s => patchWidget(s, w.id, x => ({...x, options: {...x.options, subjects}}))) : undefined}
+      view={String(w.options.view ?? 'list')} onView={ctx.saveSpec ? view => void ctx.saveSpec!(s => patchWidget(s, w.id, x => ({...x, options: {...x.options, view}}))) : undefined}
+      show={(w.options.show as string[] | undefined) ?? ['goal']} defs={spec.props?.task ?? []} /> : null;
     case 'tasks': return <Tasks m={asModule(w, 'tasks')} ctx={ctx} />;
     case 'table': return <TableWidget w={w} ctx={ctx} />;
     case 'custom': return <CustomWidget w={w} ctx={ctx} />;
@@ -198,6 +203,7 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
     case 'mission': return <Mission w={w} ctx={ctx} />;
     case 'persona-board': return <PersonaBoard w={w} ctx={ctx} />;
     case 'wishes': return <Wishes w={w} ctx={ctx} />;
+    case 'pagebox': return <PageBox w={w} ctx={ctx} />;
     case 'list': return <ListView w={w} ctx={ctx} />;
     case 'week-view': case 'month-view': case 'goals-view': case 'insights-view': return <ViewWidget w={w} ctx={ctx} spec={spec} settings={settings} today={today} />;
     case 'timetable': return <Timetable key={day} m={asModule(w, 'timer')} p={p} day={day} settings={settings} color={ctx.color} />;

@@ -18,7 +18,7 @@ const guide = () => `lit · 대화로 만들고 마음대로 꾸미는 나만의
 꼭 지킬 것 (개인 공간이다):
 - 플래너 이름(name)·탭 이름·위젯 제목은 사용자가 직접 말한 것만 쓴다. 지어내지 않는다(사용자는 화면에서 두 번 눌러 고친다).
 - 설명·주석·안내 문장을 넣지 않는다: 안내용 text 위젯, 설명 열, 예시 문장, 플레이스홀더 금지. text 위젯은 사용자가 그 문구를 원할 때만.
-- 소원 상자는 wishes 위젯(표 아님). 같은 할 일·목표를 다르게 보려면 list 위젯(필터)으로. 표(table)는 사용자가 직접 기록할 칸이 필요할 때만.
+- 메모·소원처럼 '눌러서 새 페이지를 열고 꾸미는' 칸은 pagebox 위젯(options.icon: memo|mail|box|bowl|moon|gift|star). 잠김→해금 소원 목록은 wishes 위젯(표 아님). 같은 할 일·목표를 다르게 보려면 list 위젯(필터)으로. 표(table)는 사용자가 직접 기록할 칸이 필요할 때만.
 - 과목 타이머: focus{subjects:[{name,color}], showTasks, askCondition, buttonColor}. 에너지 신호등: energy{greenAt, redAt, warnAt, timeline, labels:{"msg.blue","msg.amber","msg.red"}(사용자가 준 문구만)}. 오늘의 나: personas{display:"donut"|"top", prop}. 목록 보기: list{source:"tasks"|"goals", period:"today"|"week"|"month"|"overdue"|"all", status:"open"|"done"|"all", category, goalId, propId, propValue}. 주간·월·목표·분석을 페이지에 넣을 때: week-view, month-view, goals-view, insights-view.
 2. 제안: 어떤 위젯을 어디에 둘지, 스킨(색·글꼴·종이)을 말로 짧게 보여 주고 사용자의 OK를 받는다.
 3. 만들기: build_planner. 기존 플래너가 있으면 get_planner로 먼저 보고, 바꾸는 것만 반영한다(바꿔도 기록은 그대로, 새 버전이 된다).
@@ -124,9 +124,9 @@ export function registerPlannerTools(tool: Tool) {
         capacityBasis: av ? 'availability' : 'recent_focus', weeklyFocusMin: av ? Array.from({length: 7}, (_, i) => availableOn(av, addDays(today, i))).reduce((a, b) => a + b, 0) : s.weeklyMin, bottlenecks: s.bottlenecks.map(b => ({month: b.month, needMin: b.demandMin, haveMin: b.capacityMin, goals: b.goals})), url: plannerUrl()};
     });
 
-  tool('add_items', '할 일·루틴·페르소나·표의 줄을 플래너에 넣는다. 할 일 props와 표 cells는 속성·열 이름으로 보낸다. 할 일은 day(없으면 오늘), goalId로 목표에 이으면 체크가 진행률이 된다. fixedStart/fixedEnd(HH:MM)면 고정 일정.',
+  tool('add_items', '할 일·루틴·페르소나·표의 줄을 플래너에 넣는다. 할 일 props와 표 cells는 속성·열 이름으로 보낸다. 할 일은 day(없으면 오늘), goalId로 목표에 이으면 체크가 진행률이 된다. start/end(HH:MM)면 그 시각에 놓이는 할 일(데일리 플래너는 시작 시각 순), fixedStart/fixedEnd면 고정 일정.',
     {tasks: z.array(z.object({title: z.string().min(1).max(200), day: day.optional(), category: z.enum(['must', 'want', 'leisure']).optional(), estimateMin: z.number().int().min(1).max(1440).optional(),
-      goalId: z.string().optional(), fixedStart: z.string().regex(/^\d{2}:\d{2}$/).optional(), fixedEnd: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+      goalId: z.string().optional(), start: z.string().regex(/^\d{2}:\d{2}$/).optional(), end: z.string().regex(/^\d{2}:\d{2}$/).optional(), fixedStart: z.string().regex(/^\d{2}:\d{2}$/).optional(), fixedEnd: z.string().regex(/^\d{2}:\d{2}$/).optional(),
       props: z.record(cell).optional()})).max(50).optional(),
       rows: z.array(z.object({table: z.string().min(1).max(60), day: day.optional(), name: z.string().max(500).optional(), cells: z.record(cell).optional()})).max(100).optional(),
       routines: z.array(z.object({title: z.string().min(1).max(200), mode: z.enum(['pick_daily', 'fixed_all']).optional(), goalId: z.string().optional(), weekdays: z.array(z.number().int().min(0).max(6)).optional()})).max(30).optional(),
@@ -141,7 +141,8 @@ export function registerPlannerTools(tool: Tool) {
       const at = (d: string, hm: string) => new Date(`${d}T${hm}:00${offset(settings.tz, d)}`).toISOString();
       const made = {tasks: 0, routines: 0, personas: 0};
       for (const t of tasks ?? []) {
-        const d = t.day ?? today, fixed = t.fixedStart && t.fixedEnd ? {fixed: true, start: {value: at(d, t.fixedStart), precision: 'minute'}, end: {value: at(d, t.fixedEnd), precision: 'minute'}} : {};
+        const d = t.day ?? today, fixed = t.fixedStart && t.fixedEnd ? {fixed: true, start: {value: at(d, t.fixedStart), precision: 'minute'}, end: {value: at(d, t.fixedEnd), precision: 'minute'}}
+          : t.start ? {start: {value: at(d, t.start), precision: 'minute'}, end: t.end ? {value: at(d, t.end), precision: 'minute'} : null} : {};
         await writeRecord(owner, null, {kind: 'task', logicalDay: d, body: {title: t.title, category: t.category ?? null, goalIds: t.goalId ? [t.goalId] : [], props: byName(defs, t.props), plan: {state: 'committed', estimateMin: t.estimateMin ?? null, ...fixed}}, source: src}); made.tasks++;
       }
       for (const r of routines ?? []) { await writeRecord(owner, null, {kind: 'routine', body: {title: r.title, mode: r.mode ?? 'pick_daily', goalIds: r.goalId ? [r.goalId] : [], recurrence: r.weekdays?.length ? {freq: 'weekly', byWeekday: r.weekdays} : {freq: 'daily'}}, source: src}); made.routines++; }

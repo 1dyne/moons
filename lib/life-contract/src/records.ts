@@ -59,6 +59,8 @@ export const TaskBody = z.object({
   highlight: z.enum(['yellow', 'pink', 'green', 'blue']).nullable().default(null),
   // Values of properties the user added to tasks in the planner (spec.props.task): property id → value.
   props: z.record(z.union([z.string().max(500), z.number().finite(), z.boolean(), z.null()])).default({}),
+  // Where the user dragged it in the day's list (lower first). Tasks with a start time are listed by time.
+  order: z.number().finite().nullable().default(null),
   plan: z.object({
     state: z.enum(['planned', 'committed', 'dropped']).default('planned'),
     due: when.nullable().default(null),
@@ -110,6 +112,12 @@ export const ConditionBody = z.object({
   moment: z.enum(['wake', 'check', 'evening']).default('check'),
   mood: text(60).nullable().default(null),
   tags: z.array(text(30)).max(10).default([]),
+  // Why the score is what it is: a short reason, what lowered it (저하 요인, the user's own list),
+  // whether those can be managed (control) or not (constant), and a memo in three parts.
+  reason: text(200).nullable().default(null),
+  factors: z.array(text(30)).max(10).default([]),
+  factorKinds: z.array(z.enum(['control', 'constant'])).max(2).default([]),
+  memo: z.object({event: text(1000).nullable().default(null), body: text(1000).nullable().default(null), thought: text(1000).nullable().default(null)}).nullable().default(null),
 });
 export const ReviewBody = z.object({
   horizon: z.enum(['day', 'week', 'month']),
@@ -117,13 +125,29 @@ export const ReviewBody = z.object({
   text: text(5000).nullable().default(null),
 });
 
+/** One block of a decorated page: text, heading, checkbox line, quote, divider or a big sticker. */
+export const PageBlock = z.object({
+  id: z.string().min(1).max(30),
+  type: z.enum(['text', 'h', 'check', 'quote', 'divider', 'sticker']),
+  text: text(4000).default(''),
+  checked: z.boolean().default(false),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().default(null),
+  align: z.enum(['left', 'center', 'right']).default('left'),
+});
+export type PageBlock = z.infer<typeof PageBlock>;
+
 // Free writing on a day: a bullet-journal note (–), an idea (!), or the whole free page of a one-page daily.
 export const NoteBody = z.object({
   text: text(5000),
-  signifier: z.enum(['note', 'idea', 'page', 'row']).default('note'),
+  signifier: z.enum(['note', 'idea', 'page', 'row', 'entry']).default('note'),
   // signifier 'row': one line of a user-made table (표 위젯). table = the widget id, cells = column id → value.
   table: z.string().max(60).nullable().default(null),
   cells: z.record(z.union([z.string().max(500), z.number().finite(), z.boolean(), z.null()])).default({}),
+  // signifier 'entry': a page the user decorates, opened from a page-box widget (table = that widget's id).
+  title: text(200).nullable().default(null),
+  icon: text(16).nullable().default(null),
+  bg: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().default(null),
+  blocks: z.array(PageBlock).max(300).default([]),
 });
 
 // A role the user lives in (학생, 직장인, 엄마, 창작자…). Tasks and sessions point to personas.

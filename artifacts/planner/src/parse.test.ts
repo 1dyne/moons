@@ -10,5 +10,7 @@ test('time is the estimate, other counts are the amount, ranges are fixed appoin
   const c = parseEntry('수학 20문제', '2026-11-09');
   assert.equal(c.estimateMin, null); assert.deepEqual(c.target, {amount: 20, unit: '문제'});
   const d = parseEntry('14:00-15:30 팀 회의', '2026-11-09');
-  assert.equal(d.title, '팀 회의'); assert.ok(d.fixed);
+  assert.equal(d.title, '팀 회의'); assert.ok(d.fixed); assert.ok(d.time?.end);
+  const e = parseEntry('9:00 수학 20문제', '2026-11-09');
+  assert.equal(e.title, '수학 20문제'); assert.ok(e.time?.start); assert.equal(e.time?.end, null); assert.equal(e.fixed, null);
 });

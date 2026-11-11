@@ -15,6 +15,8 @@ import {useL} from '../labels.tsx';
 import {PropForm, PropInput, showValue} from './Table.tsx';
 import {roleGroups} from './Table.tsx';
 import {InlineEdit} from '../InlineEdit.tsx';
+import {at, clockOf, fromClock, minuteOf, reorder, sortDay, timed} from '../schedule.ts';
+import {useDragSort} from '../drag.tsx';
 export {parseEntry, parseTarget} from '../parse.ts';
 
 const CATEGORY: Record<string, string> = {must: '꼭', want: '하고 싶은', leisure: '여가'};
@@ -47,36 +49,39 @@ export function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
   const [propVal, setPropVal] = useState(''), [propsOpen, setPropsOpen] = useState<string | null>(null);
   const catName = (c: string) => L(`cat.${c}`, CATEGORY[c]!);
   const goals = linkableGoals(p.records, day), personas = ofKind(p.records, 'persona').filter(x => x.body.active);
-  const tasks = ofKind(p.records, 'task').filter(t => t.logicalDay === day && !t.body.routineId && !t.body.plan.fixed).sort((a, b) => (a.body.priority ?? 9) - (b.body.priority ?? 9) || a.createdAt.localeCompare(b.createdAt));
-  const [title, setTitle] = useState(''), [cat, setCat] = useState('must'), [goal, setGoal] = useState(''), [persona, setPersona] = useState('');
+  // The day as a planner page: timed tasks (and fixed appointments) by start time, then the rest in the order the user dragged them.
+  const tasks = sortDay(ofKind(p.records, 'task').filter(t => t.logicalDay === day && !t.body.routineId && (!t.body.plan.fixed || timed(t))));
+  const [title, setTitle] = useState(''), [cat, setCat] = useState('must'), [goal, setGoal] = useState(''), [persona, setPersona] = useState(''), [startAt, setStartAt] = useState('');
   const parsed = parseEntry(title, day), target = parsed.target;
   // Until the user picks a goal, the one the title points to is preselected, so a check moves it without extra taps.
   const [picked, setPicked] = useState(false);
   const auto = !picked && title.trim() ? suggestGoal(p.records, day, title) : null;
   const goalId = picked ? goal : auto?.id ?? '';
+  const boundary = Number(ctx.settings?.dayBoundary.slice(0, 2) ?? 4);
   const add = async () => {
     if (!title.trim()) return;
-    if (await p.write(null, {kind: 'task', logicalDay: day, body: {title: parsed.title, category: cats && !parsed.fixed ? cat : null, props: byProp && propVal ? {[byProp.id]: propVal} : {}, goalIds: goalId ? [goalId] : [], personaIds: persona ? [persona] : [],
-      plan: {state: 'committed', target, estimateMin: parsed.estimateMin, ...(parsed.fixed ? {fixed: true, ...parsed.fixed} : {})}}})) { setTitle(''); setPicked(false); setGoal(''); }
+    const time = parsed.time ?? (startAt ? {start: fromClock(day, startAt, boundary), end: null} : null);
+    const end = time?.end ?? (time && parsed.estimateMin ? at(day, minuteOf(day, time.start.value) + parsed.estimateMin) : null);
+    if (await p.write(null, {kind: 'task', logicalDay: day, body: {title: parsed.title, category: cats ? cat : null, props: byProp && propVal ? {[byProp.id]: propVal} : {}, goalIds: goalId ? [goalId] : [], personaIds: persona ? [persona] : [],
+      order: tasks.length * 10, plan: {state: 'committed', target, estimateMin: parsed.estimateMin, ...(time ? {start: time.start, end} : {})}}})) { setTitle(''); setPicked(false); setGoal(''); setStartAt(''); }
   };
   const groups: (readonly [string | null, typeof tasks])[] = byProp ? [...byProp.options, null].map(o => [o, tasks.filter(t => (t.body.props?.[byProp.id] ?? null) === o)] as const).filter(([, l]) => l.length)
     : cats ? (['must', 'want', 'leisure', null] as const).map(c => [c, tasks.filter(t => t.body.category === c)] as const).filter(([, l]) => l.length) : [[null, tasks] as const];
   const saveDefs = (next: PropDef[]) => ctx.saveSpec?.(sp => ({...sp, props: {...sp.props, task: next}}));
-  // 하고 싶은 일(want) is shown in grey and never counted against the day.
-  const counted = tasks.filter(t => t.body.category !== 'want');
+  // 하고 싶은 일(want) is shown in grey and never counted against the day; fixed appointments are not tasks to finish.
+  const counted = tasks.filter(t => t.body.category !== 'want' && !t.body.plan.fixed);
   const done = counted.filter(t => t.body.outcome.result === 'done').length, live = counted.filter(t => !['cancelled', 'postponed'].includes(t.body.outcome.result)).length;
   return <>
-    {tasks.length > 0 && <p className="tally muted small">{done}/{live} 완료 <Tip id="tasks-cycle">체크 칸을 누를 때마다 완료 → 일부 → 못 함 → 처음으로</Tip></p>}
-    {tasks.length === 0 && <Tip id="tasks-empty" block>아직 오늘 할 일이 없어요. 아래에 적어 보세요.</Tip>}
+    {tasks.length > 0 && <p className="tally muted small">{done}/{live} 완료 <Tip id="tasks-cycle">체크 칸을 누를 때마다 완료 → 일부 → 못 함 → 처음으로. ⠿를 끌어 순서·시간을 바꿔요</Tip></p>}
     {groups.map(([c, list]) => <div key={String(c)} className={`task-group ${cats && c ? `group-${c}` : ''}`}>
       {cats && c && <span className={`cat cat-${c}`}>{catName(c)}</span>}
       {byProp && <span className="cat">{c ?? `${byProp.name} 없음`}</span>}
-      <ul className="prows">{list.map(t => <TaskRow key={t.id} t={t} ctx={ctx} />)}</ul>
+      <TaskList list={list} ctx={ctx} />
     </div>)}
     <form className="padd" onSubmit={e => { e.preventDefault(); void add(); }}>
-      <span className="mark static" aria-hidden="true">+</span>
+      <input type="time" className="time-in" value={parsed.time ? clockOf(parsed.time.start.value) : startAt} disabled={!!parsed.time} onChange={e => setStartAt(e.target.value)} aria-label="시작 시각" />
       <input value={title} onChange={e => setTitle(e.target.value)} placeholder={L('placeholder', '할 일')} aria-label="할 일" />
-      {parsed.fixed ? <span className="parsed" title="고정 일정으로 읽었어요">고정 일정</span> : parsed.estimateMin ? <span className="parsed" title="예상 시간으로 읽었어요">예상 {parsed.estimateMin}분</span> : target && <span className="parsed" title="분량으로 읽었어요">{target.amount}{target.unit}</span>}
+      {parsed.estimateMin ? <span className="parsed" title="예상 시간으로 읽었어요">예상 {parsed.estimateMin}분</span> : target && <span className="parsed" title="분량으로 읽었어요">{target.amount}{target.unit}</span>}
       {byProp && <select value={propVal} onChange={e => setPropVal(e.target.value)} aria-label={byProp.name}><option value="">{byProp.name}</option>{byProp.options.map(o => <option key={o} value={o}>{o}</option>)}</select>}
       {cats && <select value={cat} onChange={e => setCat(e.target.value)} aria-label="분류">{Object.keys(CATEGORY).map(k => <option key={k} value={k}>{catName(k)}</option>)}</select>}
       {auto && <span className="parsed auto-goal" title="제목으로 고른 목표예요. 바꾸려면 옆에서 고르세요">→ {auto.body.title}</span>}
@@ -93,24 +98,60 @@ export function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
   </>;
 }
 
-function TaskRow({t, ctx}: {t: LifeRecord<'task'>; ctx: Ctx}) {
+/** One group of the day's tasks; ⠿ drags a row to a new place (and, among timed rows, to a new time). */
+function TaskList({list, ctx}: {list: LifeRecord<'task'>[]; ctx: Ctx}) {
+  const drop = (id: string, to: number) => {
+    for (const x of reorder(list, id, to)) {
+      const t = list.find(y => y.id === x.id)!;
+      void saveTask(ctx, t, {...(x.plan ? {plan: {...t.body.plan, ...x.plan}} : {}), ...(x.order !== undefined ? {order: x.order} : {})});
+    }
+  };
+  const d = useDragSort(list.map(t => t.id), drop);
+  return <ul className="prows sortable" data-sort-box>{list.map((t, i) => <TaskRow key={t.id} t={t} ctx={ctx} index={i} handle={d.handle(t.id)} dragging={d.dragging === t.id} />)}{d.indicator}</ul>;
+}
+
+const WEEKDAY = ['일', '월', '화', '수', '목', '금', '토'];
+const shortDay = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}(${WEEKDAY[new Date(`${d}T12:00:00Z`).getUTCDay()]})`;
+/** Postpone to a day the user picks: 내일·모레·다음 주 at a tap, or any date. */
+export function PostponePicker({from, onPick, onClose}: {from: string; onPick: (d: string) => void; onClose: () => void}) {
+  const [d, setD] = useState(addDays(from, 1));
+  const quick: [string, string][] = [['내일', addDays(from, 1)], ['모레', addDays(from, 2)], ['다음 주', addDays(from, 7)]];
+  return <span className="postpone" role="group" aria-label="미룰 날짜">
+    {quick.map(([n, v]) => <button key={n} type="button" className="small" onClick={() => onPick(v)}>{n} <em className="muted">{shortDay(v)}</em></button>)}
+    <input type="date" value={d} min={addDays(from, 1)} onChange={e => setD(e.target.value)} aria-label="날짜" />
+    <button type="button" className="small primary" disabled={!d || d <= from} onClick={() => onPick(d)}>옮기기</button>
+    <button type="button" className="ghost small" onClick={onClose}>닫기</button>
+  </span>;
+}
+
+function TaskRow({t, ctx, index, handle, dragging}: {t: LifeRecord<'task'>; ctx: Ctx; index: number; handle: React.HTMLAttributes<HTMLElement>; dragging: boolean}) {
   const defs = ctx.spec?.props?.task ?? [];
   const {p, nav, timer, color} = ctx;
-  const [open, setOpen] = useState(false), [amount, setAmount] = useState(''), [reason, setReason] = useState('');
-  const o = t.body.outcome, target = t.body.plan.target;
+  const [open, setOpen] = useState(false), [amount, setAmount] = useState(''), [reason, setReason] = useState(''), [postpone, setPostpone] = useState(false);
+  const o = t.body.outcome, target = t.body.plan.target, day = t.logicalDay!;
   const goals = ofKind(p.records, 'goal').filter(g => t.body.goalIds.includes(g.id)), personas = ofKind(p.records, 'persona').filter(x => t.body.personaIds.includes(x.id));
   const spent = ofKind(p.records, 'session').filter(s => s.body.taskId === t.id).reduce((m, s) => m + Math.max(0, (new Date(s.body.end ?? ctx.now()).getTime() - new Date(s.body.start).getTime()) / 60000), 0);
   const running = timer?.running?.body.taskId === t.id;
   const set = (result: Task['outcome']['result'], extra: Partial<Task['outcome']> = {}) => saveTask(ctx, t, outcome(t, {
     result, reportedAt: result === 'unknown' ? null : ctx.now(),
     ...(result === 'done' ? {completedAt: ctx.now(), amount: o.amount ?? target?.amount ?? null, unit: o.unit ?? target?.unit ?? null} : {}),
-    ...(result === 'unknown' ? {completedAt: null, amount: null, unit: null, reason: null} : {}), ...extra,
+    ...(result === 'unknown' ? {completedAt: null, amount: null, unit: null, reason: null, postponedTo: null} : {}), ...extra,
   }));
   const fixed = ['postponed', 'cancelled'].includes(o.result);
   const hl = HIGHLIGHTS.find(h => h.id === t.body.highlight);
   const pen = (id: Task['highlight']) => saveTask(ctx, t, {...t.body, highlight: id});
-  return <li className={`prow ${o.result} ${running ? 'running' : ''} ${hl ? 'hl' : ''}`} style={{'--c': color(t.id), ...(hl ? {'--hl': hl.color} : {})} as React.CSSProperties}>
-    <button className="mark" disabled={fixed} onClick={() => set(NEXT[o.result] ?? 'unknown')} aria-label={`${t.body.title}: ${RESULT[o.result]}. 눌러서 바꾸기`}>{MARK[o.result]}</button>
+  const movedTo = o.postponedTo ? ofKind(p.records, 'task').find(x => x.id === o.postponedTo)?.logicalDay : null;
+  const boundary = Number(ctx.settings?.dayBoundary.slice(0, 2) ?? 4);
+  const start = timed(t) ? clockOf(t.body.plan.start!.value) : '', end = t.body.plan.end ? clockOf(t.body.plan.end.value) : '';
+  const setTime = (s: string, e: string) => {
+    const st = s ? fromClock(day, s, boundary) : null;
+    let en = st && e ? fromClock(day, e, boundary) : null;
+    if (st && en && en.value <= st.value) en = at(day, minuteOf(day, en.value) + 1440);
+    return saveTask(ctx, t, {plan: {...t.body.plan, start: st, end: en}});
+  };
+  return <li data-sort={index} className={`prow ${o.result} ${running ? 'running' : ''} ${hl ? 'hl' : ''} ${dragging ? 'dragging' : ''} ${t.body.category === 'want' ? 'want' : ''} ${t.body.plan.fixed ? 'fixed' : ''}`} style={{'--c': color(t.id), ...(hl ? {'--hl': hl.color} : {})} as React.CSSProperties}>
+    <span {...handle}>⠿</span>
+    <span className={`ptime ${start ? '' : 'none'}`}>{start && <><b>{start}</b>{end && <small>–{end}</small>}</>}</span>
     <span className="ptitle">
       <InlineEdit className="pname" value={t.body.title} onSave={title => saveTask(ctx, t, {title})} />
       <span className="psub">
@@ -118,8 +159,9 @@ function TaskRow({t, ctx}: {t: LifeRecord<'task'>; ctx: Ctx}) {
         {goals.map(g => <button key={g.id} className="goal-chip" onClick={() => nav.openGoal(g.id)} title="이 할 일이 올리는 목표">→ {g.body.title} <b>{goalPercent(g.id, p.records).pct}%</b></button>)}
         {personas.map(x => <span key={x.id} className="persona-chip" style={{'--pc': x.body.color} as React.CSSProperties}>{x.body.name}</span>)}
         {defs.map(d => { const v = showValue(d, t.body.props?.[d.id]); return v && <span key={d.id} className="prop-val"><em>{d.name}</em> {v}</span>; })}
+        {(t.body.plan.estimateMin || spent > 0) && <span className="spent-sub">{hm(spent)}{t.body.plan.estimateMin ? `/${hm(t.body.plan.estimateMin)}` : ''}</span>}
         {o.reason && <span className="reason">· {o.reason}</span>}
-        {o.result === 'postponed' && <span>내일로 미룸</span>}
+        {o.result === 'postponed' && <span>{movedTo ? `${shortDay(movedTo)}로 미룸` : '미룸'}</span>}
       </span>
     </span>
     {t.body.plan.estimateMin ? <span className={`spent ${spent > t.body.plan.estimateMin ? 'late' : ''}`} title="예상 시간 대비 실제 집중 시간">{hm(spent)}<small>/{hm(t.body.plan.estimateMin)}</small></span>
@@ -128,12 +170,18 @@ function TaskRow({t, ctx}: {t: LifeRecord<'task'>; ctx: Ctx}) {
       ? <button className="play on" onClick={timer.stop} aria-label={`${t.body.title} 멈추기`}>■</button>
       : <button className="play" onClick={() => timer.start({task: t})} aria-label={`${t.body.title} 시작`}>▶</button>)}
     <button className="ghost small more" onClick={() => setOpen(!open)} aria-expanded={open} aria-label="더 보기">⋯</button>
+    <button className="mark" disabled={fixed} onClick={() => set(NEXT[o.result] ?? 'unknown')} aria-label={`${t.body.title}: ${RESULT[o.result]}. 눌러서 바꾸기`}>{MARK[o.result]}</button>
     {open && <div className="row-actions">
+      <span className="inline time-edit"><span className="muted small">시간</span>
+        <input type="time" className="time-in" defaultValue={start} onBlur={e => { if (e.target.value !== start) void setTime(e.target.value, end); }} aria-label="시작 시각" />–
+        <input type="time" className="time-in" defaultValue={end} disabled={!start} onBlur={e => { if (e.target.value !== end) void setTime(start, e.target.value); }} aria-label="끝 시각" />
+        {start && <button className="ghost small" onClick={() => void setTime('', '')}>시간 지우기</button>}</span>
       <span className="inline"><input className="num" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder={target ? `몇 ${target.unit}?` : '얼마나?'} aria-label="한 만큼" />
         <button className="small" onClick={() => { if (amount === '' || Number.isNaN(Number(amount))) return; const n = Number(amount); setOpen(false); void set(target && n >= target.amount ? 'done' : 'partial', {amount: n, unit: target?.unit ?? null}); }}>한 만큼 기록</button></span>
       <span className="inline"><input value={reason} onChange={e => setReason(e.target.value)} placeholder="못 한 이유(선택)" aria-label="이유" />
         <button className="small" onClick={() => { setOpen(false); void set('missed', {reason: reason.trim() || null}); }}>× 못 했어요</button></span>
-      <button className="small" onClick={() => moveTo(ctx, t, addDays(t.logicalDay!, 1))}>내일로 →</button>
+      {postpone ? <PostponePicker from={day} onClose={() => setPostpone(false)} onPick={d => { setPostpone(false); setOpen(false); void moveTo(ctx, t, d); }} />
+        : <button className="small" disabled={o.result === 'postponed'} onClick={() => setPostpone(true)}>미루기 →</button>}
       <button className="small" onClick={() => set('cancelled', {reason: reason.trim() || null})}>취소</button>
       {o.result !== 'unknown' && <button className="small" onClick={() => set('unknown')}>되돌리기</button>}
       {defs.map(d => <label key={d.id} className="inline prop-edit"><span className="muted small">{d.name}</span><PropInput def={d} value={t.body.props?.[d.id]} groups={d.type === 'role' ? roleGroups(ctx) : undefined} onChange={v => void saveTask(ctx, t, {props: {...t.body.props, [d.id]: v}})} /></label>)}
@@ -174,7 +222,7 @@ export function Routines({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
       const t = inst(r.id), result = t?.body.outcome.result ?? 'unknown', running = !!t && timer?.running?.body.taskId === t.id;
       return <li key={r.id} className={`prow ${result}`}>
         <button className="mark" onClick={() => set(r, result === 'done' ? 'unknown' : 'done')} aria-label={`${r.body.title}: ${RESULT[result]}. 눌러서 바꾸기`}>{MARK[result]}</button>
-        <span className="ptitle"><span className="pname">{r.body.title}</span>{t?.body.outcome.reason && <span className="psub reason">· {t.body.outcome.reason}</span>}</span>
+        <span className="ptitle"><InlineEdit className="pname" value={r.body.title} onSave={title => p.write(r.id, {kind: 'routine', body: {...r.body, title}, baseRevision: r.revision})} />{t?.body.outcome.reason && <span className="psub reason">· {t.body.outcome.reason}</span>}</span>
         {result !== 'done' && result !== 'missed' && <>
           {askReason && <input className="reason-in" value={reasons[r.id] ?? ''} onChange={e => setReasons({...reasons, [r.id]: e.target.value})} placeholder="못 한 이유" aria-label={`${r.body.title} 못 한 이유`} />}
           <button className="ghost small" onClick={() => set(r, 'missed')}>{L('missed', '× 못 했어요')}</button>
@@ -182,6 +230,7 @@ export function Routines({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
         </>}
         {result === 'missed' && <button className="ghost small" onClick={() => set(r, 'unknown')}>되돌리기</button>}
         {pick && t && result === 'unknown' && <button className="ghost small" onClick={() => p.remove(t.id)} aria-label="고른 것 빼기">빼기</button>}
+        <button className="ghost small danger" onClick={() => { if (confirm(`"${r.body.title}" 루틴을 지울까요? 지난 기록은 남아요.`)) void p.write(r.id, {kind: 'routine', body: {...r.body, active: false}, baseRevision: r.revision}); }} aria-label={`${r.body.title} 루틴 지우기`}>×</button>
       </li>;
     })}</ul>
     <form className="padd" onSubmit={async e => { e.preventDefault(); if (title.trim() && await p.write(null, {kind: 'routine', body: {title: title.trim(), recurrence: {freq: 'daily'}, mode: pick ? 'pick_daily' : 'fixed_all'}})) setTitle(''); }}>

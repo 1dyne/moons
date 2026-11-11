@@ -16,7 +16,9 @@ export const saveTask = (ctx: Ctx, t: LifeRecord<'task'>, patch: Partial<Task>) 
 export const outcome = (t: LifeRecord<'task'>, o: Partial<Task['outcome']>): Partial<Task> => ({outcome: {...t.body.outcome, ...o}});
 /** Moving a task keeps history: the original says "postponed to X", X starts fresh on the new day. */
 export async function moveTo(ctx: Ctx, t: LifeRecord<'task'>, day: string) {
-  const next = await ctx.p.write(null, {kind: 'task', logicalDay: day, body: {...t.body, outcome: {}}});
+  // A start time keeps its clock time on the new day.
+  const shift = (w: Task['plan']['start']) => w && t.logicalDay ? {...w, value: new Date(Date.parse(w.value) + (Date.parse(`${day}T12:00:00Z`) - Date.parse(`${t.logicalDay}T12:00:00Z`))).toISOString()} : w;
+  const next = await ctx.p.write(null, {kind: 'task', logicalDay: day, body: {...t.body, plan: {...t.body.plan, start: shift(t.body.plan.start), end: shift(t.body.plan.end), due: null}, outcome: {}}});
   if (next) await saveTask(ctx, t, outcome(t, {result: 'postponed', postponedTo: next.id, reportedAt: ctx.now()}));
 }
 

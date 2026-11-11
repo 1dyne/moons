@@ -1,9 +1,10 @@
 import {useEffect, useState} from 'react';
-import {actualMin, addDays, dayCondition, focusOf, logicalDay, personaShare, type LifeRecord, type Settings} from '@workspace/life-contract';
-import type {ModuleSpec} from '@workspace/planner-spec';
+import {actualMin, addDays, goalPercent, dayCondition, focusOf, logicalDay, personaShare, type LifeRecord, type Settings} from '@workspace/life-contract';
+import type {ModuleSpec, PropDef} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
 import {Scale} from './Scale.tsx';
 import {useL} from '../labels.tsx';
+import {clockOf, sortDay, timed} from '../schedule.ts';
 
 // Time tracker: one running session at a time, painted on a 10-minute timetable and summed into a receipt.
 const PALETTE = ['#8aaaf8', '#2f9585', '#e9b949', '#b05a57', '#00838f', '#3a66b8', '#3f9a8a', '#c9a98a'];
@@ -215,35 +216,93 @@ export function lowEnergyAlert(score: number) {
 // whatever was running); pressing ■ stops it. Every stretch is a session, so the 10-minute timetable fills by itself.
 export type Subject = {name: string; color: string};
 export const SUBJECT_COLORS = ['#3a66b8', '#2f9585', '#e9a317', '#d0342c', '#7b6bc4', '#00838f', '#c4689a', '#5d5d57'];
-export function SubjectTimer({p, day, timer, subjects, showTasks, askCondition, onSubjects}: {p: Planner; day: string; timer: Timer; subjects: Subject[]; showTasks: boolean; askCondition: boolean; onSubjects?: (s: Subject[]) => void}) {
+export function SubjectTimer({p, day, timer, subjects, showTasks, askCondition, onSubjects, view = 'list', onView, show = ['goal'], defs = []}: {p: Planner; day: string; timer: Timer; subjects: Subject[]; showTasks: boolean; askCondition: boolean; onSubjects?: (s: Subject[]) => void;
+  view?: string; onView?: (v: 'list' | 'time') => void; show?: string[]; defs?: PropDef[]}) {
   const now = useClock(1000), L = useL();
   const [adding, setAdding] = useState(''), [note, setNote] = useState('');
   const sessions = ofKind(p.records, 'session').filter(s => s.logicalDay === day);
   const spent = (match: (s: LifeRecord<'session'>) => boolean) => sessions.filter(match).reduce((m, s) => m + Math.max(0, (new Date(s.body.end ?? now.toISOString()).getTime() - new Date(s.body.start).getTime()) / 60000), 0);
   const total = spent(() => true), r = timer.running;
-  const tasks = showTasks ? ofKind(p.records, 'task').filter(t => t.logicalDay === day && !t.body.plan.fixed && !['cancelled', 'postponed'].includes(t.body.outcome.result)) : [];
-  const rows: {key: string; name: string; color: string; min: number; running: boolean; go: () => void}[] = [
+  const tasks = showTasks ? sortDay(ofKind(p.records, 'task').filter(t => t.logicalDay === day && !t.body.plan.fixed && !['cancelled', 'postponed'].includes(t.body.outcome.result))) : [];
+  const rows: {key: string; name: string; color: string; min: number; running: boolean; go: () => void; task?: LifeRecord<'task'>}[] = [
     ...subjects.map(sj => ({key: `label:${sj.name}`, name: sj.name, color: sj.color, min: spent(s => !s.body.taskId && s.body.label === sj.name), running: !!r && !r.body.taskId && r.body.label === sj.name, go: () => void timer.start({label: sj.name})})),
-    ...tasks.map(t => ({key: t.id, name: t.body.title, color: '', min: spent(s => s.body.taskId === t.id), running: r?.body.taskId === t.id, go: () => void timer.start({task: t})})),
+    ...tasks.map(t => ({key: t.id, name: t.body.title, color: '', min: spent(s => s.body.taskId === t.id), running: r?.body.taskId === t.id, go: () => void timer.start({task: t}), task: t})),
   ];
   const done = timer.stopped;
   return <div className="subj">
     <div className="subj-head"><span className="k">{L('total', '오늘 순집중')}</span><strong>{hm(total)}</strong>
-      {r && <span className="subj-now">{r.body.label} · {hms(now.getTime() - new Date(r.body.start).getTime())}</span>}</div>
+      {r && <span className="subj-now">{r.body.label} · {hms(now.getTime() - new Date(r.body.start).getTime())}</span>}
+      {onView && <span className="seg subj-view" role="radiogroup" aria-label="보기">{([['list', '목록'], ['time', '시간순']] as const).map(([k, n]) =>
+        <button key={k} role="radio" aria-checked={view === k} className={view === k ? 'on' : ''} onClick={() => onView(k)}>{n}</button>)}</span>}</div>
     {done && askCondition && !r && <div className="subj-ask" role="group" aria-label="방금 컨디션">
       <span className="small">{done.body.label} 컨디션</span>
       <Scale value={null} onPick={n => { void timer.rate(n, note); setNote(''); }} label="방금 집중할 때 컨디션 1~10" />
       <input className="subj-note" value={note} onChange={e => setNote(e.target.value)} placeholder="메모" aria-label="메모" />
       <button className="ghost small" onClick={() => { void timer.rate(null, note); setNote(''); }}>건너뛰기</button>
     </div>}
-    <ul className="subj-list">{rows.map(x => <li key={x.key} className={x.running ? 'on' : ''} style={x.color ? {'--sc': x.color} as React.CSSProperties : undefined}>
+    {view === 'time' ? <FocusTimeline p={p} day={day} timer={timer} subjects={subjects} tasks={tasks} show={show} defs={defs} now={now} />
+      : <ul className="subj-list">{rows.map(x => <li key={x.key} className={x.running ? 'on' : ''} style={x.color ? {'--sc': x.color} as React.CSSProperties : undefined}>
       <i className="subj-dot" aria-hidden="true" />
-      <span className="subj-name">{x.name}</span>
+      <span className="subj-name">{x.task && show.includes('time') && timed(x.task) && <em className="subj-at">{clockOf(x.task.body.plan.start!.value)}</em>}{x.name}
+        {x.task && <TaskProps t={x.task} p={p} show={show} defs={defs} />}</span>
       <span className="subj-min">{hm(x.min)}</span>
       <button className={`subj-btn ${x.running ? 'stop' : ''}`} onClick={x.running ? () => void timer.stop() : x.go} aria-label={`${x.name} ${x.running ? '멈추기' : '시작'}`}>{x.running ? '■' : '▶'}</button>
       {onSubjects && !x.key.startsWith('label:') ? null : onSubjects && <button className="ghost small subj-del" onClick={() => onSubjects(subjects.filter(sj => `label:${sj.name}` !== x.key))} aria-label={`${x.name} 빼기`}>×</button>}
-    </li>)}</ul>
-    {onSubjects && <form className="inline subj-add" onSubmit={e => { e.preventDefault(); const n = adding.trim(); if (n && !subjects.some(sj => sj.name === n)) onSubjects([...subjects, {name: n.slice(0, 40), color: SUBJECT_COLORS[subjects.length % SUBJECT_COLORS.length]!}]); setAdding(''); }}>
+    </li>)}</ul>}
+    {onSubjects && view !== 'time' && <form className="inline subj-add" onSubmit={e => { e.preventDefault(); const n = adding.trim(); if (n && !subjects.some(sj => sj.name === n)) onSubjects([...subjects, {name: n.slice(0, 40), color: SUBJECT_COLORS[subjects.length % SUBJECT_COLORS.length]!}]); setAdding(''); }}>
       <input value={adding} onChange={e => setAdding(e.target.value)} placeholder="과목" aria-label="과목 추가" maxLength={40} /><button className="small">추가</button></form>}
   </div>;
+}
+
+/** The properties the user chose to show next to a task: goal %, the whole goal's %, persona, category, estimate, own properties. */
+function TaskProps({t, p, show, defs}: {t: LifeRecord<'task'>; p: Planner; show: string[]; defs: PropDef[]}) {
+  const goals = ofKind(p.records, 'goal'), mine = goals.filter(g => t.body.goalIds.includes(g.id));
+  const rootOf = (id: string) => { let g = goals.find(x => x.id === id); for (let i = 0; g?.body.parentGoalId && i < 10; i++) g = goals.find(x => x.id === g!.body.parentGoalId) ?? g; return g; };
+  const out: React.ReactNode[] = [];
+  if (show.includes('goal')) for (const g of mine) out.push(<span key={`g${g.id}`} className="goal-chip">→ {g.body.title} <b>{goalPercent(g.id, p.records).pct}%</b></span>);
+  if (show.includes('root')) for (const g of new Set(mine.map(g => rootOf(g.id)).filter(x => x && !mine.includes(x)))) out.push(<span key={`r${g!.id}`} className="goal-chip root">◎ {g!.body.title} <b>{goalPercent(g!.id, p.records).pct}%</b></span>);
+  if (show.includes('persona')) for (const x of ofKind(p.records, 'persona').filter(x => t.body.personaIds.includes(x.id))) out.push(<span key={`p${x.id}`} className="persona-chip" style={{'--pc': x.body.color} as React.CSSProperties}>{x.body.name}</span>);
+  if (show.includes('category') && t.body.category) out.push(<span key="c" className={`cat cat-${t.body.category}`}>{({must: '꼭', want: '하고 싶은', leisure: '여가'} as Record<string, string>)[t.body.category]}</span>);
+  if (show.includes('estimate') && t.body.plan.estimateMin) out.push(<span key="e" className="prop-val">예상 {hm(t.body.plan.estimateMin)}</span>);
+  for (const d of defs) if (show.includes(`prop:${d.id}`)) { const v = t.body.props?.[d.id]; if (v !== null && v !== undefined && v !== '' && v !== false) out.push(<span key={d.id} className="prop-val"><em>{d.name}</em> {v === true ? '✓' : String(v)}</span>); }
+  return out.length ? <span className="psub subj-props">{out}</span> : null;
+}
+
+/** 시간순: the day's focus stretches and the tasks planned at a time, on one line of time. Stretches can be retimed or removed. */
+function FocusTimeline({p, day, timer, subjects, tasks, show, defs, now}: {p: Planner; day: string; timer: Timer; subjects: Subject[]; tasks: LifeRecord<'task'>[]; show: string[]; defs: PropDef[]; now: Date}) {
+  const [edit, setEdit] = useState<string | null>(null);
+  const sessions = ofKind(p.records, 'session').filter(s => s.logicalDay === day);
+  const color = (s: LifeRecord<'session'>) => subjects.find(sj => !s.body.taskId && sj.name === s.body.label)?.color ?? PALETTE[Math.abs([...(s.body.taskId ?? s.body.label)].reduce((h, c) => h * 31 + c.charCodeAt(0), 7)) % PALETTE.length]!;
+  type Item = {at: string; key: string; s?: LifeRecord<'session'>; t?: LifeRecord<'task'>};
+  const items: Item[] = [
+    ...sessions.map(s => ({at: s.body.start, key: s.id, s})),
+    ...tasks.filter(t => timed(t) && !sessions.some(s => s.body.taskId === t.id)).map(t => ({at: t.body.plan.start!.value, key: t.id, t})),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+  const retime = (s: LifeRecord<'session'>, which: 'start' | 'end', hhmm: string) => {
+    if (!hhmm) return;
+    const [h, m] = hhmm.split(':').map(Number), base = new Date(s.body[which] ?? s.body.start);
+    base.setHours(h!, m!, 0, 0);
+    const body = {...s.body, [which]: base.toISOString()};
+    if (body.end && body.end <= body.start) return;
+    return p.write(s.id, {kind: 'session', logicalDay: s.logicalDay, body, baseRevision: s.revision});
+  };
+  if (!items.length) return <p className="muted small">–</p>;
+  return <ol className="ftl">{items.map(it => {
+    if (it.t) return <li key={it.key} className="ftl-plan"><span className="ftl-time">{clockOf(it.t.body.plan.start!.value)}{it.t.body.plan.end && <small>–{clockOf(it.t.body.plan.end.value)}</small>}</span>
+      <span className="ftl-name">{it.t.body.title}<TaskProps t={it.t} p={p} show={show} defs={defs} /></span><span className="ftl-tag">예정</span>
+      <button className="subj-btn" onClick={() => void timer.start({task: it.t})} aria-label={`${it.t.body.title} 시작`}>▶</button></li>;
+    const s = it.s!, t = s.body.taskId ? tasks.find(x => x.id === s.body.taskId) ?? ofKind(p.records, 'task').find(x => x.id === s.body.taskId) : undefined;
+    const min = Math.max(0, (new Date(s.body.end ?? now.toISOString()).getTime() - Date.parse(s.body.start)) / 60000);
+    return <li key={it.key} className={`ftl-s ${s.body.end ? '' : 'on'}`} style={{'--sc': color(s)} as React.CSSProperties}>
+      <span className="ftl-time">{clockOf(s.body.start)}<small>–{s.body.end ? clockOf(s.body.end) : '지금'}</small></span>
+      <span className="ftl-name">{s.body.label}{t && <TaskProps t={t} p={p} show={show} defs={defs} />}{s.body.condition !== null && <em className="ftl-cond">컨디션 {s.body.condition}</em>}</span>
+      <span className="subj-min">{hm(min)}</span>
+      {s.body.end ? <button className="ghost small" onClick={() => setEdit(edit === s.id ? null : s.id)} aria-expanded={edit === s.id} aria-label="고치기">⋯</button>
+        : <button className="subj-btn stop" onClick={() => void timer.stop()} aria-label="멈추기">■</button>}
+      {edit === s.id && <span className="ftl-edit inline">
+        <input type="time" className="time-in" defaultValue={clockOf(s.body.start)} onBlur={e => void retime(s, 'start', e.target.value)} aria-label="시작" />–
+        <input type="time" className="time-in" defaultValue={clockOf(s.body.end!)} onBlur={e => void retime(s, 'end', e.target.value)} aria-label="끝" />
+        <button className="ghost small danger" onClick={() => { setEdit(null); void p.remove(s.id); }}>지우기</button></span>}
+    </li>;
+  })}</ol>;
 }

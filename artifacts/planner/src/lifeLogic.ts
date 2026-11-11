@@ -54,3 +54,23 @@ export function goalActualMin(records: AnyRecord[], goalId: string) {
 }
 
 export const roi = (impact: number | null, actualMin: number | null) => impact && actualMin ? Math.round(impact / Math.max(.1, actualMin / 60) * 100) / 100 : null;
+
+// 에너지 신호등 defaults, taken from the user's own condition scale and 저하 요인 list (Notion 집중시간 트래커).
+// Both are editable in the widget's settings.
+export const SCORE_TEXT: Record<number, string> = {
+  1: '최악: 움직임 불가능, 극심한 통증이나 무력감.', 2: '최악: 움직임 불가능, 극심한 통증이나 무력감.',
+  3: '저조: 피로 누적, 최소한의 일과만 겨우 수행.', 4: '저조: 피로 누적, 최소한의 일과만 겨우 수행.',
+  5: '보통: 평범한 컨디션, 일상적인 활동 가능.', 6: '보통: 평범한 컨디션, 일상적인 활동 가능.',
+  7: '양호: 몸이 가볍고 긍정적, 추가 활동 가능.', 8: '양호: 몸이 가볍고 긍정적, 추가 활동 가능.',
+  9: '최상: 최상의 에너지와 몰입, 자신감 넘침.', 10: '최상: 최상의 에너지와 몰입, 자신감 넘침.',
+};
+export type Factor = {name: string; desc: string};
+export const FACTORS: Factor[] = [
+  {name: '신체 통증', desc: '수술 및 근육통 등 직접적인 육체적 고통이 있는 경우'},
+  {name: '심리 트리거', desc: '특정 사건이나 환경으로 인해 트라우마가 자극되어 정서적 병목이 생긴 경우'},
+  {name: '수면 불량', desc: '입면 장애, 잦은 각성, 악몽, 수면 시간 부족 등 수면의 질 자체가 낮은 경우'},
+  {name: '호르몬 영향', desc: 'PMS 등'},
+  {name: '에너지 고갈', desc: '특별한 통증이나 사건은 없으나 전날의 과도한 활동으로 배터리가 방전된 상태'},
+];
+/** The message for a score: the user's own per-score text, else the default scale. */
+export const scoreText = (msgs: Record<string, string> | undefined, n: number) => msgs?.[String(n)] ?? SCORE_TEXT[n] ?? '';

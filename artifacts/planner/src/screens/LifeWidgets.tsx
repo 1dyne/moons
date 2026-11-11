@@ -5,7 +5,10 @@ import {ofKind, type Planner} from '../data.ts';
 import {useL} from '../labels.tsx';
 import {Gauge} from '../Gauge.tsx';
 import {hm} from './Focus.tsx';
-import {abilitiesOf, deployedOver, energyPoints, goalActualMin, lightOf, missionState, roi} from '../lifeLogic.ts';
+import {FACTORS, abilitiesOf, deployedOver, energyPoints, goalActualMin, lightOf, missionState, roi, scoreText, type Factor} from '../lifeLogic.ts';
+import {Scale} from './Scale.tsx';
+import {lowEnergyAlert} from './Focus.tsx';
+import {usePhone} from '../phone.tsx';
 export {abilitiesOf, deployedOver, energyPoints, focusReachedAt, goalActualMin, lightOf, missionState, roi} from '../lifeLogic.ts';
 import type {Ctx} from './day.ts';
 import {Wishes as WishBox} from './ViewWidgets.tsx';
@@ -14,36 +17,80 @@ const mins = (a: string, b: string) => Math.max(0, (Date.parse(b) - Date.parse(a
 const localHour = (iso: string) => { const d = new Date(iso); return d.getHours() + d.getMinutes() / 60; };
 
 // ── 에너지 신호등 ─────────────────────────────────────────────────────────────
+// The light, the score, the user's message for that score; below it each check of the day with why
+// (a short reason, 저하 요인, 통제/상수, and a memo: 사건 · 몸의 신호 · 생각·감정). Everything editable and removable.
 export function EnergyLight({w, ctx}: {w: Widget; ctx: Ctx}) {
-  const L = useL();
-  // Levels the user sets: 파랑 at or above greenAt, 빨강 at or below redAt, 호박 in between. Messages per level are theirs (문구 바꾸기).
-  const greenAt = Number(w.options.greenAt ?? 7), redAt = Number(w.options.redAt ?? 3), warnAt = Number(w.options.warnAt ?? greenAt - 1);
+  const L = useL(), phone = usePhone();
+  // Levels the user sets: 파랑 at or above greenAt, 빨강 at or below redAt, 호박 in between.
+  const greenAt = Number(w.options.greenAt ?? 7), redAt = Number(w.options.redAt ?? 3), warnAt = Number(w.options.warnAt ?? greenAt - 1), askBelow = Number(w.options.askBelow ?? 5);
+  const msgs = w.options.msgs as Record<string, string> | undefined, factors = (w.options.factors as Factor[] | undefined) ?? FACTORS;
   const level = (n: number) => n >= greenAt ? 'blue' : n <= redAt ? 'red' : 'amber';
   const pts = energyPoints(ctx.p.records, ctx.day), last = pts.at(-1), lit = last ? level(last.score) : null;
-  const msg = lit ? L(`msg.${lit}`, '') : '';
+  const msg = last ? (scoreText(msgs, last.score) || L(`msg.${lit}`, '')) : '';
+  const checks = ofKind(ctx.p.records, 'condition').filter(c => c.logicalDay === ctx.day && c.body.energy !== null).sort((a, b) => a.body.at.localeCompare(b.body.at));
+  const [editing, setEditing] = useState<string | null>(null), [info, setInfo] = useState(false);
   const [perm, setPerm] = useState(typeof Notification === 'undefined' ? 'unsupported' : Notification.permission);
   const [on, setOn] = useState(() => { try { return localStorage.getItem('lit.energyAlert') !== null; } catch { return false; } });
   const enable = async () => {
     const r = typeof Notification === 'undefined' ? 'denied' : await Notification.requestPermission();
     setPerm(r);
-    if (r === 'granted') { try { localStorage.setItem('lit.energyAlert', String(warnAt)); localStorage.setItem('lit.energyAlertText', L(`msg.${level(warnAt)}`, '')); } catch { /* no storage */ } setOn(true); }
+    if (r === 'granted') { try { localStorage.setItem('lit.energyAlert', String(warnAt)); localStorage.setItem('lit.energyAlertText', scoreText(msgs, warnAt)); } catch { /* no storage */ } setOn(true); }
+  };
+  const record = async (n: number) => {
+    lowEnergyAlert(n);
+    const r = await ctx.p.write(null, {kind: 'condition', logicalDay: ctx.day, body: {at: ctx.now(), energy: n, moment: 'check'}});
+    if (r && n < askBelow) setEditing(r.id);
   };
   const start = Number(w.options.startHour ?? 6), end = start + 20, W = 300, H = 34, x = (h: number) => 6 + (Math.min(end, Math.max(start, h < start ? h + 24 : h)) - start) / (end - start) * (W - 12);
   return <div className="tlight-wrap">
-    <div className="tlight" role="img" aria-label={last ? `에너지 ${last.score}점` : '아직 기록 없음'}>
-      {(['red', 'amber', 'blue'] as const).map(c => <i key={c} className={`lamp lamp-${c} ${lit === c ? 'lit' : ''}`} />)}
+    <div className="tlight-top">
+      <div className="tlight" role="img" aria-label={last ? `에너지 ${last.score}점` : '아직 기록 없음'}>
+        {(['red', 'amber', 'blue'] as const).map(c => <i key={c} className={`lamp lamp-${c} ${lit === c ? 'lit' : ''}`} />)}
+      </div>
+      <div className="tlight-info">
+        {last ? <p className="tlight-score"><strong>{last.score}</strong> <span className="small">{new Date(last.at).toTimeString().slice(0, 5)} · {last.label}</span>
+          {phone && msg && <button className="info-btn" onClick={() => setInfo(!info)} aria-expanded={info} aria-label="이 점수가 뜻하는 상태">i</button>}</p>
+          : <p className="tlight-score"><strong>–</strong></p>}
+        {msg && (!phone || info) && <p className={`tlight-msg ${lit}`} role={last && last.score <= warnAt ? 'alert' : undefined}>{msg}</p>}
+      </div>
     </div>
-    <div className="tlight-info">
-      {last ? <p className="tlight-score"><strong>{last.score}</strong> <span className="small">{new Date(last.at).toTimeString().slice(0, 5)} · {last.label}</span></p> : <p className="tlight-score"><strong>–</strong></p>}
-      {msg && <p className={`tlight-msg ${lit}`} role={last && last.score <= warnAt ? 'alert' : undefined}>{msg}</p>}
-      {w.options.timeline === true && pts.length > 0 && <svg viewBox={`0 0 ${W} ${H}`} className="energy-svg" aria-hidden="true">
-        {pts.map((p, i) => <circle key={i} cx={x(localHour(p.at))} cy={14} r={5} className={`dot-${level(p.score)}`} />)}
-        {[start, start + 5, start + 10, start + 15, start + 20].map(h => <text key={h} x={x(h)} y={H - 1} textAnchor="middle" className="energy-hour">{h % 24}</text>)}
-      </svg>}
-      {perm !== 'unsupported' && w.options.notify !== false && (on && perm === 'granted'
-        ? <button className="ghost small" onClick={() => { try { localStorage.removeItem('lit.energyAlert'); } catch { /* */ } setOn(false); }}>알림 끄기</button>
-        : perm !== 'denied' && <button className="ghost small" onClick={() => void enable()}>알림 받기</button>)}
-    </div>
+    <div className="tl-now"><span className="k">지금</span><Scale value={null} onPick={n => void record(n)} label="지금 컨디션 1~10" /></div>
+    {w.options.timeline === true && pts.length > 0 && <svg viewBox={`0 0 ${W} ${H}`} className="energy-svg" aria-hidden="true">
+      {pts.map((p, i) => <circle key={i} cx={x(localHour(p.at))} cy={14} r={5} className={`dot-${level(p.score)}`} />)}
+      {[start, start + 5, start + 10, start + 15, start + 20].map(h => <text key={h} x={x(h)} y={H - 1} textAnchor="middle" className="energy-hour">{h % 24}</text>)}
+    </svg>}
+    {checks.length > 0 && <ul className="tl-checks">{checks.map(c => <li key={c.id} className={editing === c.id ? 'open' : ''}>
+      <button className="tl-row" onClick={() => setEditing(editing === c.id ? null : c.id)} aria-expanded={editing === c.id}>
+        <i className={`m-light ${level(c.body.energy!)}`} aria-hidden="true" /><b className="mono">{c.body.energy}</b>
+        <span className="small mono">{new Date(c.body.at).toTimeString().slice(0, 5)}</span>
+        <span className="tl-why">{[c.body.reason, ...(c.body.factors ?? [])].filter(Boolean).join(' · ')}</span>
+      </button>
+      {editing === c.id && <ConditionWhy c={c} ctx={ctx} factors={factors} close={() => setEditing(null)} />}
+    </li>)}</ul>}
+    {perm !== 'unsupported' && w.options.notify !== false && (on && perm === 'granted'
+      ? <button className="ghost small" onClick={() => { try { localStorage.removeItem('lit.energyAlert'); } catch { /* */ } setOn(false); }}>알림 끄기</button>
+      : perm !== 'denied' && <button className="ghost small" onClick={() => void enable()}>알림 받기</button>)}
+  </div>;
+}
+
+/** Why a score is what it is. Chips save at once; text saves when the field is left. */
+function ConditionWhy({c, ctx, factors, close}: {c: LifeRecord<'condition'>; ctx: Ctx; factors: Factor[]; close: () => void}) {
+  const save = (patch: Partial<LifeRecord<'condition'>['body']>) => {
+    const cur = ofKind(ctx.p.records, 'condition').find(x => x.id === c.id) ?? c;
+    return ctx.p.write(c.id, {kind: 'condition', logicalDay: cur.logicalDay, body: {...cur.body, ...patch}, baseRevision: cur.revision});
+  };
+  const memo = c.body.memo ?? {event: null, body: null, thought: null};
+  const toggle = <T extends string>(list: T[], v: T) => list.includes(v) ? list.filter(x => x !== v) : [...list, v];
+  const text = (v: string) => v.trim() || null;
+  return <div className="tl-why-form">
+    <div className="tl-score"><Scale value={c.body.energy} onPick={n => void save({energy: n})} label="점수 고치기" /></div>
+    <label className="tl-field"><span className="k">이유</span><input defaultValue={c.body.reason ?? ''} maxLength={200} onBlur={e => { if (text(e.target.value) !== c.body.reason) void save({reason: text(e.target.value)}); }} aria-label="짧은 이유" /></label>
+    <div className="tl-field"><span className="k">저하 요인</span><div className="chips">{factors.map(f => <button key={f.name} className={`chip ${(c.body.factors ?? []).includes(f.name) ? 'on' : ''}`} title={f.desc} aria-pressed={(c.body.factors ?? []).includes(f.name)} onClick={() => void save({factors: toggle(c.body.factors ?? [], f.name)})}>{f.name}</button>)}</div></div>
+    {(c.body.factors ?? []).length > 0 && <div className="tl-field"><span className="k">심층 분석</span><div className="chips">
+      {([['control', '통제 요인'], ['constant', '상수 요인']] as const).map(([k, n]) => <button key={k} className={`chip ${(c.body.factorKinds ?? []).includes(k) ? 'on' : ''}`} title={k === 'control' ? '관리로 조절할 수 있는 요인' : '불가역적인 요인'} aria-pressed={(c.body.factorKinds ?? []).includes(k)} onClick={() => void save({factorKinds: toggle(c.body.factorKinds ?? [], k)})}>{n}</button>)}</div></div>}
+    {([['event', '사건'], ['body', '몸의 신호'], ['thought', '생각·감정']] as const).map(([k, n]) => <label key={k} className="tl-field"><span className="k">{n}</span>
+      <textarea rows={1} defaultValue={memo[k] ?? ''} maxLength={1000} onBlur={e => { if (text(e.target.value) !== memo[k]) void save({memo: {...memo, [k]: text(e.target.value)}}); }} aria-label={n} /></label>)}
+    <div className="inline"><button className="small" onClick={close}>닫기</button><button className="ghost small danger" onClick={() => { close(); void ctx.p.remove(c.id); }}>이 기록 지우기</button></div>
   </div>;
 }
 

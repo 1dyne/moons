@@ -65,3 +65,14 @@ test('modes: today\'s latest energy from any source picks the mode; the day\'s o
   assert.equal(activeMode(modes, 4, 'off'), null);
   assert.equal(activeMode(modes, 9, 'tight')?.id, 'tight');
 });
+
+test('moment flows: a time-of-day flow opens yesterday\'s receipt; record flows ignore it', async () => {
+  const {runMoment, runFlows, flowSentence} = await import('./index.ts');
+  const f = Flow.parse({id: 'r1', on: {kind: 'dayStart'}, do: [{do: 'open', what: 'receipt-yesterday'}]});
+  assert.deepEqual(runMoment(f, Logic.parse({}), [], '2026-11-12').opens, ['receipt-yesterday']);
+  assert.equal(flowSentence(f, []), '하루를 시작할 때 → 어제 영수증 띄우기');
+  const t = Flow.parse({id: 't1', on: {kind: 'time', at: '22:00'}, do: [{do: 'open', what: 'receipt-today'}]});
+  assert.equal(flowSentence(t, []), '매일 22:00에 → 오늘 영수증 띄우기');
+  const e = entry('x', '2026-11-12');
+  assert.equal(runFlows(Logic.parse({flows: [f, t]}), [e] as unknown as AnyRecord[], e as unknown as AnyRecord, {day: '2026-11-12'}).opens.length, 0);
+});

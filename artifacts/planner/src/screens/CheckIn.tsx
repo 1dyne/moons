@@ -7,6 +7,7 @@ import {Scale} from './Scale.tsx';
 import {Tip} from '../Tip.tsx';
 import {InlineEdit} from '../InlineEdit.tsx';
 import {lowEnergyAlert} from './Focus.tsx';
+import {FACTORS} from '../lifeLogic.ts';
 export {Scale};
 
 // Morning ritual: energy on waking (1–10) and today's fixed appointments → how much the day can really hold.
@@ -17,7 +18,7 @@ export function CheckIn({m, p, day, now}: {m: ModuleSpec; p: Planner; day: strin
   const checks = ofKind(p.records, 'condition').filter(c => c.logicalDay === day && c.body.moment === 'wake');
   const w = checks.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
   const fixed = ofKind(p.records, 'task').filter(t => t.logicalDay === day && t.body.plan.fixed && !['cancelled'].includes(t.body.outcome.result));
-  const [title, setTitle] = useState(''), [from, setFrom] = useState('10:00'), [to, setTo] = useState('11:00');
+  const [title, setTitle] = useState(''), [from, setFrom] = useState('10:00'), [to, setTo] = useState('11:00'), [fixing, setFixing] = useState(false);
   const cap = capacity(p.records, day, {wake, sleep, energy: w?.body.energy ?? null});
   const setEnergy = (n: number) => (lowEnergyAlert(n), p.write(w?.id ?? null, {kind: 'condition', logicalDay: day, body: {...(w?.body ?? {}), at: now(), energy: n, moment: 'wake'}, ...(w ? {baseRevision: w.revision} : {})}));
   const addFixed = async () => {
@@ -26,7 +27,10 @@ export function CheckIn({m, p, day, now}: {m: ModuleSpec; p: Planner; day: strin
   };
   const pct = (n: number) => `${Math.min(100, Math.round(n / Math.max(1, cap.awake) * 100))}%`;
   return <div className="checkin">
-    <div className="ck-row"><span className="ck-q">일어났을 때 에너지</span><Scale value={w?.body.energy} onPick={setEnergy} label="기상 직후 에너지 1~10" /></div>
+    {/* Energy right after waking is asked once a day; after that the row says it is done (고치기 reopens it). */}
+    {w?.body.energy && !fixing ? <div className="ck-row ck-done"><span className="ck-q">일어났을 때 에너지</span><b className="mono">{w.body.energy}</b><span className="done-badge">✓ 기록 완료</span>
+        <button className="ghost small" onClick={() => setFixing(true)}>고치기</button></div>
+      : <div className="ck-row"><span className="ck-q">일어났을 때 에너지</span><Scale value={w?.body.energy} onPick={n => { setFixing(false); void setEnergy(n); }} label="기상 직후 에너지 1~10" /></div>}
     <div className="ck-fixed">
       <span className="ck-q">오늘 고정 일정</span>
       <ul className="prows">{fixed.map(t => <li key={t.id} className="prow">
@@ -69,5 +73,19 @@ export function ConditionDay({p, day, now}: {p: Planner; day: string; now: () =>
       <span key={s.id} className="cond-dot" title={`${s.body.label} ${s.body.condition}/10${s.body.note ? ` · ${s.body.note}` : ''}`} style={{'--lv': s.body.condition} as React.CSSProperties}>{s.body.condition}</span>)}</div>}
     <div className="ck-row"><span className="ck-q">지금 컨디션</span><Scale value={null} onPick={n => save(n, 'check')} label="지금 컨디션 1~10" /></div>
     <div className="ck-row"><span className="ck-q">하루를 마치며</span><Scale value={evening?.body.energy} onPick={n => save(n, 'evening', evening)} label="하루 마무리 컨디션 1~10" /></div>
+  </div>;
+}
+
+/** "지금 아침 상태는?": the energy right after waking (once a day), and when it is low, what lowered it.
+ *  Asked by the sleep widget after 일어났어요, and by 아침 점검. */
+export function WakeAsk({p, day, now, factors = FACTORS.map(f => f.name)}: {p: Planner; day: string; now: () => string; factors?: string[]}) {
+  const w = ofKind(p.records, 'condition').filter(c => c.logicalDay === day && c.body.moment === 'wake').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  const save = (body: Partial<LifeRecord<'condition'>['body']>) => p.write(w?.id ?? null, {kind: 'condition', logicalDay: day, body: {...(w?.body ?? {}), at: w?.body.at ?? now(), moment: 'wake', ...body}, ...(w ? {baseRevision: w.revision} : {})});
+  const low = (w?.body.energy ?? 10) < 5;
+  return <div className="wake-ask" role="group" aria-label="지금 아침 상태">
+    <span className="ck-q">지금 아침 상태는?</span>
+    <Scale value={w?.body.energy} onPick={n => { lowEnergyAlert(n); void save({energy: n}); }} label="기상 직후 에너지 1~10" />
+    {w && low && <div className="chips" aria-label="저하 요인">{factors.map(f => { const on = (w.body.factors ?? []).includes(f); return <button key={f} className={`chip ${on ? 'on' : ''}`} aria-pressed={on}
+      onClick={() => void save({factors: on ? (w.body.factors ?? []).filter(x => x !== f) : [...(w.body.factors ?? []), f]})}>{f}</button>; })}</div>}
   </div>;
 }

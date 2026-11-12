@@ -1,6 +1,6 @@
 import {useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
-import {WIDGET_LABELS, widgetInfo, type PlannerSpec, type Widget} from '@workspace/planner-spec';
+import {Flow, Logic, WIDGET_LABELS, widgetInfo, type PlannerSpec, type Widget} from '@workspace/planner-spec';
 import {ofKind} from '../data.ts';
 import type {Ctx} from './day.ts';
 import {patchWidget} from './Table.tsx';
@@ -35,7 +35,7 @@ function Panel({w, ctx, close}: {w: Widget; ctx: Ctx; close: () => void}) {
   const labels = WIDGET_LABELS[w.type], cur = (o.labels as Record<string, string> | undefined) ?? {};
   const save = async () => {
     setBusy(true);
-    await ctx.saveSpec!(s => patchWidget(s, w.id, x => ({...x, title: title.trim() || undefined, options: o})));
+    await ctx.saveSpec!(s => withReceiptFlows(patchWidget(s, w.id, x => ({...x, title: title.trim() || undefined, options: o})), w, o));
     setBusy(false); close();
   };
   return <div className="gear-wrap" onClick={e => { if (e.target === e.currentTarget) close(); }} onKeyDown={e => { if (e.key === 'Escape') close(); }}>
@@ -51,4 +51,14 @@ function Panel({w, ctx, close}: {w: Widget; ctx: Ctx; close: () => void}) {
       <div className="inline"><button className="primary" disabled={busy} onClick={() => void save()}>저장</button><button className="ghost" onClick={close}>취소</button></div>
     </div>
   </div>;
+}
+
+/** The receipt's popup choices are automations (so they also show in 메뉴 → 로직): one for the day start, one at a time. */
+function withReceiptFlows(spec: PlannerSpec, w: Widget, o: Record<string, unknown>): PlannerSpec {
+  if (w.type !== 'receipt') return spec;
+  const logic = Logic.parse(spec.logic ?? {}), am = `rcs${w.id.replace(/[^a-z0-9]/g, '').slice(-8)}`, pm = `rce${w.id.replace(/[^a-z0-9]/g, '').slice(-8)}`;
+  const flows = logic.flows.filter(f => f.id !== am && f.id !== pm);
+  if (o.popupStart === true) flows.push(Flow.parse({id: am, name: '영수증: 하루 시작', on: {kind: 'dayStart'}, do: [{do: 'open', what: 'receipt-yesterday'}]}));
+  if (typeof o.popupAt === 'string' && o.popupAt) flows.push(Flow.parse({id: pm, name: '영수증: 하루 마침', on: {kind: 'time', at: o.popupAt}, do: [{do: 'open', what: 'receipt-today'}]}));
+  return {...spec, logic: {...logic, flows}};
 }

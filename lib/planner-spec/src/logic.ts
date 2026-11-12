@@ -159,13 +159,20 @@ export const Action = z.discriminatedUnion('do', [
   z.object({do: z.literal('updateWhere'), type: z.string().max(24), conds: z.array(Cond).max(8).default([]), fields: z.record(z.string().max(24), ValueExpr).default({}), limit: z.number().int().min(1).max(50).default(1)}),
   // Shown on the screen (and as a notification when allowed).
   z.object({do: z.literal('notify'), text: z.string().trim().min(1).max(200)}),
+  // Opens something on the screen: a receipt (today's or yesterday's) or the morning check.
+  z.object({do: z.literal('open'), what: z.enum(['receipt-today', 'receipt-yesterday', 'checkin'])}),
 ]);
+export const OPEN_WHAT = {'receipt-today': '오늘 영수증', 'receipt-yesterday': '어제 영수증', checkin: '아침 상태 묻기'} as const;
+// What starts a flow: a record written (any device, any widget; run on the server), or a moment on the screen —
+// a time of day, the first opening of a new day, or 일어났어요 (run by the planner that is open).
+export const TRIGGERS = {record: '기록이 생기거나 바뀌면', time: '매일 정한 시각에', dayStart: '하루를 시작할 때 (그날 처음 열면)', wake: '일어났어요를 누르면'} as const;
 export type Action = z.infer<typeof Action>;
 export const Flow = z.object({
   id: z.string().regex(/^[a-z0-9]{1,12}$/),
   name: z.string().max(60).default(''),
   enabled: z.boolean().default(true),
-  on: z.object({type: z.string().max(24), event: z.enum(['created', 'changed', 'any']).default('created'), verbs: z.array(z.enum(VERBS)).max(8).default([])}),
+  on: z.object({kind: z.enum(['record', 'time', 'dayStart', 'wake']).default('record'), at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('22:00'),
+    type: z.string().max(24).default(''), event: z.enum(['created', 'changed', 'any']).default('created'), verbs: z.array(z.enum(VERBS)).max(8).default([])}),
   if: z.array(Cond).max(8).default([]),
   ifAgg: z.array(AggCond).max(4).default([]),
   do: z.array(Action).min(1).max(6),
@@ -247,14 +254,14 @@ function value(x: z.infer<typeof ValueExpr>, src: Entry, nowIso: string) {
 }
 /** What the automations do after `changed` was written (created when createdAt equals updatedAt). Pure: the caller writes the result.
  *  Entries written by an automation carry its id in the chain, and a flow never runs twice in one chain (no loops). */
-export function runFlows(logic: Logic, records: AnyRecord[], changed: AnyRecord, opts: {day: string; now?: Date; chain?: string[]} = {day: ''}): {writes: FlowWrite[]; notices: string[]} {
-  const out = {writes: [] as FlowWrite[], notices: [] as string[]};
+export function runFlows(logic: Logic, records: AnyRecord[], changed: AnyRecord, opts: {day: string; now?: Date; chain?: string[]} = {day: ''}): {writes: FlowWrite[]; notices: string[]; opens: string[]} {
+  const out = {writes: [] as FlowWrite[], notices: [] as string[], opens: [] as string[]};
   if (changed.kind !== 'entry' || changed.deletedAt) return out;
   const e = changed as E, now = opts.now ?? new Date(), nowIso = now.toISOString(), chain = opts.chain ?? [];
   // Revisions count the whole account, so a new record is the one whose first write is its last.
   const created = e.createdAt === e.updatedAt;
   for (const f of logic.flows) {
-    if (!f.enabled || chain.includes(f.id) || f.on.type !== e.body.type) continue;
+    if (!f.enabled || f.on.kind !== 'record' || chain.includes(f.id) || f.on.type !== e.body.type) continue;
     if (f.on.event === 'created' && !created) continue;
     if (f.on.event === 'changed' && created) continue;
     if (f.on.verbs.length && !f.on.verbs.includes(e.body.verb)) continue;
@@ -268,6 +275,7 @@ export function runFlows(logic: Logic, records: AnyRecord[], changed: AnyRecord,
     if (!aggOk) continue;
     for (const a of f.do) {
       if (a.do === 'notify') out.notices.push(a.text);
+      if (a.do === 'open') out.opens.push(a.what);
       if (a.do === 'create') {
         const fields = Object.fromEntries(Object.entries(a.fields).map(([k, x]) => [k, value(x, e.body, nowIso)]));
         out.writes.push({id: null, logicalDay: day, flow: f.id, body: {type: a.type, verb: a.verb, at: nowIso, end: null, value: null, fields: fields as Entry['fields'], links: a.link ? [{rel: 'after', to: e.id}] : []}});
@@ -280,14 +288,33 @@ export function runFlows(logic: Logic, records: AnyRecord[], changed: AnyRecord,
   return out;
 }
 
+/** A flow started by a moment (time of day, day start, wake) rather than a record: its 합계 조건 are checked,
+ *  then notify / open / create / updateWhere run ('update' and copied values need a record, so they are skipped). */
+export function runMoment(f: Flow, logic: Logic, records: AnyRecord[], day: string, now = new Date()) {
+  const out = {writes: [] as FlowWrite[], notices: [] as string[], opens: [] as string[]};
+  if (!f.enabled || f.on.kind === 'record') return out;
+  const ok = f.ifAgg.every(c => { const v = aggregate(entriesOf(records, c.type).filter(x => inRange(x, periodRange(c.period, day, day))), c.agg, c.of, day, now.getTime()); return v !== null && cmp(v, c.op, c.value); });
+  if (!ok) return out;
+  const set = (fields: Record<string, z.infer<typeof ValueExpr>>) => Object.fromEntries(Object.entries(fields).filter(([, x]) => !('copy' in x)).map(([k, x]) => [k, 'set' in x ? x.set : now.toISOString()])) as Entry['fields'];
+  for (const a of f.do) {
+    if (a.do === 'notify') out.notices.push(a.text);
+    if (a.do === 'open') out.opens.push(a.what);
+    if (a.do === 'create') out.writes.push({id: null, logicalDay: day, flow: f.id, body: {type: a.type, verb: a.verb, at: now.toISOString(), end: null, value: null, fields: set(a.fields), links: []}});
+    if (a.do === 'updateWhere') for (const t of entriesOf(records, a.type).filter(x => matches(x.body, a.conds, now.getTime())).sort((x, y) => x.body.at.localeCompare(y.body.at)).slice(0, a.limit))
+      out.writes.push({id: t.id, logicalDay: t.logicalDay, baseRevision: t.revision, flow: f.id, body: {...t.body, fields: {...t.body.fields, ...set(a.fields)}}});
+  }
+  return out;
+}
+
 /** "수면 기록이 생기면 · 걸린 시간 < 360이면 → 알림" — the sentence a flow reads as. */
 export function flowSentence(f: Flow, types: TypeDef[]) {
   const t = (id: string) => types.find(x => x.id === id), fname = (type: string, id: string) => ({verb: '동작', value: '값', duration: '걸린 시간(분)', hour: '시작 시각(시)', link: '연결'} as Record<string, string>)[id] ?? t(type)?.fields.find(x => x.id === id)?.name ?? id;
   const op = (o: string) => OPS.find(x => x.id === o)?.name ?? o;
-  const when = `${t(f.on.type)?.name ?? '?'} 기록이 ${{created: '생기면', changed: '바뀌면', any: '생기거나 바뀌면'}[f.on.event]}${f.on.verbs.length ? ` (${f.on.verbs.map(v => VERB_NAMES[v]).join('·')})` : ''}`;
+  const when = f.on.kind === 'time' ? `매일 ${f.on.at}에` : f.on.kind === 'dayStart' ? '하루를 시작할 때' : f.on.kind === 'wake' ? '일어났어요를 누르면'
+    : `${t(f.on.type)?.name ?? '?'} 기록이 ${{created: '생기면', changed: '바뀌면', any: '생기거나 바뀌면'}[f.on.event]}${f.on.verbs.length ? ` (${f.on.verbs.map(v => VERB_NAMES[v]).join('·')})` : ''}`;
   const conds = [...f.if.map(c => `${fname(f.on.type, c.field)} ${op(c.op)}${['empty', 'filled'].includes(c.op) ? '' : ` ${c.value}`}`),
     ...f.ifAgg.map(c => `${{today: '오늘', week: '이번 주', month: '이번 달'}[c.period]} ${t(c.type)?.name ?? '?'} ${AGGS.find(a => a.id === c.agg)?.name} ${op(c.op)} ${c.value}`)];
-  const acts = f.do.map(a => a.do === 'notify' ? `알림 "${a.text}"` : a.do === 'create' ? `${t(a.type)?.name ?? '?'}에 한 줄` : a.do === 'update' ? `이 기록의 ${Object.keys(a.fields).map(k => fname(f.on.type, k)).join('·')} 바꾸기` : `${t(a.type)?.name ?? '?'}의 ${Object.keys(a.fields).map(k => fname(a.type, k)).join('·')} 바꾸기`);
+  const acts = f.do.map(a => a.do === 'open' ? `${OPEN_WHAT[a.what]} 띄우기` : a.do === 'notify' ? `알림 "${a.text}"` : a.do === 'create' ? `${t(a.type)?.name ?? '?'}에 한 줄` : a.do === 'update' ? `이 기록의 ${Object.keys(a.fields).map(k => fname(f.on.type, k)).join('·')} 바꾸기` : `${t(a.type)?.name ?? '?'}의 ${Object.keys(a.fields).map(k => fname(a.type, k)).join('·')} 바꾸기`);
   return `${when}${conds.length ? `, ${conds.join(' 그리고 ')}이면` : ''} → ${acts.join(', ')}`;
 }
 

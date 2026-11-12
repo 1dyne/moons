@@ -42,8 +42,9 @@ async function write(m: M, id: string | null, body: Partial<Entry>, ext?: Record
   const full = {type: m.opts.type, verb: 'did', end: null, value: null, fields: {}, links: [], ...base?.body, ...body, at} as Entry;
   const rec = await m.ctx.p.write(id, {kind: 'entry', logicalDay: base?.logicalDay ?? (settings ? logicalDay(at, settings) : m.ctx.day), body: full, ...(ext ? {ext} : base?.ext ? {ext: base.ext} : {}), ...(base ? {baseRevision: base.revision} : {})});
   if (rec) {
-    const {notices, writes} = runFlows(m.logic, [...m.ctx.p.records.filter(r => r.id !== rec.id), rec], rec, {day: rec.logicalDay ?? m.ctx.day});
+    const {notices, writes, opens} = runFlows(m.logic, [...m.ctx.p.records.filter(r => r.id !== rec.id), rec], rec, {day: rec.logicalDay ?? m.ctx.day});
     notices.forEach(m.notify);
+    if (opens.length) dispatchEvent(new CustomEvent('lit:open', {detail: {what: opens.at(-1)}}));
     if (writes.length) setTimeout(() => void m.ctx.p.refresh(), 500);
   }
   return rec as E | null;

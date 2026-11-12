@@ -11,6 +11,7 @@ import {Week} from './Week.tsx';
 import {GaugeProvider} from '../Gauge.tsx';
 import {usePhone} from '../phone.tsx';
 import {StudioHost} from '../made/Studio.tsx';
+import {MomentHost} from '../made/Moments.tsx';
 
 // Where the user is survives a save (the page remounts with the new version).
 const memory: {tab?: string; day?: string} = {};
@@ -39,6 +40,7 @@ export function PlannerView({spec, settings, p, saveSpec}: {spec: PlannerSpec; s
     {tab.kind === 'goals' && <Goals spec={spec} p={p} nav={nav} today={today} goalId={goalId} setGoalId={setGoalId} />}
     {tab.kind === 'month' && <Month p={p} nav={nav} month={month} setMonth={setMonth} today={today} />}
     {tab.kind === 'insights' && <Insights p={p} settings={settings} today={today} />}
+    {saveSpec && <MomentHost spec={spec} p={p} today={today} settings={settings} />}
     <StudioHost spec={spec} settings={settings} p={p} nav={nav} today={today} tab={tab} saveSpec={saveSpec} />
   </div></GaugeProvider>;
 }

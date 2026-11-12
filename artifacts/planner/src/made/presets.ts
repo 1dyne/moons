@@ -7,7 +7,7 @@ export type Seed = {subjects: string[]; routines: string[]};
 export type Preset = {id: string; name: string; icon: string; desc: string; group: 'old' | 'new'; make: (logic: Logic, seed: Seed) => {title: string; types: TypeDef[]; options: MadeOptions; flows: Flow[]}};
 const B = (kind: LogicBlock['kind'], x: Partial<LogicBlock> = {}) => LogicBlock.parse({id: newLogicId(), kind, ...x});
 const T = (x: {id: string; name: string; fields?: Record<string, unknown>[]} & Record<string, unknown>) => TypeDef.parse(x);
-const F = (x: Omit<Partial<Flow>, 'do'> & {on: Flow['on']; do: Flow['do']}) => Flow.parse({id: newLogicId(), ...x});
+const F = (x: Omit<Partial<Flow>, 'do' | 'on'> & {on: Partial<Flow['on']> & {type: string}; do: Flow['do']}) => Flow.parse({id: newLogicId(), ...x});
 const opts = (type: string, blocks: LogicBlock[]) => MadeOptions.parse({type, blocks});
 /** A type id not used yet, starting from the preset's own. */
 const freeId = (logic: Logic, base: string) => { let id = base, n = 2; while (logic.types.some(t => t.id === id)) id = `${base}${n++}`; return id; };

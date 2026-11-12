@@ -3,7 +3,7 @@ import {addDays, goalPercent, goalProgress, logicalDay, periodContains, personaS
 import {modulesFor, uses, type ModuleSpec, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
 import {FocusBar, Receipt, Timetable, colors, hm, useTimer, type Timer} from './Focus.tsx';
-import {CheckIn, ConditionDay} from './CheckIn.tsx';
+import {CheckIn, ConditionDay, WakeAsk} from './CheckIn.tsx';
 import {parseEntry} from '../parse.ts';
 import {MARK, NEXT, moveTo, outcome, saveTask, type Ctx, type Nav} from './day.ts';
 export {MARK, NEXT, moveTo, outcome, saveTask, type Ctx, type Nav} from './day.ts';
@@ -312,26 +312,39 @@ export function SleepBox({ctx}: {ctx: Ctx}) {
   const sleeps = ofKind(ctx.p.records, 'sleep');
   const running = sleeps.find(r => r.body.start && !r.body.end);
   const night = sleeps.filter(r => r.logicalDay === ctx.day && r.body.end).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-  const [edit, setEdit] = useState(false), L = useL();
+  const wakeDone = ofKind(ctx.p.records, 'condition').some(c => c.logicalDay === ctx.day && c.body.moment === 'wake' && c.body.energy !== null);
+  const [edit, setEdit] = useState(false), [asking, setAsking] = useState(false), L = useL();
   const local = (iso: string | null | undefined) => iso ? new Date(new Date(iso).getTime() - new Date(iso).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
   const clock = (iso: string) => new Date(iso).toTimeString().slice(0, 5);
   const start = () => { const at = ctx.now(); return ctx.p.write(null, {kind: 'sleep', logicalDay: logicalDay(at, settings), body: {start: at}}); };
-  const wake = () => { if (!running) return; const at = ctx.now(); return ctx.p.write(running.id, {kind: 'sleep', logicalDay: logicalDay(at, settings), body: {...running.body, end: at}, baseRevision: running.revision}); };
+  // 일어났어요 works with or without 잘게요: with it the night is measured; without it the wake time alone is kept.
+  const wake = async () => {
+    const at = ctx.now(), day = logicalDay(at, settings);
+    if (running) await ctx.p.write(running.id, {kind: 'sleep', logicalDay: day, body: {...running.body, end: at}, baseRevision: running.revision});
+    else await ctx.p.write(null, {kind: 'sleep', logicalDay: day, body: {start: null, end: at}});
+    setAsking(true);
+    dispatchEvent(new CustomEvent('lit:wake', {detail: {day}}));
+  };
   const save = (key: 'start' | 'end', v: string) => night && ctx.p.write(night.id, {kind: 'sleep', logicalDay: night.logicalDay, body: {...night.body, [key]: v ? new Date(v).toISOString() : null}, baseRevision: night.revision});
   if (running) return <div className="sleep running">
     <span className="sleep-moon" aria-hidden="true">☾</span><span>{clock(running.body.start!)}부터 자는 중 · {hm((Date.now() - Date.parse(running.body.start!)) / 60000)}</span>
-    <button className="primary" onClick={wake}>{L('wake', '일어났어요')}</button>
+    <button className="primary" onClick={() => void wake()}>{L('wake', '일어났어요')}</button>
     <button className="ghost small" onClick={() => ctx.p.remove(running.id)}>취소</button>
   </div>;
   return <div className="sleep">
-    {night ? <p className="sleep-night"><b>{clock(night.body.start!)} → {clock(night.body.end!)}</b> · {hm((Date.parse(night.body.end!) - Date.parse(night.body.start!)) / 60000)} 잤어요
+    {night ? <p className="sleep-night">{night.body.start ? <><b>{clock(night.body.start)} → {clock(night.body.end!)}</b> · {hm((Date.parse(night.body.end!) - Date.parse(night.body.start)) / 60000)} 잤어요</>
+        : <><b>{clock(night.body.end!)} 기상</b> <span className="muted small">잠든 시각 없음</span></>}
       <button className="ghost small" onClick={() => setEdit(!edit)}>{edit ? '닫기' : '고치기'}</button>
       <button className="ghost small danger" onClick={() => ctx.p.remove(night.id)}>지우기</button></p>
       : <Tip id="sleep-buttons" block>자기 전에 "잘게요", 일어나면 "일어났어요"를 누르세요.</Tip>}
     {edit && night && <div className="inline">
       <label>잠든 시각 <input type="datetime-local" defaultValue={local(night.body.start)} onBlur={e => save('start', e.target.value)} /></label>
       <label>일어난 시각 <input type="datetime-local" defaultValue={local(night.body.end)} onBlur={e => save('end', e.target.value)} /></label></div>}
-    <button className="small" onClick={start}>{L('sleep', '☾ 잘게요')}</button>
+    {night && (asking || !wakeDone) && <WakeAsk p={ctx.p} day={night.logicalDay ?? ctx.day} now={ctx.now} />}
+    <div className="inline">
+      {!night && <button className="primary small" onClick={() => void wake()}>{L('wake', '일어났어요')}</button>}
+      <button className="small" onClick={start}>{L('sleep', '☾ 잘게요')}</button>
+    </div>
   </div>;
 }
 

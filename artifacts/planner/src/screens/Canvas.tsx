@@ -22,6 +22,8 @@ import {ListView, ViewWidget, Wishes} from './ViewWidgets.tsx';
 import {PageBox} from './PageBox.tsx';
 import {MadeWidget, logicOf} from '../made/MadeWidget.tsx';
 import {useMode} from '../mode.ts';
+import {openPopup} from '../made/Moments.tsx';
+import {entryFocusMin, focusOf as _f} from './receiptBits.ts';
 import {useWidgetSettings} from './WidgetSettings.tsx';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
@@ -228,7 +230,7 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
     case 'list': return <ListView w={w} ctx={ctx} />;
     case 'week-view': case 'month-view': case 'goals-view': case 'insights-view': return <ViewWidget w={w} ctx={ctx} spec={spec} settings={settings} today={today} />;
     case 'timetable': return <Timetable key={day} m={asModule(w, 'timer')} p={p} day={day} settings={settings} color={ctx.color} logic={logicOf(ctx)} />;
-    case 'receipt': return <Receipt p={p} day={day} routineRate={ofKind(p.records, 'routine').length ? routineRate(p.records, day) : null} logic={logicOf(ctx)} />;
+    case 'receipt': return w.options.display === 'icon' ? <ReceiptIcon ctx={ctx} /> : <Receipt p={p} day={day} routineRate={ofKind(p.records, 'routine').length ? routineRate(p.records, day) : null} logic={logicOf(ctx)} />;
     case 'hourly': return <HourlyDay ctx={ctx} startHour={start} endHour={endHour} />;
     case 'bullet': return <BulletDay ctx={ctx} />;
     case 'page': return <OnePageDay key={day} ctx={ctx} startHour={start} endHour={endHour} />;
@@ -265,4 +267,11 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
       {w.options.text ? <text x="50" y="56" textAnchor="middle" fontSize={String(w.options.textSize ?? 14)} fill={w.ink ?? '#2d2f2a'}>{String(w.options.text)}</text> : null}
     </svg>;
   }
+}
+
+/** 영수증 as an icon: today's 순집중 at a glance; tapping opens the receipts to flip through. */
+function ReceiptIcon({ctx}: {ctx: Ctx}) {
+  const min = Math.round(_f(ctx.p.records, ctx.day, new Date()).todayMinutes + entryFocusMin(ctx.p.records, logicOf(ctx), ctx.day));
+  return <button className="receipt-icon" onClick={() => openPopup('receipt', ctx.day)} aria-label="영수증 보기">
+    <span className="ri-paper" aria-hidden="true">🧾</span><span className="ri-text"><b>영수증</b><span className="mono small">순집중 {Math.floor(min / 60)}:{String(min % 60).padStart(2, '0')}</span></span></button>;
 }

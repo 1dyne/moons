@@ -92,6 +92,11 @@ export function WidgetOptions({w, opt, goals, props, tables}: {w: Widget; opt: (
       <label>소원 표 <select value={String(o.wishTable ?? '')} onChange={e => opt('wishTable', e.target.value || undefined)}><option value="">없음</option>{tables.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}</select></label>
       {!!o.wishTable && <><label>상태 열 이름 <input value={String(o.statusColumn ?? '상태')} onChange={e => opt('statusColumn', e.target.value)} /></label>
         <div className="inline"><label>잠김 값 <input value={String(o.lockedValue ?? '잠김')} onChange={e => opt('lockedValue', e.target.value)} /></label><label>해금 값 <input value={String(o.unlockValue ?? '해금')} onChange={e => opt('unlockValue', e.target.value)} /></label></div></>}</>;
+    case 'receipt': return <>
+      <label>보기 <select value={String(o.display ?? 'full')} onChange={e => opt('display', e.target.value)}><option value="full">영수증 펼쳐 두기</option><option value="icon">아이콘 (눌러서 지난 영수증 넘겨보기)</option></select></label>
+      <label className="row-check"><input type="checkbox" checked={o.popupStart === true} onChange={e => opt('popupStart', e.target.checked)} /> 하루를 시작할 때 어제 영수증 띄우기</label>
+      <label className="row-check"><input type="checkbox" checked={!!o.popupAt} onChange={e => opt('popupAt', e.target.checked ? '22:00' : '')} /> 하루를 마칠 때 오늘 영수증 띄우기</label>
+      {!!o.popupAt && <label>시각 <input type="time" className="time-in" value={String(o.popupAt)} onChange={e => e.target.value && opt('popupAt', e.target.value)} /></label>}</>;
     case 'pagebox': return <>
       <span className="muted small">아이콘</span>
       <div className="swatches">{Object.entries(BOX_ICONS).map(([k, v]) => <button key={k} className={`emoji-btn ${String(o.icon ?? 'memo') === k ? 'on' : ''}`} onClick={() => opt('icon', k)} title={v.name} aria-label={v.name}>{v.glyph}</button>)}</div>

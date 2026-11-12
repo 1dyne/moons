@@ -12,6 +12,7 @@ import {ConnectPage} from './screens/Connect.tsx';
 import {skinProps} from './screens/Canvas.tsx';
 import {PlannerView, currentTab} from './screens/PlannerView.tsx';
 import {MenuDrawer} from './screens/Menu.tsx';
+import {editModePage, modePageToEdit} from './mode.ts';
 import {AvailabilityProvider} from './avail.tsx';
 import {AvailabilityEditor} from './screens/AvailabilityEditor.tsx';
 import {LibraryProvider, useLibraryState} from './library.tsx';
@@ -70,8 +71,8 @@ function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Lo
     </header>
     <LibraryProvider value={library}><AvailabilityProvider value={loaded.settings.availability ?? null}>
     <MenuDrawer open={menu} close={() => setMenu(false)} spec={spec} saveSpec={async next => { await api.putSpec(next); await reload(); }} openSettings={() => { setDecorating(false); setSettingsOpen(true); }} openDecorate={() => { setDecorating(true); setSettingsOpen(false); }} />
-    <PlannerCtx.Provider value={p}>{decorating ? <Editor spec={spec} settings={loaded.settings} p={p} saveLabel="저장" onCancel={() => setDecorating(false)} pageId={tabsOf(spec).find(t => t.id === currentTab() && t.kind !== 'today')?.id}
-      onSave={async next => { await api.putSpec(next); setDecorating(false); await reload(); }} hint="지금 기록 그대로 보면서 꾸며요. 저장하면 새 버전이 되고 기록은 그대로예요." /> : settingsOpen ? <SettingsPanel loaded={loaded} edit={edit} close={() => setSettingsOpen(false)} reload={reload} /> : <PlannerView spec={spec} settings={loaded.settings} p={p} saveSpec={async change => { await api.putSpec(change(spec)); await reload(); }} />}</PlannerCtx.Provider>
+    <PlannerCtx.Provider value={p}>{decorating ? <Editor spec={spec} settings={loaded.settings} p={p} saveLabel="저장" onCancel={() => { editModePage(null); setDecorating(false); }} modeId={modePageToEdit() ?? undefined} pageId={modePageToEdit() ? undefined : tabsOf(spec).find(t => t.id === currentTab() && t.kind !== 'today')?.id}
+      onSave={async next => { await api.putSpec(next); editModePage(null); setDecorating(false); await reload(); }} hint="지금 기록 그대로 보면서 꾸며요. 저장하면 새 버전이 되고 기록은 그대로예요." /> : settingsOpen ? <SettingsPanel loaded={loaded} edit={edit} close={() => setSettingsOpen(false)} reload={reload} /> : <PlannerView spec={spec} settings={loaded.settings} p={p} saveSpec={async change => { await api.putSpec(change(spec)); await reload(); }} />}</PlannerCtx.Provider>
     </AvailabilityProvider></LibraryProvider>
   </div>;
 }

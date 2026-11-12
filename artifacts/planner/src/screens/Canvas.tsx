@@ -21,6 +21,7 @@ import {patchWidget} from './Table.tsx';
 import {ListView, ViewWidget, Wishes} from './ViewWidgets.tsx';
 import {PageBox} from './PageBox.tsx';
 import {MadeWidget, logicOf} from '../made/MadeWidget.tsx';
+import {useMode} from '../mode.ts';
 import {useWidgetSettings} from './WidgetSettings.tsx';
 
 // The DIY day page: widgets on a 12-column grid. Same component for using the planner and for editing it.
@@ -92,13 +93,15 @@ const SHAPES: Record<string, string> = {
 export type EditApi = {widgets: Widget[]; mode: CanvasMode; selected: string | null; select: (id: string | null) => void; change: (ws: Widget[], movedId?: string) => void};
 
 export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveSpec}: {spec: PlannerSpec; settings: Settings; p: Planner; today: string; day: string; nav: Ctx['nav']; edit?: EditApi; page?: Widget[]; saveSpec?: Ctx['saveSpec']}) {
-  const widgets = edit?.widgets ?? page ?? canvasOf(spec), mode = edit?.mode ?? (page ? 'free' : modeOf(spec)), M = METRICS[mode];
+  // A mode with its own page shows that page instead of the usual day page.
+  const dayMode = useMode(spec, p.records, day).mode;
+  const widgets = edit?.widgets ?? page ?? (dayMode?.widgets ?? canvasOf(spec)), mode = edit?.mode ?? (page ? 'free' : modeOf(spec)), M = METRICS[mode];
   const timer = useTimer(p, settings), phone = usePhone();
   // Subject colours from the timer(s) on this page carry into the timetable and receipt.
   const fixed = Object.fromEntries(widgets.filter(w => w.type === 'focus').flatMap(w => ((w.options.subjects as Subject[] | undefined) ?? []).map(sj => [`label:${sj.name}`, sj.color])));
   const color = colors(p, day, fixed);
   const timed = widgets.some(w => ['focus', 'timetable', 'receipt', 'hourly'].includes(w.type));
-  const ctx: Ctx = {p, day, nav, now: () => new Date().toISOString(), timer: timed ? timer : null, color, settings, spec, saveSpec: edit ? undefined : saveSpec, preview: !!edit};
+  const ctx: Ctx = {p, day, nav, now: () => new Date().toISOString(), timer: timed ? timer : null, color, settings, spec, saveSpec: edit ? undefined : saveSpec, preview: !!edit, mode: dayMode};
   const grid = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<{id: string; mode: 'move' | 'size'; x0: number; y0: number; w: Widget; preview: Widget} | null>(null);
   const endHour = Number(settings.dayBoundary.slice(0, 2)) + 24;

@@ -8,6 +8,7 @@ import {label} from './Today.tsx';
 import {DayCanvas} from './Canvas.tsx';
 import {hm} from './Focus.tsx';
 import {parseEntry} from '../parse.ts';
+import {setModePick, useMode} from '../mode.ts';
 import {at, fromClock, minuteOf} from '../schedule.ts';
 
 // A day: the date line, then the user's own widget page (the day page, or a page tab's widgets).
@@ -16,8 +17,10 @@ const DAILY = new Set(['tasks', 'focus', 'timetable', 'receipt', 'hourly', 'bull
 export function DayPage({spec, settings, p, nav, today, saveSpec, page}: {spec: PlannerSpec; settings: Settings; p: Planner; nav: Nav; today: string; saveSpec?: Ctx['saveSpec']; page?: Widget[]}) {
   const dated = !page || page.some(w => DAILY.has(w.type) || (w.type === 'table' && w.options.scope !== 'all') || (w.type === 'list' && w.options.period === 'today'));
   const phone = usePhone();
+  const md = useMode(spec, p.records, nav.day);
   return <div className="sheet">
-    {dated && (phone ? <><WeekStrip nav={nav} today={today} /><Summary p={p} day={nav.day} logic={Logic.parse(spec.logic ?? {})} /></> : <div className="day-nav">
+    {dated && md.modes.length > 0 && <ModeBar md={md} day={nav.day} />}
+    {dated && (phone ? <><WeekStrip nav={nav} today={today} /><Summary p={p} day={nav.day} logic={Logic.parse(spec.logic ?? {})} did={md.mode?.taskStyle === 'did'} /></> : <div className="day-nav">
       <button onClick={() => nav.setDay(addDays(nav.day, -1))} aria-label="전날">‹</button>
       <h2>{label(nav.day)}</h2>
       <button onClick={() => nav.setDay(addDays(nav.day, 1))} aria-label="다음 날">›</button>
@@ -25,7 +28,7 @@ export function DayPage({spec, settings, p, nav, today, saveSpec, page}: {spec: 
     </div>)}
     {page && page.length === 0 && <p className="muted page-empty">빈 페이지</p>}
     <DayCanvas spec={spec} settings={settings} p={p} today={today} day={nav.day} nav={nav} saveSpec={saveSpec} page={page} />
-    {phone && dated && <AddButton p={p} day={nav.day} />}
+    {phone && dated && <AddButton p={p} day={nav.day} did={md.mode?.taskStyle === 'did'} />}
   </div>;
 }
 
@@ -43,39 +46,53 @@ function WeekStrip({nav, today}: {nav: Nav; today: string}) {
 }
 
 /** Phone: the day in one line — net focus, tasks done (want left out), condition. */
-function Summary({p, day, logic}: {p: Planner; day: string; logic: Logic}) {
+function Summary({p, day, logic, did}: {p: Planner; day: string; logic: Logic; did: boolean}) {
   const focus = Math.round(ofKind(p.records, 'session').filter(s => s.logicalDay === day).reduce((m, s) => m + Math.max(0, (Date.parse(s.body.end ?? new Date().toISOString()) - Date.parse(s.body.start)) / 60000), 0)) + entryFocusMin(p.records, logic, day);
   const tasks = ofKind(p.records, 'task').filter(t => t.logicalDay === day && t.body.category !== 'want' && !['cancelled', 'postponed'].includes(t.body.outcome.result));
   const done = tasks.filter(t => t.body.outcome.result === 'done').length, score = dayCondition(p.records, day).score;
   const light = score === null ? '' : score >= 7 ? 'blue' : score <= 3 ? 'red' : 'amber';
   return <div className="m-summary">
     <span><em>순집중</em><b>{hm(focus)}</b></span>
-    <span><em>완료</em><b>{done}/{tasks.length}</b></span>
+    {did ? <span><em>한 일</em><b>{done}</b></span> : <span><em>완료</em><b>{done}/{tasks.length}</b></span>}
     <span><em>컨디션</em><b>{score ?? '–'}</b>{light && <i className={`m-light ${light}`} aria-hidden="true" />}</span>
   </div>;
 }
 
 /** Phone: one + button; adding happens in a sheet from the bottom instead of input boxes inside every card. */
-function AddButton({p, day}: {p: Planner; day: string}) {
+function AddButton({p, day, did}: {p: Planner; day: string; did: boolean}) {
   const [open, setOpen] = useState(false), [text, setText] = useState(''), [cat, setCat] = useState('must'), [time, setTime] = useState('');
   const add = async () => {
     const parsed = parseEntry(text, day);
     if (!parsed.title.trim()) return;
     const start = parsed.time?.start ?? (time ? fromClock(day, time) : null);
     const end = parsed.time?.end ?? (start && parsed.estimateMin ? at(day, minuteOf(day, start.value) + parsed.estimateMin) : null);
-    await p.write(null, {kind: 'task', logicalDay: day, body: {title: parsed.title, category: cat, plan: {state: 'committed', target: parsed.target, estimateMin: parsed.estimateMin, ...(start ? {start, end} : {})}}});
+    await p.write(null, {kind: 'task', logicalDay: day, body: {title: parsed.title, category: cat, ...(did ? {outcome: {result: 'done', completedAt: new Date().toISOString(), reportedAt: new Date().toISOString()}} : {}), plan: {state: 'committed', target: parsed.target, estimateMin: parsed.estimateMin, ...(start ? {start, end} : {})}}});
     setText(''); setTime('');
   };
   return <>
-    <button className="fab" onClick={() => setOpen(true)} aria-label="할 일 추가">＋</button>
+    <button className="fab" onClick={() => setOpen(true)} aria-label={did ? '한 일 적기' : '할 일 추가'}>＋</button>
     {open && <div className="sheet-wrap" onClick={e => { if (e.target === e.currentTarget) setOpen(false); }}>
       <form className="bottom-sheet" onSubmit={e => { e.preventDefault(); void add(); }}>
         <div className="inline sheet-row"><input type="time" className="time-in" value={time} onChange={e => setTime(e.target.value)} aria-label="시작 시각" />
-          <input value={text} onChange={e => setText(e.target.value)} placeholder="할 일" aria-label="할 일" autoFocus /></div>
+          <input value={text} onChange={e => setText(e.target.value)} placeholder={did ? '한 일' : '할 일'} aria-label={did ? '한 일' : '할 일'} autoFocus /></div>
         <div className="seg" role="radiogroup" aria-label="분류">{([['must', '꼭'], ['want', '하고 싶은'], ['leisure', '여가']] as const).map(([k, v]) =>
           <button key={k} type="button" role="radio" aria-checked={cat === k} className={cat === k ? 'on' : ''} onClick={() => setCat(k)}>{v}</button>)}</div>
-        <div className="inline"><button className="primary" disabled={!text.trim()}>추가</button><button type="button" className="ghost" onClick={() => setOpen(false)}>닫기</button></div>
+        <div className="inline"><button className="primary" disabled={!text.trim()}>{did ? '기록' : '추가'}</button><button type="button" className="ghost" onClick={() => setOpen(false)}>닫기</button></div>
       </form>
     </div>}
   </>;
+}
+
+/** The mode in force today, why, and a switch: the energy rule decides unless the user picks for the day. */
+function ModeBar({md, day}: {md: ReturnType<typeof useMode>; day: string}) {
+  const [open, setOpen] = useState(false);
+  const why = md.pick ? '직접 켬' : md.energy !== null ? `에너지 ${md.energy}` : '';
+  return <div className={`mode-bar ${md.mode ? 'on' : ''}`}>
+    {md.mode ? <><span className="mode-dot" aria-hidden="true" /><b>{md.mode.name}</b>{why && <span className="muted small">{why}</span>}
+      <button className="ghost small" onClick={() => setModePick(day, 'off')}>끄기</button></>
+      : <button className="ghost small" onClick={() => setOpen(!open)} aria-expanded={open}>모드{md.pick === 'off' ? ' · 오늘 끔' : ''} ▾</button>}
+    {md.pick && md.mode && <button className="ghost small" onClick={() => setModePick(day, null)}>에너지로 정하기</button>}
+    {open && !md.mode && <span className="mode-pick">{md.modes.map(m => <button key={m.id} className="small" onClick={() => { setModePick(day, m.id); setOpen(false); }}>{m.name} 켜기</button>)}
+      {md.pick && <button className="ghost small" onClick={() => { setModePick(day, null); setOpen(false); }}>에너지로 정하기</button>}</span>}
+  </div>;
 }

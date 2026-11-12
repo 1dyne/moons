@@ -11,7 +11,7 @@ type Value = string | number | boolean | null;
 /** Applies a change to one widget wherever it lives: the day page or a page tab. */
 export function patchWidget(spec: PlannerSpec, id: string, f: (w: Widget) => Widget): PlannerSpec {
   const map = (ws: Widget[] | undefined) => ws?.map(w => w.id === id ? f(w) : w);
-  return {...spec, canvas: {...spec.canvas, day: map(spec.canvas.day)}, tabs: spec.tabs?.map(t => ({...t, widgets: map(t.widgets)}))};
+  return {...spec, canvas: {...spec.canvas, day: map(spec.canvas.day)}, tabs: spec.tabs?.map(t => ({...t, widgets: map(t.widgets)})), modes: spec.modes?.map(m => m.widgets ? {...m, widgets: map(m.widgets)} : m)};
 }
 
 /** Name, type and (for 선택) choices of one property. */

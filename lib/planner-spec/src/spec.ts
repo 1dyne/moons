@@ -1,6 +1,7 @@
 import {z} from 'zod';
 import {PropDef, Skin, Widget} from './canvas.ts';
 import {Logic} from './logic.ts';
+import {Mode} from './modes.ts';
 
 // PlannerSpec (docs/PLANNER_SPEC_v1.md §4.1): what the planner looks like. Data lives in the life hub;
 // changing a spec never moves or rewrites records.
@@ -65,6 +66,8 @@ export const PlannerSpec = z.object({
   props: z.object({task: z.array(PropDef).max(20).default([])}).default({}),
   // The user's own logic (docs/lit/BLOCKS.md): types (collections of entries) and automations between widgets.
   logic: Logic.default({}),
+  // Modes: the day page and the way tasks are run change with the situation (에너지 긴축모드…).
+  modes: z.array(Mode).max(6).default([]),
   source: z.object({kind: z.enum(['chat', 'paper', 'notion', 'template']), ref: z.string().max(80).optional()}).optional(),
 }).superRefine((spec, ctx) => {
   const ids = spec.modules.map(m => m.id);

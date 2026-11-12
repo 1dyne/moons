@@ -1,5 +1,5 @@
 import type {LifeRecord, Settings, Task} from '@workspace/life-contract';
-import type {PlannerSpec} from '@workspace/planner-spec';
+import type {Mode, PlannerSpec} from '@workspace/planner-spec';
 import type {Planner} from '../data.ts';
 import type {Timer} from './Focus.tsx';
 
@@ -9,7 +9,9 @@ export type Ctx = {p: Planner; day: string; nav: Nav; now: () => string; timer: 
   // The page being shown and a way to change it in place (add a property, a table column…). Absent in read-only mockups.
   spec?: PlannerSpec; saveSpec?: (change: (s: PlannerSpec) => PlannerSpec) => Promise<void>;
   // The editor shows examples where real data is missing, so a style change is visible.
-  preview?: boolean};
+  preview?: boolean;
+  // The mode in force on this day (에너지 긴축모드…): changes how tasks are shown and written.
+  mode?: Mode | null};
 export const MARK: Record<string, string> = {done: '○', partial: '△', missed: '×', in_progress: '◐', postponed: '→', cancelled: '–', unknown: ''};
 export const NEXT: Record<string, Task['outcome']['result']> = {unknown: 'done', in_progress: 'done', done: 'partial', partial: 'missed', missed: 'unknown'};
 export const saveTask = (ctx: Ctx, t: LifeRecord<'task'>, patch: Partial<Task>) => ctx.p.write(t.id, {kind: 'task', logicalDay: t.logicalDay, body: {...t.body, ...patch}, baseRevision: t.revision});

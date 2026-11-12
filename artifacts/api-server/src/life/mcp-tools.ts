@@ -2,7 +2,7 @@ import {z} from 'zod';
 import './autolog.ts';
 import './flows.ts';
 import {LINK_RELS, VERBS, ALL_SCOPES, Availability, addDays, availableOn, buildNow, dayCondition, estimateAccuracy, goalPercent, goalSchedule, logicalDay, periodSummary, personaShare, weeklyFocus, type AnyRecord, type LifeRecord} from '@workspace/life-contract';
-import {AGGS, Action, BLOCK_KINDS, Design, FIELD_KINDS, Flow, LOGIC_BLOCKS, Logic, LogicBlock, MadeOptions, PERIODS, TypeDef, VERB_NAMES, durationMin, entriesOf, flowSentence, newLogicId, type Widget, BLOCKS, PERMISSIONS, isCode, BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
+import {Mode, AGGS, Action, BLOCK_KINDS, Design, FIELD_KINDS, Flow, LOGIC_BLOCKS, Logic, LogicBlock, MadeOptions, PERIODS, TypeDef, VERB_NAMES, durationMin, entriesOf, flowSentence, newLogicId, type Widget, BLOCKS, PERMISSIONS, isCode, BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 import {listLibrary, saveLibrary} from './library.ts';
 import {allRecords, deleteRecord, getSettings, getSpec, lastActivity, putAvailability, putSettings, saveSpec, writeRecord} from './store.ts';
@@ -82,8 +82,21 @@ export function registerPlannerTools(tool: Tool) {
       widgets: planner?.spec.canvas?.day ?? null, skin: planner?.spec.skin ?? null,
       tabs: planner ? tabsOf(planner.spec as PlannerSpec).map(t => ({name: t.name, kind: t.kind, widgets: t.widgets?.length ?? undefined})) : null, taskProps: (planner?.spec as PlannerSpec | undefined)?.props?.task ?? [],
       tables: planner ? [...((planner.spec as PlannerSpec).canvas?.day ?? []), ...((planner.spec as PlannerSpec).tabs ?? []).flatMap(t => t.widgets ?? [])].filter(w => w.type === 'table').map(w => ({id: w.id, title: w.title ?? null, columns: w.options.columns ?? []})) : [], settings: settings.configured ? {tz: settings.tz, dayBoundary: settings.dayBoundary} : null,
+      modes: ((planner?.spec as PlannerSpec | undefined)?.modes ?? []).map(m => ({id: m.id, name: m.name, energyAtOrBelow: m.energyAtOrBelow, taskStyle: m.taskStyle, ownPage: !!m.widgets})),
       records: {goals: count('goal'), tasks: count('task'), routines: count('routine'), personas: count('persona')}};
   });
+
+  tool('set_modes', '모드를 정한다(전체를 이 목록으로 바꾼다): 에너지가 energyAtOrBelow 이하이면 저절로 켜지고(없으면 직접 켤 때만), taskStyle "did"(한 일 방식: 남은 할 일은 희망사항(회색), 하면 한 일로 색칠, 새로 적으면 한 일) | "plan"(그대로). ownPage:true면 지금 오늘 페이지를 복사해 그 모드 전용 페이지를 만든다(이미 있으면 그대로). 사용자가 원한 것만 만든다.',
+    {modes: z.array(z.object({id: z.string().regex(/^[a-z0-9-]{1,24}$/).optional(), name: z.string().min(1).max(30), energyAtOrBelow: z.number().int().min(1).max(10).nullable().optional(), taskStyle: z.enum(['plan', 'did']).optional(), ownPage: z.boolean().optional()})).max(6)},
+    async ({modes}, owner) => {
+      const current = (await getSpec(owner))?.spec as PlannerSpec | undefined;
+      if (!current) throw new WorkspaceError(400, '먼저 build_planner로 플래너를 만든다.');
+      const before = current.modes ?? [];
+      const next = modes.map((m, i) => { const id = m.id ?? before.find(b => b.name === m.name)?.id ?? `mode-${i + 1}`, prev = before.find(b => b.id === id);
+        return Mode.parse({id, name: m.name, energyAtOrBelow: m.energyAtOrBelow ?? null, taskStyle: m.taskStyle ?? 'did', ...(m.ownPage ? {widgets: prev?.widgets ?? current.canvas.day ?? []} : m.ownPage === false ? {} : prev?.widgets ? {widgets: prev.widgets} : {})}); });
+      const saved = await saveSpec(owner, {...current, modes: next});
+      return {version: saved.version, modes: next.map(m => ({id: m.id, name: m.name, energyAtOrBelow: m.energyAtOrBelow, taskStyle: m.taskStyle, ownPage: !!m.widgets}))};
+    });
 
   tool('build_planner', '플래너를 만들거나 바꾼다(새 버전, 기록은 그대로). widgets는 위젯 배치(guide 참고), skin은 바꿀 스킨 값만. 사용자에게 계획을 보여 주고 OK를 받은 뒤에 부른다.',
     {name: z.string().max(40).optional(), widgets: z.array(looseWidget).min(1).max(80), skin: z.record(z.unknown()).optional(), skinPreset: z.string().optional(),

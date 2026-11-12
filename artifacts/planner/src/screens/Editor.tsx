@@ -15,13 +15,15 @@ const SWATCHES = PALETTE;
 let seq = 0;
 const newId = (type: string) => `${type}-${Date.now().toString(36)}${(seq++).toString(36)}`.slice(0, 40);
 
-export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pageId}: {spec: PlannerSpec; settings: Settings; p: Planner; saveLabel: string; onSave: (spec: PlannerSpec) => Promise<void> | void; onCancel?: () => void; hint?: string; pageId?: string}) {
+export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pageId, modeId}: {spec: PlannerSpec; settings: Settings; p: Planner; saveLabel: string; onSave: (spec: PlannerSpec) => Promise<void> | void; onCancel?: () => void; hint?: string; pageId?: string; modeId?: string}) {
   const today = logicalDay(new Date(), settings);
   // A page tab is edited the same way. One placement mode (the fine lattice); old 정리형 pages arrive converted.
   const pageTab = pageId ? tabsOf(spec).find(t => t.id === pageId) : undefined;
   // A built-in tab (주간·월·목표·분석) becomes a page holding that view as a widget, so it can be decorated too.
   const viewOf = {week: 'week-view', month: 'month-view', goals: 'goals-view', insights: 'insights-view'} as const;
-  const [widgets, setWidgets] = useState<Widget[]>(() => !pageTab ? canvasOf(spec) : pageTab.kind === 'page' ? pageTab.widgets ?? []
+  // A mode's own day page (the second template) is edited the same way.
+  const modeEdit = modeId ? (spec.modes ?? []).find(m => m.id === modeId) : undefined;
+  const [widgets, setWidgets] = useState<Widget[]>(() => modeEdit ? modeEdit.widgets ?? canvasOf(spec) : !pageTab ? canvasOf(spec) : pageTab.kind === 'page' ? pageTab.widgets ?? []
     : [{id: newId(viewOf[pageTab.kind as keyof typeof viewOf]), type: viewOf[pageTab.kind as keyof typeof viewOf], x: 0, y: 0, w: 48, h: 72, options: {}}]);
   const mode: CanvasMode = 'free', M = METRICS[mode];
   const [skin, setSkin] = useState<Skin>(() => spec.skin ?? Skin.parse({}));
@@ -40,7 +42,7 @@ export function Editor({spec, settings, p, saveLabel, onSave, onCancel, hint, pa
   const opt = (id: string, key: string, value: unknown) => change(widgets.map(w => w.id === id ? {...w, options: {...w.options, [key]: value}} : w));
   const nav = useMemo(() => ({day: today, setDay: () => {}, openGoal: () => {}}), [today]);
   const sp = skinProps(skin);
-  const save = async () => { setBusy(true); setError(''); try { await onSave(pageTab ? {...spec, skin, tabs: tabsOf(spec).map(t => t.id === pageTab.id ? {...t, kind: 'page' as const, widgets} : t)} : applyCanvas(spec, widgets, skin, mode)); } catch (e) { setError((e as Error).message); setBusy(false); } };
+  const save = async () => { setBusy(true); setError(''); try { await onSave(modeEdit ? {...spec, skin, modes: (spec.modes ?? []).map(m => m.id === modeEdit.id ? {...m, widgets} : m)} : pageTab ? {...spec, skin, tabs: tabsOf(spec).map(t => t.id === pageTab.id ? {...t, kind: 'page' as const, widgets} : t)} : applyCanvas(spec, widgets, skin, mode)); } catch (e) { setError((e as Error).message); setBusy(false); } };
   const goals = ofKind(p.records, 'goal');
 
   return <div className="editor">

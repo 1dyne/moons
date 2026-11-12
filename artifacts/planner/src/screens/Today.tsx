@@ -58,12 +58,15 @@ export function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
   const auto = !picked && title.trim() ? suggestGoal(p.records, day, title) : null;
   const goalId = picked ? goal : auto?.id ?? '';
   const boundary = Number(ctx.settings?.dayBoundary.slice(0, 2) ?? 4);
+  // 한 일 방식 (에너지 긴축모드): what is written is already done.
+  const did = ctx.mode?.taskStyle === 'did';
   const add = async () => {
     if (!title.trim()) return;
+    const doneNow = did ? {outcome: {result: 'done' as const, completedAt: ctx.now(), reportedAt: ctx.now()}} : {};
     const time = parsed.time ?? (startAt ? {start: fromClock(day, startAt, boundary), end: null} : null);
     const end = time?.end ?? (time && parsed.estimateMin ? at(day, minuteOf(day, time.start.value) + parsed.estimateMin) : null);
     if (await p.write(null, {kind: 'task', logicalDay: day, body: {title: parsed.title, category: cats ? cat : null, props: byProp && propVal ? {[byProp.id]: propVal} : {}, goalIds: goalId ? [goalId] : [], personaIds: persona ? [persona] : [],
-      order: tasks.length * 10, plan: {state: 'committed', target, estimateMin: parsed.estimateMin, ...(time ? {start: time.start, end} : {})}}})) { setTitle(''); setPicked(false); setGoal(''); setStartAt(''); }
+      order: tasks.length * 10, ...doneNow, plan: {state: 'committed', target, estimateMin: parsed.estimateMin, ...(time ? {start: time.start, end} : {})}}})) { setTitle(''); setPicked(false); setGoal(''); setStartAt(''); }
   };
   const groups: (readonly [string | null, typeof tasks])[] = byProp ? [...byProp.options, null].map(o => [o, tasks.filter(t => (t.body.props?.[byProp.id] ?? null) === o)] as const).filter(([, l]) => l.length)
     : cats ? (['must', 'want', 'leisure', null] as const).map(c => [c, tasks.filter(t => t.body.category === c)] as const).filter(([, l]) => l.length) : [[null, tasks] as const];
@@ -72,7 +75,8 @@ export function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
   const counted = tasks.filter(t => t.body.category !== 'want' && !t.body.plan.fixed);
   const done = counted.filter(t => t.body.outcome.result === 'done').length, live = counted.filter(t => !['cancelled', 'postponed'].includes(t.body.outcome.result)).length;
   return <>
-    {tasks.length > 0 && <p className="tally muted small">{done}/{live} 완료 <Tip id="tasks-cycle">체크 칸을 누를 때마다 완료 → 일부 → 못 함 → 처음으로. ⠿를 끌어 순서·시간을 바꿔요</Tip></p>}
+    {did ? <p className="tally did-tally"><b>{ctx.mode!.name}</b> · 한 일 <strong>{tasks.filter(t => t.body.outcome.result === 'done').length}</strong>{tasks.some(t => !['done', 'cancelled', 'postponed'].includes(t.body.outcome.result)) && <span className="muted small"> · 희망사항 {tasks.filter(t => !['done', 'cancelled', 'postponed'].includes(t.body.outcome.result)).length}</span>}</p>
+      : tasks.length > 0 && <p className="tally muted small">{done}/{live} 완료 <Tip id="tasks-cycle">체크 칸을 누를 때마다 완료 → 일부 → 못 함 → 처음으로. ⠿를 끌어 순서·시간을 바꿔요</Tip></p>}
     {groups.map(([c, list]) => <div key={String(c)} className={`task-group ${cats && c ? `group-${c}` : ''}`}>
       {cats && c && <span className={`cat cat-${c}`}>{catName(c)}</span>}
       {byProp && <span className="cat">{c ?? `${byProp.name} 없음`}</span>}
@@ -80,14 +84,14 @@ export function Tasks({m, ctx}: {m: ModuleSpec; ctx: Ctx}) {
     </div>)}
     <form className="padd" onSubmit={e => { e.preventDefault(); void add(); }}>
       <input type="time" className="time-in" value={parsed.time ? clockOf(parsed.time.start.value) : startAt} disabled={!!parsed.time} onChange={e => setStartAt(e.target.value)} aria-label="시작 시각" />
-      <input value={title} onChange={e => setTitle(e.target.value)} placeholder={L('placeholder', '할 일')} aria-label="할 일" />
+      <input value={title} onChange={e => setTitle(e.target.value)} placeholder={did ? '한 일' : L('placeholder', '할 일')} aria-label={did ? '한 일' : '할 일'} />
       {parsed.estimateMin ? <span className="parsed" title="예상 시간으로 읽었어요">예상 {parsed.estimateMin}분</span> : target && <span className="parsed" title="분량으로 읽었어요">{target.amount}{target.unit}</span>}
       {byProp && <select value={propVal} onChange={e => setPropVal(e.target.value)} aria-label={byProp.name}><option value="">{byProp.name}</option>{byProp.options.map(o => <option key={o} value={o}>{o}</option>)}</select>}
       {cats && <select value={cat} onChange={e => setCat(e.target.value)} aria-label="분류">{Object.keys(CATEGORY).map(k => <option key={k} value={k}>{catName(k)}</option>)}</select>}
       {auto && <span className="parsed auto-goal" title="제목으로 고른 목표예요. 바꾸려면 옆에서 고르세요">→ {auto.body.title}</span>}
       {goals.length > 0 && <select value={goalId} onChange={e => { setGoal(e.target.value); setPicked(true); }} aria-label="이어질 목표"><option value="">목표 없음</option>{goals.map(g => <option key={g.id} value={g.id}>{g.body.horizon === 'milestone' ? '◆ ' : ''}{g.body.title}</option>)}</select>}
       {personas.length > 0 && <select value={persona} onChange={e => setPersona(e.target.value)} aria-label="페르소나"><option value="">페르소나</option>{personas.map(x => <option key={x.id} value={x.id}>{x.body.name}</option>)}</select>}
-      <button className="primary small">{L('add', '추가')}</button>
+      <button className="primary small">{did ? '기록' : L('add', '추가')}</button>
     </form>
     {ctx.saveSpec && <div className="props-bar">
       {defs.map(d => propsOpen === d.id ? <PropForm key={d.id} initial={d} onCancel={() => setPropsOpen(null)} onSave={x => { void saveDefs(defs.map(y => y.id === d.id ? x : y)); setPropsOpen(null); }} onDelete={() => { void saveDefs(defs.filter(y => y.id !== d.id)); setPropsOpen(null); }} />
@@ -149,7 +153,9 @@ function TaskRow({t, ctx, index, handle, dragging}: {t: LifeRecord<'task'>; ctx:
     if (st && en && en.value <= st.value) en = at(day, minuteOf(day, en.value) + 1440);
     return saveTask(ctx, t, {plan: {...t.body.plan, start: st, end: en}});
   };
-  return <li data-sort={index} className={`prow ${o.result} ${running ? 'running' : ''} ${hl ? 'hl' : ''} ${dragging ? 'dragging' : ''} ${t.body.category === 'want' ? 'want' : ''} ${t.body.plan.fixed ? 'fixed' : ''}`} style={{'--c': color(t.id), ...(hl ? {'--hl': hl.color} : {})} as React.CSSProperties}>
+  // 한 일 방식: unfinished tasks are 희망사항 (grey); a finished one is coloured as 한 일.
+  const didMode = ctx.mode?.taskStyle === 'did', wish = didMode && !['done', 'cancelled', 'postponed'].includes(o.result), didOne = didMode && o.result === 'done';
+  return <li data-sort={index} className={`prow ${o.result} ${running ? 'running' : ''} ${hl ? 'hl' : ''} ${dragging ? 'dragging' : ''} ${t.body.category === 'want' ? 'want' : ''} ${t.body.plan.fixed ? 'fixed' : ''} ${wish ? 'as-wish' : ''} ${didOne ? 'as-did' : ''}`} style={{'--c': color(t.id), ...(hl ? {'--hl': hl.color} : {})} as React.CSSProperties}>
     <span {...handle}>⠿</span>
     <span className={`ptime ${start ? '' : 'none'}`}>{start && <><b>{start}</b>{end && <small>–{end}</small>}</>}</span>
     <span className="ptitle">
@@ -161,6 +167,7 @@ function TaskRow({t, ctx, index, handle, dragging}: {t: LifeRecord<'task'>; ctx:
         {defs.map(d => { const v = showValue(d, t.body.props?.[d.id]); return v && <span key={d.id} className="prop-val"><em>{d.name}</em> {v}</span>; })}
         {(t.body.plan.estimateMin || spent > 0) && <span className="spent-sub">{hm(spent)}{t.body.plan.estimateMin ? `/${hm(t.body.plan.estimateMin)}` : ''}</span>}
         {o.reason && <span className="reason">· {o.reason}</span>}
+        {wish && <span className="wish-tag">희망사항</span>}{didOne && <span className="did-tag">한 일{o.completedAt ? ` · ${clockOf(o.completedAt)}` : ''}</span>}
         {o.result === 'postponed' && <span>{movedTo ? `${shortDay(movedTo)}로 미룸` : '미룸'}</span>}
       </span>
     </span>

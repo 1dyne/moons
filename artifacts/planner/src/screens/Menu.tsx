@@ -5,11 +5,13 @@ import {hiddenOnPhone, openByDefault, phoneOrder} from '../phone.tsx';
 import {currentTab} from './PlannerView.tsx';
 import {canvasOf} from './Canvas.tsx';
 import {openStudio} from '../made/Studio.tsx';
+import {editModePage} from '../mode.ts';
+import {Mode} from '@workspace/planner-spec';
 
 // The menu (≡): everything that is not today's planner lives here, out of the way of daily use.
 // Sections follow plugin managers (Obsidian: installed list with toggles, code gated until approved;
 // Figma: manifest permissions, sandboxed frame) and Notion's sidebar (templates and settings tucked aside).
-type Section = 'home' | 'library' | 'make' | 'installed' | 'dev' | 'mobile';
+type Section = 'home' | 'library' | 'make' | 'installed' | 'dev' | 'mobile' | 'modes';
 const KIND_NAME = {widget: '저장한 위젯', template: '페이지 틀', skin: '스킨', custom: '내 위젯'} as const;
 
 export function MenuDrawer({open, close, spec, saveSpec, openSettings, openDecorate}: {open: boolean; close: () => void; spec: PlannerSpec; saveSpec: (s: PlannerSpec) => Promise<void>; openSettings: () => void; openDecorate?: () => void}) {
@@ -18,7 +20,7 @@ export function MenuDrawer({open, close, spec, saveSpec, openSettings, openDecor
   useEffect(() => { if (!open) setSection('home'); else void lib?.reload(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); }; if (open) addEventListener('keydown', k); return () => removeEventListener('keydown', k); }, [open, close]);
   if (!open) return null;
-  const title = {home: '메뉴', library: '내 라이브러리', make: '위젯 만들기', installed: '설치한 위젯', dev: '개발자', mobile: '모바일 배치'}[section];
+  const title = {home: '메뉴', library: '내 라이브러리', make: '위젯 만들기', installed: '설치한 위젯', dev: '개발자', mobile: '모바일 배치', modes: '모드'}[section];
   return <div className="drawer-wrap" onClick={e => { if (e.target === e.currentTarget) close(); }}>
     <aside className="drawer" role="dialog" aria-label={title}>
       <header className="drawer-head">
@@ -27,6 +29,7 @@ export function MenuDrawer({open, close, spec, saveSpec, openSettings, openDecor
         <button className="ghost small" onClick={close} aria-label="닫기">✕</button>
       </header>
       {section === 'home' && <nav className="drawer-nav">
+        <button onClick={() => setSection('modes')}><b>모드</b><span>에너지가 낮으면 바뀌는 플래너 (에너지 긴축모드: 할 일 → 한 일)</span></button>
         <button onClick={() => setSection('mobile')}><b>모바일 배치</b><span>폰에서 보일 위젯과 순서, 처음에 펼칠 것</span></button>
         {openDecorate && <button onClick={() => { close(); openDecorate(); }}><b>꾸미기</b><span>PC 배치·스킨·위젯 설정</span></button>}
         <button onClick={() => setSection('library')}><b>내 라이브러리</b><span>저장한 위젯·페이지 틀·스킨</span></button>
@@ -42,6 +45,7 @@ export function MenuDrawer({open, close, spec, saveSpec, openSettings, openDecor
       {section === 'installed' && <Installed spec={spec} saveSpec={saveSpec} />}
       {section === 'dev' && <DevView />}
       {section === 'mobile' && <MobileArrange spec={spec} saveSpec={saveSpec} />}
+      {section === 'modes' && <ModesView spec={spec} saveSpec={saveSpec} decorate={openDecorate ? id => { editModePage(id); close(); openDecorate(); } : undefined} />}
     </aside>
   </div>;
 }
@@ -225,5 +229,29 @@ function MobileArrange({spec, saveSpec}: {spec: PlannerSpec; saveSpec: (s: Plann
       <span className="m-move"><button className="ghost small" disabled={i === 0} onClick={() => move(i, -1)} aria-label="위로">↑</button><button className="ghost small" disabled={i === list.length - 1} onClick={() => move(i, 1)} aria-label="아래로">↓</button></span>
     </li>)}</ul>
     <div className="inline"><button className="primary" disabled={busy} onClick={() => void save()}>저장</button>{msg && <span className="small muted">{msg}</span>}</div>
+  </div>;
+}
+
+/** Modes: when the planner changes by itself (energy at or below a score) and what changes. */
+function ModesView({spec, saveSpec, decorate}: {spec: PlannerSpec; saveSpec: (s: PlannerSpec) => Promise<void>; decorate?: (id: string) => void}) {
+  const [modes, setModes] = useState<Mode[]>(spec.modes ?? []), [busy, setBusy] = useState(false), [saved, setSaved] = useState(false);
+  const put = (i: number, p: Partial<Mode>) => { setSaved(false); setModes(ms => ms.map((m, j) => j === i ? {...m, ...p} : m)); };
+  const save = async (next = modes) => { setBusy(true); await saveSpec({...spec, modes: next}); setBusy(false); setSaved(true); };
+  return <div className="drawer-body modes-view">
+    {modes.map((m, i) => <section key={m.id} className="mode-card">
+      <label><span className="k">이름</span><input value={m.name} maxLength={30} onChange={e => put(i, {name: e.target.value || ' '})} /></label>
+      <label className="inline"><span className="k">켜지는 때</span> 에너지 <select value={m.energyAtOrBelow ?? ''} onChange={e => put(i, {energyAtOrBelow: e.target.value ? Number(e.target.value) : null})}>
+        <option value="">직접 켤 때만</option>{[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => <option key={n} value={n}>{n} 이하</option>)}</select></label>
+      <label className="inline"><span className="k">할 일</span><select value={m.taskStyle} onChange={e => put(i, {taskStyle: e.target.value as Mode['taskStyle']})}>
+        <option value="did">한 일 방식 — 남은 할 일은 희망사항(회색), 하면 한 일로 색칠, 새로 적으면 한 일</option><option value="plan">그대로 (할 일 목록)</option></select></label>
+      <div className="inline wrap"><span className="k">페이지</span>{m.widgets ? <>
+          <span className="small">이 모드 전용 페이지 ({m.widgets.length}개 위젯)</span>
+          {decorate && <button className="small" onClick={async () => { await save(); decorate(m.id); }} disabled={busy}>꾸미기</button>}
+          <button className="ghost small" onClick={() => put(i, {widgets: undefined})}>평소 페이지 쓰기</button></>
+        : <><span className="small">평소 페이지 그대로</span><button className="small" onClick={() => put(i, {widgets: canvasOf(spec)})}>전용 페이지 만들기 (지금 페이지 복사)</button></>}</div>
+      <button className="ghost small danger" onClick={() => { setSaved(false); setModes(ms => ms.filter((_, j) => j !== i)); }}>이 모드 지우기</button>
+    </section>)}
+    {modes.length < 6 && <button className="small" onClick={() => { setSaved(false); setModes([...modes, Mode.parse({id: `mode-${Date.now().toString(36)}`, name: modes.length ? '새 모드' : '에너지 긴축모드', energyAtOrBelow: modes.length ? null : 4, taskStyle: 'did'})]); }}>+ 모드</button>}
+    <div className="inline"><button className="primary" disabled={busy} onClick={() => void save()}>{saved ? '저장됨' : '저장'}</button></div>
   </div>;
 }

@@ -19,7 +19,7 @@ export type StudioOpen = {widgetId?: string} | {pick: true} | {logic: true};
 export const openStudio = (detail: StudioOpen) => dispatchEvent(new CustomEvent('lit:studio', {detail}));
 
 type Draft = {widgetId: string | null; title: string; options: MadeOptions; types: TypeDef[]; flows: Flow[]};
-const allWidgets = (spec: PlannerSpec) => [...(spec.canvas.day ?? []).map(w => ({w, page: '오늘'})), ...tabsOf(spec).flatMap(t => (t.widgets ?? []).map(w => ({w, page: t.name})))];
+const allWidgets = (spec: PlannerSpec) => [...(spec.canvas.day ?? []).map(w => ({w, page: '오늘'})), ...tabsOf(spec).flatMap(t => (t.widgets ?? []).map(w => ({w, page: t.name}))), ...(spec.modes ?? []).flatMap(m => (m.widgets ?? []).map(w => ({w, page: m.name})))];
 
 export function StudioHost({spec, settings, p, nav, today, tab, saveSpec}: {spec: PlannerSpec; settings: Settings; p: Planner; nav: Nav; today: string; tab: TabSpec; saveSpec?: (change: (s: PlannerSpec) => PlannerSpec) => Promise<void>}) {
   const [open, setOpen] = useState<StudioOpen | null>(null), [draft, setDraft] = useState<Draft | null>(null);
@@ -42,7 +42,7 @@ export function StudioHost({spec, settings, p, nav, today, tab, saveSpec}: {spec
     await saveSpec(s => {
       const next: PlannerSpec = {...s, logic: {types: d.types, flows: d.flows}};
       const patch = (ws: Widget[]) => ws.map(w => w.id === d.widgetId ? {...w, title: d.title || undefined, options: d.options as unknown as Record<string, unknown>} : w);
-      if (d.widgetId) return {...next, canvas: {...next.canvas, day: next.canvas.day ? patch(next.canvas.day) : next.canvas.day}, tabs: next.tabs?.map(t => t.widgets ? {...t, widgets: patch(t.widgets)} : t)};
+      if (d.widgetId) return {...next, canvas: {...next.canvas, day: next.canvas.day ? patch(next.canvas.day) : next.canvas.day}, tabs: next.tabs?.map(t => t.widgets ? {...t, widgets: patch(t.widgets)} : t), modes: next.modes?.map(m => m.widgets ? {...m, widgets: patch(m.widgets)} : m)};
       const add = (ws: Widget[]): Widget[] => [...ws, {id: `made-${Date.now().toString(36)}`, type: 'made', x: 0, y: ws.reduce((m, w) => Math.max(m, w.y + w.h), 0), w: 24, h: 30, title: d.title || undefined, options: d.options as unknown as Record<string, unknown>}];
       if (tab.kind === 'page') return {...next, tabs: tabsOf(next).map(t => t.id === tab.id ? {...t, widgets: add(t.widgets ?? [])} : t)};
       return {...next, canvas: {day: add(next.canvas.day ?? []), mode: 'free'}};

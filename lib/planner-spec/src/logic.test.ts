@@ -53,3 +53,15 @@ test('link suggestions learn from earlier choices', () => {
   assert.equal(suggestLinks('언어이해 1세트', goals, [])[0]?.id, 'g1');
   assert.equal(suggestLinks('단어 암기', goals, [{title: '단어 암기 100개', to: 'g2'}])[0]?.id, 'g2');
 });
+
+test('modes: today\'s latest energy from any source picks the mode; the day\'s own choice wins', async () => {
+  const {activeMode, currentEnergy, Mode} = await import('./index.ts');
+  const day = '2026-11-12', rec = (kind: string, body: Record<string, unknown>) => ({id: `R${++n}`, kind, logicalDay: day, deletedAt: null, body}) as unknown as AnyRecord;
+  const records = [rec('condition', {at: '2026-11-12T01:00:00.000Z', energy: 7}), rec('session', {start: '2026-11-12T02:00:00.000Z', end: '2026-11-12T03:00:00.000Z', condition: 4})];
+  assert.deepEqual(currentEnergy(records, undefined, day), {score: 4, at: '2026-11-12T03:00:00.000Z'});
+  const modes = [Mode.parse({id: 'tight', name: '에너지 긴축모드', energyAtOrBelow: 4})];
+  assert.equal(activeMode(modes, 4, null)?.id, 'tight');
+  assert.equal(activeMode(modes, 5, null), null);
+  assert.equal(activeMode(modes, 4, 'off'), null);
+  assert.equal(activeMode(modes, 9, 'tight')?.id, 'tight');
+});

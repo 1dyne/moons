@@ -164,3 +164,10 @@ test('logic layer: Claude makes a widget from blocks, writes entries, and automa
   const spec = (await getSpec(owner))!.spec;
   assert.ok(spec.canvas.day!.some(w => w.type === 'made' && w.options.type === 'water'));
 });
+
+test('modes: an energy-driven mode can be set from chat and is listed back', async () => {
+  const r = await call('set_modes', {modes: [{name: '에너지 긴축모드', energyAtOrBelow: 4, taskStyle: 'did'}]});
+  assert.deepEqual((r.modes as {name: string; energyAtOrBelow: number}[]).map(m => [m.name, m.energyAtOrBelow]), [['에너지 긴축모드', 4]]);
+  const p = await call('get_planner', {});
+  assert.equal((p.modes as {taskStyle: string}[])[0]!.taskStyle, 'did');
+});

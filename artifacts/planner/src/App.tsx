@@ -219,6 +219,7 @@ function LoginGate({children}: {children: React.ReactNode}) {
     <Moon size={96} />
     <p className="brand big">lit</p>
     <button className="primary login-btn" onClick={() => clerk.openSignIn({forceRedirectUrl: location.href})}>로그인</button>
+    <button className="login-btn" onClick={() => clerk.openSignUp({forceRedirectUrl: location.href})}>처음이에요 · 가입하기</button>
     <button className="link small muted" onClick={() => { try { localStorage.setItem('lit.guest', '1'); } catch { /* */ } setGuest(true); }}>로그인 없이 이 기기에서만 쓰기</button>
   </div>;
   return <>{children}</>;

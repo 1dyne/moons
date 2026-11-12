@@ -10,6 +10,8 @@ export const FIELD_KINDS = [
   {id: 'number', name: '숫자'}, {id: 'score', name: '점수'}, {id: 'text', name: '짧은 글'}, {id: 'longtext', name: '긴 글'},
   {id: 'choice', name: '선택'}, {id: 'multi', name: '여러 개 선택'}, {id: 'check', name: '체크'}, {id: 'date', name: '날짜'},
   {id: 'time', name: '시각'}, {id: 'duration', name: '걸린 시간(분)'}, {id: 'link', name: '연결'},
+  // 상황: a condition the user picks from lit's list (오늘 순집중 8시간…), kept on the item (a wish's unlock condition).
+  {id: 'signal', name: '상황'},
 ] as const;
 export type FieldKind = (typeof FIELD_KINDS)[number]['id'];
 const id24 = z.string().regex(/^[a-z0-9]{1,24}$/);
@@ -58,7 +60,7 @@ export type SavedFilter = z.infer<typeof SavedFilter>;
 // ── Blocks: the pieces a widget is made of ───────────────────────────────────────────────────────
 export const BLOCK_GROUPS = {input: '입력', time: '시간', compute: '계산', view: '보기', deco: '꾸미기'} as const;
 export type BlockGroup = keyof typeof BLOCK_GROUPS;
-export const BLOCK_KINDS = ['button', 'toggle', 'counter', 'check', 'score', 'form', 'stopwatch', 'timer', 'stat', 'list', 'timeline', 'calendar', 'chart', 'gallery', 'table', 'grid10', 'breakdown', 'heading', 'note'] as const;
+export const BLOCK_KINDS = ['button', 'toggle', 'counter', 'check', 'score', 'form', 'stopwatch', 'timer', 'stat', 'list', 'timeline', 'calendar', 'chart', 'gallery', 'table', 'grid10', 'breakdown', 'cards', 'heading', 'note'] as const;
 export type BlockKind = (typeof BLOCK_KINDS)[number];
 export const LOGIC_BLOCKS: {kind: BlockKind; group: BlockGroup; name: string; desc: string}[] = [
   {kind: 'button', group: 'input', name: '버튼', desc: '누르면 그 시각이 한 줄 기록돼요 (기상, 약 먹음, 출근…)'},
@@ -78,11 +80,16 @@ export const LOGIC_BLOCKS: {kind: BlockKind; group: BlockGroup; name: string; de
   {kind: 'table', group: 'view', name: '표', desc: '속성을 열로'},
   {kind: 'grid10', group: 'view', name: '10분 타임테이블', desc: '하루를 10분 칸으로. 잰 시간이 저절로 칠해지고, 빈 칸을 눌러 직접 칠해요'},
   {kind: 'breakdown', group: 'compute', name: '나눠 보기', desc: '선택 속성별 합계 (과목별 시간, 분류별 지출) — 목록 또는 원형'},
+  {kind: 'cards', group: 'view', name: '열림 카드', desc: '항목마다 상황(조건)과 진행 막대. 조건이 되면 열리고, 열린 것은 사용하기 (소원, 보상)'},
   {kind: 'heading', group: 'deco', name: '제목·문구', desc: '블록 사이의 글'},
   {kind: 'note', group: 'deco', name: '안내 없는 빈 줄', desc: '간격'},
 ];
 export const blockInfo = (k: BlockKind) => LOGIC_BLOCKS.find(b => b.kind === k)!;
 import {AGGS, type Agg} from './agg.ts';
+import {Signal} from './signal-schema.ts';
+import {evalSignal, signalText} from './signals.ts';
+import {EFFECT_IDS, EFFECT_NAME} from './effects.ts';
+export {EFFECTS, EFFECT_IDS, type EffectId} from './effects.ts';
 export {AGGS, type Agg} from './agg.ts';
 export const Step = z.object({name: z.string().trim().min(1).max(20), min: z.number().min(0.1).max(600)});
 export const LogicBlock = z.object({
@@ -123,22 +130,48 @@ export const LogicBlock = z.object({
   style: z.string().max(20).default(''),
   icon: z.string().max(24).default(''),
   text: z.string().max(500).default(''),
+  // 열림 카드: the choice field that holds 잠김 / 열림 / 사용함 (its options, in that order).
+  stateField: z.string().max(24).default(''),
+  // A ready-made movement and when it plays.
+  anim: z.enum(['', ...EFFECT_IDS]).default(''),
+  animWhen: z.enum(['always', 'tap', 'appear']).default('tap'),
 });
 export type LogicBlock = z.infer<typeof LogicBlock>;
 export const newBlock = (kind: BlockKind, extra: Partial<LogicBlock> = {}): LogicBlock => LogicBlock.parse({id: newLogicId(), kind, ...extra});
 
 // ── Design of a made widget ──────────────────────────────────────────────────────────────────────
 export const Design = z.object({
-  mode: z.enum(['blocks', 'html']).default('blocks'),
+  // blocks: the parts as they are · html: an HTML/CSS template over them · code: the developer console (HTML/CSS/JS, sandboxed)
+  mode: z.enum(['blocks', 'html', 'code']).default('blocks'),
   // Tokens the blocks and any HTML template use as CSS variables (--accent, --bg…).
   accent: z.string().max(20).default(''), bg: z.string().max(20).default(''), ink: z.string().max(20).default(''),
   radius: z.number().min(0).max(40).nullable().default(null), density: z.enum(['compact', 'normal', 'airy']).default('normal'),
   align: z.enum(['left', 'center']).default('left'),
   html: z.string().max(20000).default(''),
   css: z.string().max(20000).default(''),
+  js: z.string().max(40000).default(''),
+  // A colour chart the parts take their colours from (빨강·파랑… presets) — '' = the page's own.
+  palette: z.string().max(20).default(''),
 });
 export type Design = z.infer<typeof Design>;
+// How the widget sits on the page: open as it is, or as a sticker that opens it (popup, sheet, page).
+export const Launch = z.object({
+  mode: z.enum(['off', 'sticker', 'shape', 'image']).default('off'),
+  icon: z.string().max(24).default('gift'),
+  shape: z.enum(['circle', 'square', 'star', 'heart', 'cloud', 'label']).default('circle'),
+  color: z.string().max(20).default('#8fb4f0'),
+  image: z.string().max(400000).default(''),
+  imageCut: z.enum(['as-is', 'circle', 'heart', 'star', 'cloud']).default('as-is'),
+  size: z.number().min(40).max(220).default(96),
+  rotate: z.number().min(-30).max(30).default(-6),
+  open: z.enum(['popup', 'sheet', 'page']).default('sheet'),
+  // The number on the sticker: none, every item, or items whose choice field has a value (열린 소원).
+  badge: z.object({field: z.string().max(24).default(''), value: z.string().max(30).default('')}).nullable().default(null),
+  label: z.string().max(30).default(''),
+});
+export type Launch = z.infer<typeof Launch>;
 export const MadeOptions = z.object({
+  launch: Launch.default({}),
   type: z.string().max(24).default(''),
   blocks: z.array(LogicBlock).max(30).default([]),
   design: Design.default({}),
@@ -161,21 +194,27 @@ export const Action = z.discriminatedUnion('do', [
   z.object({do: z.literal('notify'), text: z.string().trim().min(1).max(200)}),
   // Opens something on the screen: a receipt (today's or yesterday's) or the morning check.
   z.object({do: z.literal('open'), what: z.enum(['receipt-today', 'receipt-yesterday', 'checkin'])}),
+  // A movement: on the item that started this (its card), or on the whole widget.
+  z.object({do: z.literal('effect'), name: z.enum(EFFECT_IDS), target: z.enum(['item', 'widget']).default('item')}),
 ]);
 export const OPEN_WHAT = {'receipt-today': '오늘 영수증', 'receipt-yesterday': '어제 영수증', checkin: '아침 상태 묻기'} as const;
 // What starts a flow: a record written (any device, any widget; run on the server), or a moment on the screen —
 // a time of day, the first opening of a new day, or 일어났어요 (run by the planner that is open).
-export const TRIGGERS = {record: '기록이 생기거나 바뀌면', time: '매일 정한 시각에', dayStart: '하루를 시작할 때 (그날 처음 열면)', wake: '일어났어요를 누르면'} as const;
+export const TRIGGERS = {record: 'DB에 항목이 추가·수정되면', item: '항목마다, 그 항목의 상황이 되면', signal: '상황이 되면', time: '매일 정한 시각에', dayStart: '하루를 시작하면 (그날 처음 열 때)', wake: '일어났어요를 누르면'} as const;
 export type Action = z.infer<typeof Action>;
 export const Flow = z.object({
   id: z.string().regex(/^[a-z0-9]{1,12}$/),
   name: z.string().max(60).default(''),
   enabled: z.boolean().default(true),
-  on: z.object({kind: z.enum(['record', 'time', 'dayStart', 'wake']).default('record'), at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('22:00'),
+  on: z.object({kind: z.enum(['record', 'item', 'signal', 'time', 'dayStart', 'wake']).default('record'), at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('22:00'),
+    // item: the 상황 field on each item (a wish's condition) · signal: one 상황 for the whole planner
+    field: z.string().max(24).default(''), signal: Signal.nullable().default(null),
     type: z.string().max(24).default(''), event: z.enum(['created', 'changed', 'any']).default('created'), verbs: z.array(z.enum(VERBS)).max(8).default([])}),
   if: z.array(Cond).max(8).default([]),
   ifAgg: z.array(AggCond).max(4).default([]),
-  do: z.array(Action).min(1).max(6),
+  // 만약 [상황]이면 — conditions about the user's day (순집중, 할 일, 목표, 에너지…), checked before acting.
+  when: z.array(Signal).max(4).default([]),
+  do: z.array(Action).min(1).max(8),
 });
 export type Flow = z.infer<typeof Flow>;
 export const Logic = z.object({types: z.array(TypeDef).max(60).default([]), flows: z.array(Flow).max(100).default([])});
@@ -254,8 +293,8 @@ function value(x: z.infer<typeof ValueExpr>, src: Entry, nowIso: string) {
 }
 /** What the automations do after `changed` was written (created when createdAt equals updatedAt). Pure: the caller writes the result.
  *  Entries written by an automation carry its id in the chain, and a flow never runs twice in one chain (no loops). */
-export function runFlows(logic: Logic, records: AnyRecord[], changed: AnyRecord, opts: {day: string; now?: Date; chain?: string[]} = {day: ''}): {writes: FlowWrite[]; notices: string[]; opens: string[]} {
-  const out = {writes: [] as FlowWrite[], notices: [] as string[], opens: [] as string[]};
+export function runFlows(logic: Logic, records: AnyRecord[], changed: AnyRecord, opts: {day: string; now?: Date; chain?: string[]} = {day: ''}): FlowOut {
+  const out = emptyOut();
   if (changed.kind !== 'entry' || changed.deletedAt) return out;
   const e = changed as E, now = opts.now ?? new Date(), nowIso = now.toISOString(), chain = opts.chain ?? [];
   // Revisions count the whole account, so a new record is the one whose first write is its last.
@@ -273,9 +312,11 @@ export function runFlows(logic: Logic, records: AnyRecord[], changed: AnyRecord,
       return v !== null && cmp(v, c.op, c.value);
     });
     if (!aggOk) continue;
+    if (!f.when.every(sg => evalSignal(sg, records, logic, day, now).met)) continue;
     for (const a of f.do) {
       if (a.do === 'notify') out.notices.push(a.text);
       if (a.do === 'open') out.opens.push(a.what);
+      if (a.do === 'effect') out.effects.push({name: a.name, entry: a.target === 'item' ? e.id : null});
       if (a.do === 'create') {
         const fields = Object.fromEntries(Object.entries(a.fields).map(([k, x]) => [k, value(x, e.body, nowIso)]));
         out.writes.push({id: null, logicalDay: day, flow: f.id, body: {type: a.type, verb: a.verb, at: nowIso, end: null, value: null, fields: fields as Entry['fields'], links: a.link ? [{rel: 'after', to: e.id}] : []}});
@@ -288,17 +329,24 @@ export function runFlows(logic: Logic, records: AnyRecord[], changed: AnyRecord,
   return out;
 }
 
-/** A flow started by a moment (time of day, day start, wake) rather than a record: its 합계 조건 are checked,
- *  then notify / open / create / updateWhere run ('update' and copied values need a record, so they are skipped). */
-export function runMoment(f: Flow, logic: Logic, records: AnyRecord[], day: string, now = new Date()) {
-  const out = {writes: [] as FlowWrite[], notices: [] as string[], opens: [] as string[]};
-  if (!f.enabled || f.on.kind === 'record') return out;
-  const ok = f.ifAgg.every(c => { const v = aggregate(entriesOf(records, c.type).filter(x => inRange(x, periodRange(c.period, day, day))), c.agg, c.of, day, now.getTime()); return v !== null && cmp(v, c.op, c.value); });
+export type FlowOut = {writes: FlowWrite[]; notices: string[]; opens: string[]; effects: {name: string; entry: string | null}[]};
+const emptyOut = (): FlowOut => ({writes: [], notices: [], opens: [], effects: []});
+
+/** A flow started by a moment rather than a record written: a time of day, the day starting, 일어났어요, or a 상황
+ *  becoming true. Its 상황·합계 조건 are checked, then notify / open / effect / create / updateWhere run
+ *  ('update' and copied values need an item, so they are skipped). */
+export function runMoment(f: Flow, logic: Logic, records: AnyRecord[], day: string, now = new Date()): FlowOut {
+  const out = emptyOut();
+  if (!f.enabled || f.on.kind === 'record' || f.on.kind === 'item') return out;
+  if (f.on.kind === 'signal' && (!f.on.signal || !evalSignal(f.on.signal, records, logic, day, now).met)) return out;
+  const ok = f.ifAgg.every(c => { const v = aggregate(entriesOf(records, c.type).filter(x => inRange(x, periodRange(c.period, day, day))), c.agg, c.of, day, now.getTime()); return v !== null && cmp(v, c.op, c.value); })
+    && f.when.every(sg => evalSignal(sg, records, logic, day, now).met);
   if (!ok) return out;
   const set = (fields: Record<string, z.infer<typeof ValueExpr>>) => Object.fromEntries(Object.entries(fields).filter(([, x]) => !('copy' in x)).map(([k, x]) => [k, 'set' in x ? x.set : now.toISOString()])) as Entry['fields'];
   for (const a of f.do) {
     if (a.do === 'notify') out.notices.push(a.text);
     if (a.do === 'open') out.opens.push(a.what);
+    if (a.do === 'effect') out.effects.push({name: a.name, entry: null});
     if (a.do === 'create') out.writes.push({id: null, logicalDay: day, flow: f.id, body: {type: a.type, verb: a.verb, at: now.toISOString(), end: null, value: null, fields: set(a.fields), links: []}});
     if (a.do === 'updateWhere') for (const t of entriesOf(records, a.type).filter(x => matches(x.body, a.conds, now.getTime())).sort((x, y) => x.body.at.localeCompare(y.body.at)).slice(0, a.limit))
       out.writes.push({id: t.id, logicalDay: t.logicalDay, baseRevision: t.revision, flow: f.id, body: {...t.body, fields: {...t.body.fields, ...set(a.fields)}}});
@@ -306,16 +354,65 @@ export function runMoment(f: Flow, logic: Logic, records: AnyRecord[], day: stri
   return out;
 }
 
-/** "수면 기록이 생기면 · 걸린 시간 < 360이면 → 알림" — the sentence a flow reads as. */
-export function flowSentence(f: Flow, types: TypeDef[]) {
-  const t = (id: string) => types.find(x => x.id === id), fname = (type: string, id: string) => ({verb: '동작', value: '값', duration: '걸린 시간(분)', hour: '시작 시각(시)', link: '연결'} as Record<string, string>)[id] ?? t(type)?.fields.find(x => x.id === id)?.name ?? id;
-  const op = (o: string) => OPS.find(x => x.id === o)?.name ?? o;
-  const when = f.on.kind === 'time' ? `매일 ${f.on.at}에` : f.on.kind === 'dayStart' ? '하루를 시작할 때' : f.on.kind === 'wake' ? '일어났어요를 누르면'
-    : `${t(f.on.type)?.name ?? '?'} 기록이 ${{created: '생기면', changed: '바뀌면', any: '생기거나 바뀌면'}[f.on.event]}${f.on.verbs.length ? ` (${f.on.verbs.map(v => VERB_NAMES[v]).join('·')})` : ''}`;
-  const conds = [...f.if.map(c => `${fname(f.on.type, c.field)} ${op(c.op)}${['empty', 'filled'].includes(c.op) ? '' : ` ${c.value}`}`),
-    ...f.ifAgg.map(c => `${{today: '오늘', week: '이번 주', month: '이번 달'}[c.period]} ${t(c.type)?.name ?? '?'} ${AGGS.find(a => a.id === c.agg)?.name} ${op(c.op)} ${c.value}`)];
-  const acts = f.do.map(a => a.do === 'open' ? `${OPEN_WHAT[a.what]} 띄우기` : a.do === 'notify' ? `알림 "${a.text}"` : a.do === 'create' ? `${t(a.type)?.name ?? '?'}에 한 줄` : a.do === 'update' ? `이 기록의 ${Object.keys(a.fields).map(k => fname(f.on.type, k)).join('·')} 바꾸기` : `${t(a.type)?.name ?? '?'}의 ${Object.keys(a.fields).map(k => fname(a.type, k)).join('·')} 바꾸기`);
-  return `${when}${conds.length ? `, ${conds.join(' 그리고 ')}이면` : ''} → ${acts.join(', ')}`;
+/** 항목마다, 그 항목의 상황이 되면: every item of the DB that passes the 만약 conditions and whose own 상황 (kept in
+ *  on.field) is met. Each runs the actions as "그 항목" — so a wish that opened (상태 잠김 → 열림) no longer passes
+ *  "상태 = 잠김" and does not run twice. */
+export function runItems(f: Flow, logic: Logic, records: AnyRecord[], day: string, now = new Date()): FlowOut {
+  const out = emptyOut();
+  if (!f.enabled || f.on.kind !== 'item' || !f.on.field) return out;
+  if (!f.when.every(sg => evalSignal(sg, records, logic, day, now).met)) return out;
+  const nowIso = now.toISOString();
+  for (const e of entriesOf(records, f.on.type)) {
+    if (!matches(e.body, f.if, now.getTime())) continue;
+    const raw = e.body.fields[f.on.field];
+    const sg = typeof raw === 'string' ? Signal.safeParse(safeJson(raw)) : null;
+    if (!sg?.success || !evalSignal(sg.data, records, logic, day, now).met) continue;
+    for (const a of f.do) {
+      if (a.do === 'notify') out.notices.push(a.text.replace('{이름}', titleOfEntry(e.body, logic.types.find(t => t.id === e.body.type))));
+      if (a.do === 'effect') out.effects.push({name: a.name, entry: a.target === 'item' ? e.id : null});
+      if (a.do === 'open') out.opens.push(a.what);
+      if (a.do === 'update') out.writes.push({id: e.id, logicalDay: e.logicalDay, baseRevision: e.revision, flow: f.id, body: {...e.body, fields: {...e.body.fields, ...Object.fromEntries(Object.entries(a.fields).map(([k, x]) => [k, value(x, e.body, nowIso)]))} as Entry['fields']}});
+      if (a.do === 'create') out.writes.push({id: null, logicalDay: day, flow: f.id, body: {type: a.type, verb: a.verb, at: nowIso, end: null, value: null, fields: Object.fromEntries(Object.entries(a.fields).map(([k, x]) => [k, value(x, e.body, nowIso)])) as Entry['fields'], links: a.link ? [{rel: 'after', to: e.id}] : []}});
+    }
+  }
+  return out;
+}
+const safeJson = (s: string) => { try { return JSON.parse(s); } catch { return null; } };
+/** A readable name for an item: its first short-text property. */
+export const titleOfEntry = (e: Entry, t?: TypeDef) => String(t?.fields.filter(f => f.kind === 'text').map(f => e.fields[f.id]).find(Boolean) ?? t?.name ?? '');
+
+/** Korean particles that follow the last letter: 이/가, 을/를, 은/는, 으로/로. */
+export function josa(word: string, pair: '이가' | '을를' | '은는' | '으로') {
+  const last = word.trim().slice(-1), code = last.charCodeAt(0) - 0xac00;
+  const has = code >= 0 && code <= 11171 ? code % 28 : /[0-9]$/.test(last) ? ([1, 3, 6, 7, 8, 0].includes(Number(last)) ? 1 : 0) : 0;
+  if (pair === '으로') return word + (has && has !== 8 ? '으로' : '로');
+  return word + (has ? pair[0] : pair[1]);
+}
+/** The rule as one plain sentence: "소원의 항목마다, 그 항목의 조건이 되면 · 상태가 잠김이면 → 상태를 열림으로, 그 카드에 반짝 효과". */
+export function flowSentence(f: Flow, types: TypeDef[], goals: {id: string; title: string}[] = []) {
+  const t = (id: string) => types.find(x => x.id === id);
+  const fname = (type: string, id: string) => ({value: '값', duration: '걸린 시간(분)', hour: '시작 시각(시)', link: '연결'} as Record<string, string>)[id] ?? t(type)?.fields.find(x => x.id === id)?.name ?? id;
+  const cond = (type: string, c: Cond) => {
+    const n = fname(type, c.field);
+    if (c.op === 'empty') return `${josa(n, '이가')} 비어 있으면`;
+    if (c.op === 'filled') return `${josa(n, '이가')} 채워져 있으면`;
+    if (c.op === 'has') return `${n}에 ${c.value}${josa(String(c.value), '이가').slice(-1)} 들어 있으면`;
+    const v = String(c.value);
+    return `${josa(n, '이가')} ${v}${{eq: josa(v, '이가').slice(v.length) === '이' ? '이면' : '면', ne: josa(v, '이가').slice(v.length) + ' 아니면', lt: ' 미만이면', lte: ' 이하이면', gt: ' 초과이면', gte: ' 이상이면'}[c.op]}`;
+  };
+  const lg = {types} as unknown as Logic;
+  const when = f.on.kind === 'time' ? `매일 ${f.on.at}에` : f.on.kind === 'dayStart' ? '하루를 시작하면' : f.on.kind === 'wake' ? '일어났어요를 누르면'
+    : f.on.kind === 'signal' ? `${josa(f.on.signal ? signalText(f.on.signal, lg, goals) : '상황', '이가')} 되면`
+    : f.on.kind === 'item' ? `${t(f.on.type)?.name ?? 'DB'}의 항목마다, 그 항목의 ${josa(fname(f.on.type, f.on.field), '이가')} 되면`
+    : `${t(f.on.type)?.name ?? 'DB'}에 항목이 ${{created: '추가되면', changed: '수정되면', any: '추가·수정되면'}[f.on.event]}`;
+  const ifs = [...f.if.map(c => cond(f.on.type, c)), ...f.when.map(sg => `${signalText(sg, lg, goals)}이면`),
+    ...f.ifAgg.map(c => `${{today: '오늘', week: '이번 주', month: '이번 달'}[c.period]} ${t(c.type)?.name ?? 'DB'} ${josa(AGGS.find(a => a.id === c.agg)?.name ?? '', '이가')} ${c.value}${{lt: ' 미만', lte: ' 이하', gt: ' 초과', gte: ' 이상', eq: '', ne: ' 아님'}[c.op]}이면`)];
+  const val = (x: z.infer<typeof ValueExpr>) => 'set' in x ? String(x.set) : 'now' in x ? '지금 시각' : `그 항목의 ${x.copy}`;
+  const sets = (type: string, fields: Record<string, z.infer<typeof ValueExpr>>) => Object.entries(fields).map(([k, x]) => `${josa(fname(type, k), '을를')} ${josa(val(x), '으로')}`).join(', ');
+  const acts = f.do.map(a => a.do === 'open' ? `${OPEN_WHAT[a.what]} 열기` : a.do === 'notify' ? `알림 "${a.text}"` : a.do === 'effect' ? `${a.target === 'item' ? '그 카드에' : '위젯에'} ${EFFECT_NAME[a.name] ?? a.name} 효과`
+    : a.do === 'create' ? `${t(a.type)?.name ?? 'DB'}에 항목 추가` : a.do === 'update' ? (sets(f.on.type, a.fields) || '그 항목 고치기')
+    : `${t(a.type)?.name ?? 'DB'}에서 ${a.conds.map(c => cond(a.type, c).replace(/(이면|면)$/, '인')).join(' · ') || '항목'} ${a.limit}개의 ${sets(a.type, a.fields)}`);
+  return `${when}${ifs.length ? ` · ${ifs.join(' · ')}` : ''} → ${acts.join(', ')}`;
 }
 
 // ── Link suggestions: what a new entry probably belongs to ───────────────────────────────────────

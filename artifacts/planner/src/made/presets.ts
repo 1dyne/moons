@@ -105,14 +105,15 @@ const NEW: Preset[] = [
       options: opts(id, [B('form', {fields: ['item', 'won', 'cat']}), B('stat', {label: '이달 합계', agg: 'sum', of: 'won', period: 'month'}),
         B('list', {period: 'month', filters: [{id: 'f1', name: '식비', conds: [{field: 'cat', op: 'eq', value: '식비'}]}, {id: 'f2', name: '카페', conds: [{field: 'cat', op: 'eq', value: '카페'}]}]})]), flows: []};
   }},
-  {id: 'wish', group: 'new', name: '소원 해금', icon: 'gift', desc: '뽀모도로 8번이면 잠긴 소원 하나가 열려요', make: logic => {
-    const id = freeId(logic, 'wish'), pomo = logic.types.find(t => t.id === 'pomo');
-    const extra = pomo ? [] : [T({id: 'pomo', group: 'new', name: '뽀모도로', unit: '분', fields: [{id: 'step', name: '단계', kind: 'choice', options: ['집중', '휴식']}]})];
-    return {title: '소원', types: [T({id, name: '소원', icon: 'gift', fields: [{id: 'wish', group: 'new', name: '소원', kind: 'text'}, {id: 'state', name: '상태', kind: 'choice', options: ['잠김', '해금', '사용함']}]}), ...extra],
-      options: opts(id, [B('form', {fields: ['wish'], verb: 'wished'}), B('gallery', {period: 'all', filters: [{id: 'f1', name: '잠김', conds: [{field: 'state', op: 'ne', value: '해금'}]}, {id: 'f2', name: '해금', conds: [{field: 'state', op: 'eq', value: '해금'}]}]})]),
-      flows: [F({name: '소원 기본 상태', on: {type: id, event: 'created', verbs: []}, if: [{field: 'state', op: 'empty', value: ''}], do: [{do: 'update', fields: {state: {set: '잠김'}}}]}),
-        F({name: '뽀모도로로 해금', on: {type: 'pomo', event: 'created', verbs: []}, if: [{field: 'step', op: 'eq', value: '집중'}], ifAgg: [{type: 'pomo', agg: 'count', of: '', period: 'today', op: 'gte', value: 8}],
-          do: [{do: 'updateWhere', type: id, conds: [{field: 'state', op: 'eq', value: '잠김'}], fields: {state: {set: '해금'}}, limit: 1}, {do: 'notify', text: '소원 하나가 열렸어요'}]})]};
+  {id: 'wish', group: 'new', name: '소원 상자', icon: 'gift', desc: '소원마다 여는 조건(상황)을 정해 두면, 그 상황이 되는 순간 반짝 열려요. 스티커를 누르면 상자가 열려요', make: logic => {
+    const id = freeId(logic, 'wish');
+    return {title: '소원 상자', types: [T({id, name: '소원', icon: 'gift', fields: [{id: 'wish', name: '소원', kind: 'text'}, {id: 'cond', name: '여는 조건', kind: 'signal', desc: '이 상황이 되면 열려요'},
+      {id: 'state', name: '상태', kind: 'choice', options: ['잠김', '열림', '사용함']}]})],
+      options: MadeOptions.parse({type: id, blocks: [B('form', {fields: ['wish', 'cond'], label: '소원 넣기'}), B('cards', {field: 'cond', stateField: 'state', period: 'all'})],
+        launch: {mode: 'sticker', icon: 'gift', color: '#e8833a', size: 84, rotate: -6, open: 'sheet', badge: {field: 'state', value: '열림'}, label: '소원 상자'}}),
+      flows: [F({name: '새 소원은 잠김', on: {type: id, event: 'created'}, if: [{field: 'state', op: 'empty', value: ''}], do: [{do: 'update', fields: {state: {set: '잠김'}}}]}),
+        F({name: '조건이 되면 열기', on: {kind: 'item', type: id, field: 'cond'}, if: [{field: 'state', op: 'eq', value: '잠김'}],
+          do: [{do: 'update', fields: {state: {set: '열림'}}}, {do: 'effect', name: 'sparkle', target: 'item'}, {do: 'notify', text: '{이름} 열렸어요'}]})]};
   }},
 ];
 // The sleep preset is one of the earlier widgets too.

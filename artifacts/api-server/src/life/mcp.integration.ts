@@ -152,7 +152,7 @@ test('logic layer: Claude makes a widget from blocks, writes entries, and automa
   const made = await call('make_widget', {type: {id: 'water', name: '물', unit: '잔', desc: '한 잔 마실 때마다 한 줄', fields: [{id: 'note', name: '메모', kind: 'text'}]},
     blocks: [{kind: 'counter', target: 8}, {kind: 'stat', agg: 'sum', period: 'day'}],
     flows: [{on: {type: 'water'}, ifAgg: [{type: 'water', agg: 'count', period: 'today', op: 'gte', value: 2}], do: [{do: 'create', type: 'water', verb: 'noted', fields: {note: {set: '두 잔 달성'}}}]}]});
-  assert.match((made.flows as string[])[0]!, /물 기록이 생기면/);
+  assert.match((made.flows as string[])[0]!, /물에 항목이 추가되면/);
   const logic = await call('get_logic', {});
   assert.equal((logic.types as {id: string}[]).find(t => t.id === 'water')?.id, 'water');
   assert.ok((logic.blocks as {kind: string}[]).some(b => b.kind === 'timer'));
@@ -163,6 +163,25 @@ test('logic layer: Claude makes a widget from blocks, writes entries, and automa
   assert.ok(got.some(e => e.verb === 'noted' && e.fields['메모'] === '두 잔 달성'));
   const spec = (await getSpec(owner))!.spec;
   assert.ok(spec.canvas.day!.some(w => w.type === 'made' && w.options.type === 'water'));
+});
+
+test('wish box: an item rule opens a wish on the server when its own 상황 is met, and new rules replace the DB\'s old ones', async () => {
+  const {writeRecord} = await import('./store.ts');
+  const type = {id: 'wishx', name: '소원', fields: [{id: 'wish', name: '소원', kind: 'text'}, {id: 'cond', name: '여는 조건', kind: 'signal'}, {id: 'state', name: '상태', kind: 'choice', options: ['잠김', '열림', '사용함']}]};
+  const rules = [{on: {type: 'wishx'}, if: [{field: 'state', op: 'empty', value: ''}], do: [{do: 'update', fields: {state: {set: '잠김'}}}]},
+    {on: {kind: 'item', type: 'wishx', field: 'cond'}, if: [{field: 'state', op: 'eq', value: '잠김'}], do: [{do: 'update', fields: {state: {set: '열림'}}}, {do: 'effect', name: 'sparkle'}, {do: 'notify', text: '{이름} 열렸어요'}]}];
+  await call('make_widget', {type, blocks: [{kind: 'form', fields: ['wish', 'cond']}, {kind: 'cards', field: 'cond', stateField: 'state'}], flows: rules, launch: {mode: 'sticker', icon: 'gift', badge: {field: 'state', value: '열림'}}});
+  const again = await call('make_widget', {type, blocks: [{kind: 'cards', field: 'cond', stateField: 'state'}], flows: rules});
+  assert.equal((again.flows as string[]).filter(x => x.startsWith('소원')).length, 2, 'the same two rules, not four');
+  const at = '2026-11-12T01:00:00.000Z';
+  await call('add_entries', {type: '소원', entries: [{at, fields: {소원: '바다 보기', '여는 조건': JSON.stringify({kind: 'tasksDone', n: 1})}}]});
+  const state = async () => ((await call('get_entries', {type: 'wishx'})) as unknown as {fields: Record<string, unknown>}[])[0]!.fields['상태'];
+  assert.equal(await state(), '잠김');
+  const day = ((await allRecords(owner)).find(r => r.kind === 'entry' && (r.body as {type: string}).type === 'wishx')!).logicalDay!;
+  await writeRecord(owner, null, {kind: 'task', logicalDay: day, body: {title: '빨래', category: 'must', plan: {}, outcome: {result: 'done'}}});
+  assert.equal(await state(), '열림', 'a done task opened the wish');
+  const spec = (await getSpec(owner))!.spec;
+  assert.ok(spec.canvas.day!.some(w => w.type === 'made' && w.options.type === 'wishx' && (w.options as {launch: {mode: string}}).launch.mode === 'sticker'));
 });
 
 test('modes: an energy-driven mode can be set from chat and is listed back', async () => {

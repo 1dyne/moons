@@ -2,7 +2,7 @@ import {z} from 'zod';
 import './autolog.ts';
 import './flows.ts';
 import {LINK_RELS, VERBS, ALL_SCOPES, Availability, addDays, availableOn, buildNow, dayCondition, estimateAccuracy, goalPercent, goalSchedule, logicalDay, periodSummary, personaShare, weeklyFocus, type AnyRecord, type LifeRecord} from '@workspace/life-contract';
-import {Mode, AGGS, Action, BLOCK_KINDS, Design, FIELD_KINDS, Flow, LOGIC_BLOCKS, Logic, LogicBlock, MadeOptions, PERIODS, TypeDef, VERB_NAMES, durationMin, entriesOf, flowSentence, newLogicId, type Widget, BLOCKS, PERMISSIONS, isCode, BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
+import {Mode, AGGS, Action, EFFECTS, Launch, SIGNALS, BLOCK_KINDS, Design, FIELD_KINDS, Flow, LOGIC_BLOCKS, Logic, LogicBlock, MadeOptions, PERIODS, TypeDef, VERB_NAMES, durationMin, entriesOf, flowSentence, newLogicId, type Widget, BLOCKS, PERMISSIONS, isCode, BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 import {listLibrary, saveLibrary} from './library.ts';
 import {allRecords, deleteRecord, getSettings, getSpec, lastActivity, putAvailability, putSettings, saveSpec, writeRecord} from './store.ts';
@@ -42,7 +42,7 @@ const guide = () => `lit · 대화로 만들고 마음대로 꾸미는 나만의
 목표 이룸·포기: update_goal(status achieved: impact 1~10·nextOwner me/ai/outsource·note → 성취 기록지, ROI 자동 / dropped: note → 조정 기록지 / active: 다시 목표로). 페르소나: set_persona(월별 deployed/attached/standby·우선순위·roles). 할 일 속성 type "role"은 페르소나별 역할 중에서 고른다.
 기본 위젯: energy{warnAt(기본 6),startHour}(에너지 신호등: 7↑ 파랑, 4~6 호박, 3↓ 빨강) · mission{focusTarget(분, 기본 480), wishTable(표 id), statusColumn('상태'), lockedValue('잠김'), unlockValue('해금')} · persona-board{limit(기본 3)}. 하고 싶은 일(category want)은 회색이고 달성률에서 빠진다.
 버튼·칸 문구는 위젯 options.labels로 바꾼다: ${Object.entries(WIDGET_LABELS).map(([t, ls]) => `${t}{${ls!.map(l => l.key).join(',')}}`).join(' ')}. 예시 문장을 플레이스홀더로 넣지 않는다(개인 공간이다).
-만든 위젯(make_widget, 기본): lit은 로직 블록을 주고 사용자는 이름만 붙인다. type(기록 묶음: id·name·desc·fields, 속성마다 desc로 무엇을 적는 칸인지 한 줄) + blocks(button·toggle·counter·check·score·form·stopwatch·timer·stat·list·timeline·calendar·chart·gallery·table·heading) + flows(자동화: on{type,event,verbs} → if/ifAgg → do create|update|updateWhere|notify). 같은 type을 쓰는 위젯은 기록을 함께 본다(연결). 예: 기상/취침 = type 수면 + toggle(startLabel 취침, endLabel 기상), 뽀모도로 = timer steps [{name:"집중",min:25},{name:"휴식",min:5}] loop 4. 과목별 타이머 = toggle field(선택 속성 id) + ask(점수 속성 id), 루틴 = check field(선택 속성). 신호등 = stat show:"light" green/red msgs{점수:문구}. 10분 타임테이블 = grid10 scope "all"(잰 시간 전부가 저절로 칠해짐). 과목별 합계 = breakdown field agg of show "list"|"donut". type.focus=true면 순집중에 더한다. 기록은 add_entries/get_entries, 로직은 get_logic.
+만든 위젯(make_widget, 기본): 에디터는 화면(부품·꾸미기·스티커·개발자 콘솔) · 동작(규칙 카드) · 저장 칸(DB) 세 칸이다. type(DB: id·name·desc·fields, 속성마다 desc로 무엇을 적는 칸인지 한 줄; 속성 종류에 signal=상황) + blocks(부품: button·toggle·counter·check·score·form·stopwatch·timer·stat·list·timeline·calendar·chart·gallery·table·cards(열림 카드: field=상황 속성, stateField=상태 속성)·heading, 부품마다 anim(sparkle·bounce·shake·float·pulse·spin·pop·glow·confetti)+animWhen(tap|appear|always)) + flows(규칙: on{kind record|item|signal|time|dayStart|wake, type, event, field, signal} → if(속성 조건)/when(상황 목록) → do create|update|updateWhere|notify|open|effect). item 규칙은 항목마다 그 항목의 상황 속성이 되면 돈다(소원 상자: 잠김이고 조건 되면 열림+반짝+알림 "{이름} 열렸어요"). launch{mode off|sticker|shape|image, icon, color, size, rotate, open sheet|popup|page, badge{field,value}, label}이면 위젯이 스티커로 붙고 누르면 열린다. design.mode code면 html·css·js(개발자 콘솔, window.lit.made: data()·press(부품id)·add({속성 이름:값})·update(id,{…})·lit.on('change')). 같은 type을 쓰는 위젯은 기록을 함께 본다(연결). 예: 기상/취침 = type 수면 + toggle(startLabel 취침, endLabel 기상), 뽀모도로 = timer steps [{name:"집중",min:25},{name:"휴식",min:5}] loop 4. 과목별 타이머 = toggle field(선택 속성 id) + ask(점수 속성 id), 루틴 = check field(선택 속성). 신호등 = stat show:"light" green/red msgs{점수:문구}. 10분 타임테이블 = grid10 scope "all"(잰 시간 전부가 저절로 칠해짐). 과목별 합계 = breakdown field agg of show "list"|"donut". type.focus=true면 순집중에 더한다. 기록은 add_entries/get_entries, 로직은 get_logic.
 내 위젯(create_widget): lit에 없는 위젯은 설명서(manifest)로 만들어 사용자의 라이브러리에 넣는다. 블록 위젯이 기본이다: data.columns(열 이름·종류, key는 생략하면 이름) + view(블록 목록: ${BLOCKS.map(b => `${b.id}=${b.name}`).join(', ')}). 블록에서 열은 이름으로 부른다. 예: {"id":"leet-score","name":"기출 점수","permissions":["table:read","table:write"],"data":{"columns":[{"name":"회차","type":"text"},{"name":"점수","type":"number"}]},"view":[{"block":"form"},{"block":"chart","x":"회차","y":"점수"},{"block":"stat","value":"점수","agg":"avg","label":"평균"}]}.
 코드 위젯은 블록으로 안 될 때만: html·css·code(JavaScript, 전역 lit API: lit.table.rows/add/update/remove, lit.tasks.today, lit.goals.list, lit.condition.today, lit.context, lit.on('change')). 인터넷 접속은 막혀 있다. permissions: ${PERMISSIONS.map(p => p.id).join(', ')} 중 필요한 것만. 코드 위젯은 사용자가 lit에서 권한을 보고 승인해야 돈다고 알려 준다.
 기록 규칙: 하루는 logicalDay(YYYY-MM-DD, 사용자 하루 경계 기준). 목표는 연간 → 마일스톤(끝낼 달) → 할 일. 사용자가 말하지 않은 시험일·점수 등은 묻는다.`;
@@ -350,22 +350,25 @@ export function registerPlannerTools(tool: Tool) {
     });
 
   // ── Logic layer (docs/lit/BLOCKS.md): types of entries, made widgets, automations ─────────────────────────
-  tool('get_logic', '사용자가 만든 로직: 타입(기록 묶음: 이름·설명·속성), 자동화(문장으로), 쓸 수 있는 블록·동작 단어(verb)·속성 종류. 기록을 읽거나 위젯을 만들기 전에 먼저 읽는다.', {}, async (_a, owner) => {
+  tool('get_logic', '사용자가 만든 로직: DB(이름·설명·속성), 규칙(문장으로), 쓸 수 있는 부품·속성 종류·상황·움직임. 기록을 읽거나 위젯을 만들기 전에 먼저 읽는다.', {}, async (_a, owner) => {
     const logic = logicOf((await getSpec(owner))?.spec as PlannerSpec | undefined);
     return {types: logic.types, flows: logic.flows.map(f => ({id: f.id, enabled: f.enabled, sentence: flowSentence(f, logic.types), flow: f})),
-      verbs: VERB_NAMES, fieldKinds: FIELD_KINDS, blocks: LOGIC_BLOCKS.map(b => ({kind: b.kind, group: b.group, name: b.name, desc: b.desc})), aggregates: AGGS, periods: PERIODS};
+      verbs: VERB_NAMES, fieldKinds: FIELD_KINDS, blocks: LOGIC_BLOCKS.map(b => ({kind: b.kind, group: b.group, name: b.name, desc: b.desc})), aggregates: AGGS, periods: PERIODS,
+      signals: SIGNALS, effects: EFFECTS};
   });
 
-  tool('make_widget', '블록으로 위젯을 만든다(또는 고친다): type(기록 묶음, 새로 만들거나 기존 id) + blocks(get_logic의 블록) + flows(자동화: on→if→do) + design(blocks|html). 같은 type을 쓰는 위젯끼리는 기록을 함께 본다. 사용자에게 무엇을 만들지 말하고 OK를 받은 뒤에 부른다.',
-    {type: TypeDef, blocks: z.array(LogicBlock.partial({id: true}).extend({kind: z.enum(BLOCK_KINDS)})).min(1).max(30), flows: z.array(Flow.partial({id: true}).extend({do: z.array(Action).min(1).max(6)})).max(20).optional(),
-      design: Design.partial().optional(), title: z.string().max(40).optional(), widgetId: z.string().optional(), tab: z.string().optional()},
-    async ({type, blocks, flows, design, title, widgetId, tab}, owner) => {
+  tool('make_widget', '부품으로 위젯을 만든다(또는 widgetId로 고친다): type(DB, 새로 만들거나 기존 id) + blocks(부품) + flows(규칙: on→if/when→do; 주면 이 DB의 기존 규칙을 바꾼다) + design(blocks|html|code) + launch(스티커). 같은 DB를 쓰는 위젯끼리는 기록을 함께 본다. 사용자에게 무엇을 만들지 말하고 OK를 받은 뒤에 부른다.',
+    {type: TypeDef, blocks: z.array(LogicBlock.partial({id: true}).extend({kind: z.enum(BLOCK_KINDS)})).min(1).max(30), flows: z.array(Flow.partial({id: true}).extend({do: z.array(Action).min(1).max(8)})).max(20).optional(),
+      design: Design.partial().optional(), launch: Launch.partial().optional(), title: z.string().max(40).optional(), widgetId: z.string().optional(), tab: z.string().optional()},
+    async ({type, blocks, flows, design, launch, title, widgetId, tab}, owner) => {
       const current = (await getSpec(owner))?.spec as PlannerSpec | undefined;
       if (!current) throw new WorkspaceError(400, '먼저 build_planner로 플래너를 만든다.');
       const logic = logicOf(current);
       const types = [...logic.types.filter(t => t.id !== type.id), type];
-      const fl = [...logic.flows, ...(flows ?? []).map(f => Flow.parse({...f, id: f.id ?? newLogicId()}))];
-      const options = MadeOptions.parse({type: type.id, blocks: blocks.map(b => LogicBlock.parse({...b, id: b.id ?? newLogicId()})), design: design ?? {}});
+      // New rules for this DB replace its old ones (as the editor's 동작 tab does); other DBs' rules stay.
+      const mine = (f: Flow) => f.on.type === type.id || f.do.some(a => 'type' in a && a.type === type.id);
+      const fl = [...(flows ? logic.flows.filter(f => !mine(f)) : logic.flows), ...(flows ?? []).map(f => Flow.parse({...f, id: f.id ?? newLogicId()}))];
+      const options = MadeOptions.parse({type: type.id, blocks: blocks.map(b => LogicBlock.parse({...b, id: b.id ?? newLogicId()})), design: design ?? {}, launch: launch ?? {}});
       const place = (ws: Widget[]) => {
         if (widgetId && ws.some(w => w.id === widgetId)) return ws.map(w => w.id === widgetId ? {...w, title: title ?? w.title, options} : w);
         const bottom = ws.reduce((m, w) => Math.max(m, w.y + w.h), 0);
@@ -378,7 +381,7 @@ export function registerPlannerTools(tool: Tool) {
       return {version: saved.version, type: type.id, flows: fl.map(f => flowSentence(f, types))};
     });
 
-  tool('add_entries', '타입(기록 묶음)에 기록을 넣는다. fields는 속성 이름으로. at/end는 ISO 시각(없으면 지금), verb는 동작 단어(get_logic). 자동화가 있으면 서버에서 이어서 돈다.',
+  tool('add_entries', 'DB에 항목을 넣는다. fields는 속성 이름으로. at/end는 ISO 시각(없으면 지금), verb는 동작 단어(get_logic). 자동화가 있으면 서버에서 이어서 돈다.',
     {type: z.string(), entries: z.array(z.object({verb: z.enum(VERBS).optional(), at: z.string().optional(), end: z.string().nullable().optional(), value: z.object({amount: z.number(), unit: z.string().max(12)}).nullable().optional(), fields: z.record(z.unknown()).optional(), links: z.array(z.object({rel: z.enum(LINK_RELS), to: z.string()})).optional()})).min(1).max(100)},
     async ({type, entries}, owner) => {
       const logic = logicOf((await getSpec(owner))?.spec as PlannerSpec | undefined), t = logic.types.find(x => x.id === type || x.name === type);

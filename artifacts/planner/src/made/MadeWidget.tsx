@@ -6,6 +6,7 @@ import {Logic, MadeOptions, aggregate, timeStretches, type Stretch, checkTemplat
 import {ofKind} from '../data.ts';
 import type {Ctx} from '../screens/day.ts';
 import {Icon, iconSvg} from './icons.tsx';
+import {Animated, CardsBlock, CodeDesign, SignalPicker, Sticker, playEffect, useEffectsOn} from './parts.tsx';
 
 // A made widget: blocks over one type of entries (docs/lit/BLOCKS.md §3). The same component draws the live widget,
 // the preview in the studio, and the blocks inside an HTML design.
@@ -26,13 +27,29 @@ export function MadeWidget({w, ctx, today, logic: override, options}: {w: {id: s
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') { try { new Notification('lit', {body: s}); } catch { /* not here */ } }
   };
   const m: M = {ctx: opts.followDay ? ctx : {...ctx, day: today}, logic, type, wid: w.id, opts, today, notify};
+  const box = useRef<HTMLDivElement>(null);
+  useEffectsOn(box);
   if (!type) return <p className="muted small made-empty">{ctx.saveSpec ? '두 번 눌러 이 위젯의 기록 묶음을 정해요' : '–'}</p>;
   const d = opts.design;
   const style = {...(d.accent ? {'--accent': d.accent, '--btn': d.accent} : {}), ...(d.bg ? {background: d.bg, '--wg-bg': d.bg} : {}), ...(d.ink ? {color: d.ink, '--ink': d.ink} : {}), ...(d.radius !== null ? {'--radius': `${d.radius}px`} : {})} as React.CSSProperties;
-  return <div className={`made density-${d.density} align-${d.align}`} style={style} data-made={w.id}>
-    {d.mode === 'html' && d.html.trim() ? <HtmlDesign m={m} /> : opts.blocks.map(b => <BlockView key={b.id} b={b} m={m} />)}
+  const body = <div ref={box} className={`made density-${d.density} align-${d.align} pal-${d.palette || 'own'}`} style={style} data-made={w.id}>
+    {d.mode === 'html' && d.html.trim() ? <HtmlDesign m={m} /> : d.mode === 'code' ? <CodeConsole m={m} /> : opts.blocks.map(b => <Animated key={b.id} b={b}><BlockView b={b} m={m} /></Animated>)}
     {notices.length > 0 && <div className="made-notice" role="status">{notices.map((n, i) => <p key={i}>{n}</p>)}</div>}
   </div>;
+  // As a sticker: only the sticker sits on the page; the widget opens from it. The badge counts items (열린 소원…).
+  if (opts.launch.mode !== 'off' && !options) {
+    const b = opts.launch.badge, all = entries(m), count = b ? all.filter(e => !b.field || String(e.body.fields[b.field] ?? '') === b.value).length : 0;
+    return <Sticker launch={opts.launch} count={count} label={(w as {title?: string}).title || type.name}>{body}</Sticker>;
+  }
+  return body;
+}
+
+/** 개발자 콘솔 over this widget's own data and parts. */
+function CodeConsole({m}: {m: M}) {
+  const byName = (f: Record<string, unknown>) => Object.fromEntries(Object.entries(f).map(([k, v]) => [m.type?.fields.find(x => x.name === k || x.id === k)?.id ?? k, v])) as Entry['fields'];
+  return <CodeDesign m={m} data={() => designData(m)} press={id => { const b = m.opts.blocks.find(x => x.id === id); if (b) void press(m, b); }}
+    add={f => write(m, null, {verb: 'noted', at: atFor(m), fields: byName(f)})}
+    update={(id, f) => { const e = entries(m).find(x => x.id === id); return e ? write(m, id, {fields: {...e.body.fields, ...byName(f)}}, undefined, e) : Promise.resolve(null); }} />;
 }
 
 // ── Writing entries (and the automations that follow) ────────────────────────────────────────────
@@ -44,6 +61,7 @@ async function write(m: M, id: string | null, body: Partial<Entry>, ext?: Record
   if (rec) {
     const {notices, writes, opens} = runFlows(m.logic, [...m.ctx.p.records.filter(r => r.id !== rec.id), rec], rec, {day: rec.logicalDay ?? m.ctx.day});
     notices.forEach(m.notify);
+    for (const fx of runFlows(m.logic, [...m.ctx.p.records.filter(r => r.id !== rec.id), rec], rec, {day: rec.logicalDay ?? m.ctx.day}).effects) playEffect(fx.name, fx.entry);
     if (opens.length) dispatchEvent(new CustomEvent('lit:open', {detail: {what: opens.at(-1)}}));
     if (writes.length) setTimeout(() => void m.ctx.p.refresh(), 500);
   }
@@ -97,6 +115,8 @@ function BlockView({b, m}: {b: LogicBlock; m: M}) {
     case 'calendar': return <div className="mb mb-calendar">{head}<CalendarBlock b={b} m={m} /></div>;
     case 'chart': return <div className="mb mb-chart">{head}<ChartBlock b={b} m={m} /></div>;
     case 'grid10': return <Grid10Block b={b} m={m} />;
+    case 'cards': return <div className="mb mb-cards">{head}<CardsBlock b={b} m={m} entries={ofPeriod(m, b)}
+      write={(id, fields) => { const e = entries(m).find(x => x.id === id); if (e) void write(m, id, {fields: {...e.body.fields, ...fields} as Entry['fields']}, undefined, e); }} remove={id => void m.ctx.p.remove(id)} /></div>;
     case 'breakdown': return <BreakdownBlock b={b} m={m} />;
     case 'heading': return <p className={`mb mb-heading ${b.style || 'm'}`}>{b.icon && <Icon name={b.icon} size={18} />}{b.text}</p>;
     case 'note': return <div className="mb mb-space" aria-hidden="true" />;
@@ -208,6 +228,7 @@ function FieldInput({f, m, value, onChange, title}: {f: FieldDef; m: M; value: u
     case 'check': return <input type="checkbox" checked={value === true} onChange={e => onChange(e.target.checked)} />;
     case 'date': return <input type="date" value={s} onChange={e => onChange(e.target.value)} />;
     case 'time': return <input type="time" className="time-in" value={s} onChange={e => onChange(e.target.value)} />;
+    case 'signal': return <SignalPicker value={s} onChange={onChange} m={m} />;
     case 'link': {
       const cands = linkCandidates(m.ctx.p.records, f.to, m.logic);
       const history = entries(m).filter(e => typeof e.body.fields[f.id] === 'string').map(e => ({title: titleOf(e.body, m.type), to: String(e.body.fields[f.id])}));
@@ -430,7 +451,7 @@ function ChartBlock({b, m}: {b: LogicBlock; m: M}) {
 // ── HTML design: the user's template over the widget's data; blocks still work inside it ─────────────
 export function designData(m: M) {
   const all = entries(m), day = all.filter(e => e.logicalDay === m.ctx.day).sort((a, c) => a.body.at.localeCompare(c.body.at));
-  const row = (e: E) => ({time: clock(e.body.at), end: e.body.end ? clock(e.body.end) : '', minutes: e.body.end ? Math.round(durationMin(e.body)) : '', duration: e.body.end ? hm(durationMin(e.body)) : '',
+  const row = (e: E) => ({id: e.id, time: clock(e.body.at), end: e.body.end ? clock(e.body.end) : '', minutes: e.body.end ? Math.round(durationMin(e.body)) : '', duration: e.body.end ? hm(durationMin(e.body)) : '',
     value: e.body.value?.amount ?? '', unit: e.body.value?.unit ?? '', day: e.logicalDay ?? '', verb: e.body.verb,
     ...Object.fromEntries((m.type?.fields ?? []).map(f => [f.name, showValue(m, f, e.body.fields[f.id])]))});
   const blocks: Record<string, unknown> = {};

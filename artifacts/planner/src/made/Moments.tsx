@@ -2,7 +2,8 @@ import {useBack} from '../back.ts';
 import {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {addDays, routineRate, type Settings} from '@workspace/life-contract';
-import {Logic, runMoment, type PlannerSpec} from '@workspace/planner-spec';
+import {Logic, runItems, runMoment, titleOfEntry, type FlowOut, type PlannerSpec} from '@workspace/planner-spec';
+import {playEffect} from './parts.tsx';
 import {ofKind, type Planner} from '../data.ts';
 import {Receipt} from '../screens/Focus.tsx';
 import {WakeAsk} from '../screens/CheckIn.tsx';
@@ -16,16 +17,56 @@ const firedKey = (id: string) => `lit.flow.${id}`;
 const fired = (id: string) => { try { return localStorage.getItem(firedKey(id)); } catch { return null; } };
 const mark = (id: string, day: string) => { try { localStorage.setItem(firedKey(id), day); } catch { /* */ } };
 
+const seenItems = (): string[] => { try { return JSON.parse(sessionStorage.getItem('lit.items.seen') ?? '[]'); } catch { return []; } };
+const saveSeen = (v: string[]) => { try { sessionStorage.setItem('lit.items.seen', JSON.stringify(v.slice(-50))); } catch { /* */ } };
+
 export function MomentHost({spec, p, today, settings}: {spec: PlannerSpec; p: Planner; today: string; settings: Settings}) {
   const [pop, setPop] = useState<{what: OpenWhat; day: string} | null>(null), [notes, setNotes] = useState<string[]>([]);
   const live = useRef({spec, p, today}); live.current = {spec, p, today};
   useBack(!!pop, () => setPop(null));
+  const applyRef = useRef<(o: FlowOut, day: string) => void>(() => {}), runRef = useRef<(k: 'signal') => void>(() => {}), busy = useRef(new Set<string>());
+  // 항목마다 rules (a wish opens when its own 상황 is met) and 상황 rules look again whenever the records change.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const {spec: sp, p: pl, today: day} = live.current, logic = Logic.safeParse(sp.logic ?? {}).data;
+      if (!logic) return;
+      const now = new Date();
+      for (const f of logic.flows) {
+        if (!f.enabled || f.on.kind !== 'item') continue;
+        const out = runItems(f, logic, pl.records, day, now);
+        // A write still on its way would match again; wait for it rather than open (and announce) twice.
+        if (!out.writes.length || out.writes.some(w => w.id && busy.current.has(w.id))) continue;
+        for (const w of out.writes) if (w.id) { const k = w.id; busy.current.add(k); setTimeout(() => busy.current.delete(k), 5000); }
+        applyRef.current(out, day);
+      }
+      // Opened by the server (after a write from another device or from Claude): still show it, once, if it is fresh.
+      const seen = seenItems();
+      for (const f of logic.flows) {
+        if (!f.enabled || f.on.kind !== 'item') continue;
+        for (const r of pl.records) {
+          if (r.kind !== 'entry' || r.deletedAt || r.source?.ref !== `flow:${f.id}` || now.getTime() - Date.parse(r.updatedAt) > 120_000) continue;
+          const key = r.id;
+          if (seen.includes(key)) continue;
+          // Only while it still holds what the rule set (a wish used since then is not announced again).
+          const sets = f.do.flatMap(a => a.do === 'update' ? Object.entries(a.fields).flatMap(([k, x]) => 'set' in x ? [[k, x.set] as const] : []) : []);
+          if (!sets.every(([k, v]) => (r.body as {fields: Record<string, unknown>}).fields[k] === v)) continue;
+          seen.push(key);
+          const name = titleOfEntry(r.body, logic.types.find(t => t.id === r.body.type));
+          applyRef.current({writes: [], opens: [], notices: f.do.flatMap(a => a.do === 'notify' ? [a.text.replace('{이름}', name)] : []),
+            effects: f.do.flatMap(a => a.do === 'effect' ? [{name: a.name, entry: a.target === 'item' ? r.id : null}] : [])}, day);
+        }
+      }
+      saveSeen(seen);
+      runRef.current('signal');
+    }, 400);
+    return () => clearTimeout(id);
+  }, [p.records, spec.logic]);
   useEffect(() => {
     const open = (e: Event) => { const d = (e as CustomEvent<{what: OpenWhat; day?: string}>).detail, t = live.current.today; setPop({what: d.what, day: d.day ?? (d.what === 'receipt-yesterday' ? addDays(t, -1) : t)}); };
     addEventListener('lit:open', open); return () => removeEventListener('lit:open', open);
   }, []);
   useEffect(() => {
-    const run = (kind: 'time' | 'dayStart' | 'wake') => {
+    const run = (kind: 'time' | 'dayStart' | 'wake' | 'signal') => {
       const {spec: sp, p: pl, today: day} = live.current, logic = Logic.safeParse(sp.logic ?? {}).data;
       if (!logic) return;
       const now = new Date(), hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -34,17 +75,26 @@ export function MomentHost({spec, p, today, settings}: {spec: PlannerSpec; p: Pl
         // Once a day each (a time flow also runs when the planner is first opened after its time).
         if (kind !== 'wake' && fired(f.id) === day) continue;
         if (kind === 'time' && hhmm < f.on.at) continue;
-        if (kind !== 'wake') mark(f.id, day);
         const out = runMoment(f, logic, pl.records, day, now);
-        for (const w of out.writes) void pl.write(w.id, {kind: 'entry', logicalDay: w.logicalDay, body: w.body, ...(w.baseRevision !== undefined ? {baseRevision: w.baseRevision} : {})});
-        if (out.notices.length) { setNotes(n => [...n, ...out.notices]); setTimeout(() => setNotes(n => n.slice(out.notices.length)), 6000); }
-        const o = out.opens.at(-1) as OpenWhat | undefined;
-        if (o) setPop({what: o, day: o === 'receipt-yesterday' ? addDays(day, -1) : day});
+        // A 상황 rule waits until its situation is met, then counts as done for the day.
+        if (kind === 'signal' && !out.writes.length && !out.notices.length && !out.opens.length && !out.effects.length) continue;
+        if (kind !== 'wake') mark(f.id, day);
+        apply(out, day);
       }
     };
-    run('dayStart'); run('time');
-    const t = setInterval(() => run('time'), 30_000);
-    const vis = () => { if (document.visibilityState === 'visible') { run('dayStart'); run('time'); } };
+    const apply = (out: FlowOut, day: string) => {
+      const pl = live.current.p;
+      for (const w of out.writes) void pl.write(w.id, {kind: 'entry', logicalDay: w.logicalDay, body: w.body, ...(w.baseRevision !== undefined ? {baseRevision: w.baseRevision} : {})}, {quiet: true});
+      if (out.notices.length) { setNotes(n => [...n, ...out.notices]); setTimeout(() => setNotes(n => n.slice(out.notices.length)), 6000); }
+      // Effects play once the card has re-rendered with its new state.
+      if (out.effects.length) setTimeout(() => { for (const fx of out.effects) playEffect(fx.name, fx.entry); }, 350);
+      const o = out.opens.at(-1) as OpenWhat | undefined;
+      if (o) setPop({what: o, day: o === 'receipt-yesterday' ? addDays(day, -1) : day});
+    };
+    applyRef.current = apply; runRef.current = run;
+    run('dayStart'); run('time'); run('signal');
+    const t = setInterval(() => { run('time'); run('signal'); }, 30_000);
+    const vis = () => { if (document.visibilityState === 'visible') { run('dayStart'); run('time'); run('signal'); } };
     const wake = () => run('wake');
     document.addEventListener('visibilitychange', vis); addEventListener('lit:wake', wake);
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis); removeEventListener('lit:wake', wake); };

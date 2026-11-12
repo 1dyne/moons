@@ -17,6 +17,11 @@ export const METHODS = {
   'tasks.today': 'tasks:read',
   'goals.list': 'goals:read',
   'condition.today': 'condition:read',
+  // A made widget's own developer console (the user's code for their own widget): its own data and parts only.
+  'made.data': null,
+  'made.press': null,
+  'made.add': null,
+  'made.update': null,
 } as const satisfies Record<string, WidgetPermission | null>;
 export type Method = keyof typeof METHODS;
 

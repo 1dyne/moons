@@ -162,7 +162,7 @@ export function DayCanvas({spec, settings, p, today, day, nav, edit, page, saveS
       const title = w.title ?? widgetInfo(w.type).label, sel = edit?.selected === w.id;
       const decor = isDecor(w.type), rot = Number(w.options.rotate ?? 0), dx = Number(w.options.dx ?? 0), dy = Number(w.options.dy ?? 0);
       const toggle = !decor && w.options.toggle === true, isFolded = toggle && fold.has(w.id);
-      return <section key={w.id} data-id={w.id} data-toggle={toggle ? '1' : undefined} className={`wg ${decor ? 'wg-decor' : `wg-${w.style ?? spec.skin?.card ?? 'line'}`} wg-type-${w.type} ${sel ? 'selected' : ''} ${drag?.id === w.id ? 'dragging' : ''} ${isFolded ? 'folded' : ''}`}
+      return <section key={w.id} data-id={w.id} data-toggle={toggle ? '1' : undefined} className={`wg ${decor ? 'wg-decor' : `wg-${w.style ?? spec.skin?.card ?? 'line'}`} wg-type-${w.type} ${isSticker(w) ? 'wg-stk' : ''} ${sel ? 'selected' : ''} ${drag?.id === w.id ? 'dragging' : ''} ${isFolded ? 'folded' : ''}`}
         style={{gridColumn: `${w.x + 1} / span ${w.w}`, gridRow: `${w.y + 1} / span ${w.h}`, order: w.y * M.cols + w.x, ...(w.color ? {'--accent': w.color} : {}), ...(w.options.buttonColor ? {'--btn': String(w.options.buttonColor)} : {}),
           ...(w.font ? {fontFamily: `var(--wfont-${w.id})`} : {}), ...(w.background ? {background: w.background, '--wg-bg': w.background} : {}), ...(w.ink ? {color: w.ink, '--ink': w.ink, '--wg-ink': w.ink} : {}),
           ...(decor || rot ? {transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)`} : {}), ...(decor || mode === 'free' ? {zIndex: (decor ? 20 : 1) + Number(w.options.layer ?? 0)} : {})} as React.CSSProperties}
@@ -197,13 +197,16 @@ function PhoneHead({w, ctx, title, open}: {w: Widget; ctx: Ctx; title: string; o
   return <div className="m-headrow"><button className="m-head" onClick={() => setFold(w.id, !open)} aria-expanded={open}><span>{title}</span><i aria-hidden="true">{open ? '−' : '+'}</i></button>{s.gear}{s.panel}</div>;
 }
 
+/** A made widget shown as a sticker sits on the page bare: no card, no title (⚙ stays, small). */
+const isSticker = (w: Widget) => w.type === 'made' && (w.options.launch as {mode?: string} | undefined)?.mode !== undefined && (w.options.launch as {mode: string}).mode !== 'off';
+
 /** Phone: one column in the user's mobile order; each card folds by tapping its title. */
 function PhoneStack({widgets, ctx, spec, settings, today, endHour}: {widgets: Widget[]; ctx: Ctx; spec: PlannerSpec; settings: Settings; today: string; endHour: number}) {
   const folds = useFold();
   const list = phoneOrder(widgets.filter(w => !hiddenOnPhone(w)));
   return <div className="m-stack">{list.map(w => {
-    const decor = isDecor(w.type), title = w.title || widgetInfo(w.type).label, open = decor || (folds[w.id] ?? openByDefault(w));
-    return <section key={w.id} className={`m-card wg-type-${w.type} ${open ? 'open' : ''} ${decor ? 'm-decor' : ''}`}
+    const stk = isSticker(w), decor = isDecor(w.type), title = w.title || widgetInfo(w.type).label, open = decor || stk || (folds[w.id] ?? openByDefault(w));
+    return <section key={w.id} className={`m-card wg-type-${w.type} ${open ? 'open' : ''} ${decor ? 'm-decor' : ''} ${stk ? 'm-stk' : ''}`}
       style={{...(w.color ? {'--accent': w.color} : {}), ...(w.options.buttonColor ? {'--btn': String(w.options.buttonColor)} : {}), ...(w.background ? {background: w.background, '--wg-bg': w.background} : {}), ...(w.ink ? {color: w.ink, '--ink': w.ink, '--wg-ink': w.ink} : {})} as React.CSSProperties}>
       {!decor && <PhoneHead w={w} ctx={ctx} title={title} open={open} />}
       {open && <div className="m-body" onPointerUp={e => tapOpen(w.id, e)}><LabelProvider value={(w.options.labels as Record<string, unknown> | undefined) ?? {}}><WidgetBody w={w} ctx={ctx} spec={spec} settings={settings} today={today} endHour={endHour} /></LabelProvider></div>}

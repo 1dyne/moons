@@ -36,7 +36,7 @@ test('automations: when → if → do, with no loops', () => {
   assert.equal(two.writes.find(w => w.id === wish.id)?.body.fields.st, '해금');
   const again = runFlows(logic, [wish, p1, p2] as unknown as AnyRecord[], p2 as unknown as AnyRecord, {day: '2026-11-11', chain: ['f2']});
   assert.ok(!again.writes.some(w => w.flow === 'f2'), 'a flow never runs twice in one chain');
-  assert.match(flowSentence(logic.flows[0]!, logic.types), /뽀모도로 기록이 생기면, 오늘 뽀모도로 개수 ≥ 2이면 → 소원의 상태 바꾸기/);
+  assert.equal(flowSentence(logic.flows[0]!, logic.types), '뽀모도로에 항목이 추가되면 · 오늘 뽀모도로 개수가 2 이상이면 → 소원에서 상태가 잠김인 1개의 상태를 해금으로, 알림 "소원이 열렸어요"');
   assert.equal(entriesOf([wish, p1] as unknown as AnyRecord[], 'wish').length, 1);
 });
 
@@ -70,9 +70,29 @@ test('moment flows: a time-of-day flow opens yesterday\'s receipt; record flows 
   const {runMoment, runFlows, flowSentence} = await import('./index.ts');
   const f = Flow.parse({id: 'r1', on: {kind: 'dayStart'}, do: [{do: 'open', what: 'receipt-yesterday'}]});
   assert.deepEqual(runMoment(f, Logic.parse({}), [], '2026-11-12').opens, ['receipt-yesterday']);
-  assert.equal(flowSentence(f, []), '하루를 시작할 때 → 어제 영수증 띄우기');
+  assert.equal(flowSentence(f, []), '하루를 시작하면 → 어제 영수증 열기');
   const t = Flow.parse({id: 't1', on: {kind: 'time', at: '22:00'}, do: [{do: 'open', what: 'receipt-today'}]});
-  assert.equal(flowSentence(t, []), '매일 22:00에 → 오늘 영수증 띄우기');
+  assert.equal(flowSentence(t, []), '매일 22:00에 → 오늘 영수증 열기');
   const e = entry('x', '2026-11-12');
   assert.equal(runFlows(Logic.parse({flows: [f, t]}), [e] as unknown as AnyRecord[], e as unknown as AnyRecord, {day: '2026-11-12'}).opens.length, 0);
+});
+
+test('wishes: each item opens when its own 상황 is met, once; 상황 conditions gate a rule', async () => {
+  const {runItems, flowSentence, josa} = await import('./index.ts');
+  const day = '2026-11-12', mk = (kind: string, body: Record<string, unknown>, ld = day) => ({id: `W${++n}`, kind, revision: 1, logicalDay: ld, deletedAt: null, createdAt: '', updatedAt: '', body}) as unknown as AnyRecord;
+  const logic = Logic.parse({types: [{id: 'wish', name: '소원', fields: [{id: 'wish', name: '소원', kind: 'text'}, {id: 'cond', name: '조건', kind: 'signal'}, {id: 'state', name: '상태', kind: 'choice', options: ['잠김', '열림', '사용함']}]}]});
+  const f = Flow.parse({id: 'open', on: {kind: 'item', type: 'wish', field: 'cond'}, if: [{field: 'state', op: 'eq', value: '잠김'}],
+    do: [{do: 'update', fields: {state: {set: '열림'}}}, {do: 'effect', name: 'sparkle'}, {do: 'notify', text: '{이름} 열렸어요'}]});
+  const sea = mk('entry', {type: 'wish', verb: 'wished', at: `${day}T00:00:00.000Z`, end: null, value: null, links: [], fields: {wish: '바다', cond: JSON.stringify({kind: 'tasksAll'}), state: '잠김'}});
+  const kb = mk('entry', {type: 'wish', verb: 'wished', at: `${day}T00:00:00.000Z`, end: null, value: null, links: [], fields: {wish: '키보드', cond: JSON.stringify({kind: 'focus', n: 8}), state: '잠김'}});
+  const task = (r: string) => mk('task', {title: 't', category: 'must', plan: {}, outcome: {result: r}});
+  assert.equal(runItems(f, logic, [sea, kb, task('unknown')], day).writes.length, 0, 'tasks not done yet');
+  const out = runItems(f, logic, [sea, kb, task('done')], day);
+  assert.deepEqual(out.writes.map(w => [w.id, w.body.fields.state]), [[sea.id, '열림']]);
+  assert.deepEqual(out.effects, [{name: 'sparkle', entry: sea.id}]);
+  assert.deepEqual(out.notices, ['바다 열렸어요']);
+  const opened = {...sea, body: {...(sea as unknown as {body: object}).body, fields: {wish: '바다', cond: JSON.stringify({kind: 'tasksAll'}), state: '열림'}}} as unknown as AnyRecord;
+  assert.equal(runItems(f, logic, [opened, kb, task('done')], day).writes.length, 0, 'an opened wish does not open again');
+  assert.equal(flowSentence(f, logic.types), '소원의 항목마다, 그 항목의 조건이 되면 · 상태가 잠김이면 → 상태를 열림으로, 그 카드에 반짝 효과, 알림 "{이름} 열렸어요"');
+  assert.equal(josa('상태', '을를'), '상태를'); assert.equal(josa('목표', '이가'), '목표가'); assert.equal(josa('열림', '으로'), '열림으로'); assert.equal(josa('잠김', '이가'), '잠김이');
 });

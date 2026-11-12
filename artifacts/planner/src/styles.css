@@ -1588,3 +1588,111 @@ lit-block{display:block;min-width:0;max-width:100%}
 .undo-bar button{border:0;background:none;color:#ffd84d;font-weight:700;padding:6px 8px}
 .undo-bar button.ghost{color:#aaa;font-weight:400}
 @media (max-width:700px){.undo-bar{bottom:84px}}
+
+/* ── 새 에디터: 스티커 · 열림 카드 · 움직임 · 규칙 카드 · 상황 · 콘솔 ───────────────────────────── */
+/* Stickers: a cut-out icon, an icon in a shape, or the user's picture. */
+.sticker{position:relative;display:inline-grid;place-items:center;gap:2px;border:0;background:none;padding:4px;transition:transform .15s}
+.sticker:hover{background:none}
+.sticker:active{transform:scale(.94)!important}
+.stk-cut{display:block;filter:drop-shadow(0 3px 3px #0003)}
+.stk-shape{display:grid;place-items:center;color:#fff;border:3px solid #fff;box-shadow:0 3px 6px #0003}
+.stk-shape svg{stroke:#fff}
+.sh-circle{border-radius:50%}.sh-square{border-radius:22%}.sh-label{border-radius:10px;aspect-ratio:1.6}
+.sh-star{clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);border:0}
+.sh-heart{clip-path:path('M50 90 C 10 60 0 35 18 18 C 32 6 46 12 50 26 C 54 12 68 6 82 18 C 100 35 90 60 50 90Z');border:0}
+.sh-cloud{border-radius:50% 50% 40% 40% / 60% 60% 40% 40%}
+.stk-img{display:block;background:center/contain no-repeat;filter:drop-shadow(0 0 0 #fff) drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff) drop-shadow(0 3px 4px #0004)}
+.stk-img.cut-circle{border-radius:50%;background-size:cover;border:3px solid #fff}
+.stk-img.cut-heart{background-size:cover;clip-path:path('M50 90 C 10 60 0 35 18 18 C 32 6 46 12 50 26 C 54 12 68 6 82 18 C 100 35 90 60 50 90Z')}
+.stk-img.cut-star{background-size:cover;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.stk-img.cut-cloud{background-size:cover;border-radius:50% 50% 40% 40% / 60% 60% 40% 40%;border:3px solid #fff}
+.stk-badge{position:absolute;top:0;right:0;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:#e5484d;color:#fff;font:600 12px/22px var(--mono);border:2px solid #fff}
+.stk-label{font-size:12px;font-weight:600;background:#fff;padding:0 6px;border:1px solid var(--ink)}
+.stk-wrap{position:fixed;inset:0;z-index:320;background:#0006;display:grid}
+.stk-panel{background:var(--bg,#ecebe6);display:grid;grid-template-rows:auto 1fr;min-height:0;max-height:100%}
+.stk-bar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--line)}
+.stk-body{overflow:auto;padding:12px;min-height:0}
+.open-popup{place-items:center;padding:16px}.open-popup .stk-panel{width:min(440px,100%);max-height:86vh;border:1.5px solid var(--ink);animation:pop .18s ease-out}
+.open-sheet{align-items:end}.open-sheet .stk-panel{width:100%;max-width:560px;margin:0 auto;max-height:86vh;border-radius:16px 16px 0 0;animation:stk-up .22s ease-out}
+.open-page{background:var(--bg,#ecebe6)}.open-page .stk-panel{height:100dvh;max-width:720px;width:100%;margin:0 auto}
+@keyframes stk-up{from{transform:translateY(40%);opacity:.3}to{transform:none;opacity:1}}
+
+/* 열림 카드 (wishes) */
+.mb-wcards{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.wcard{display:grid;gap:4px;padding:10px 12px;border:1px solid var(--line);background:var(--surface,#f5f5f1)}
+.wc-head{display:flex;align-items:center;gap:8px}.wc-head b{flex:1;min-width:0;overflow-wrap:anywhere}
+.wc-ico{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--soft);color:var(--muted)}
+.wc-state{font-size:12px;font-family:var(--mono);color:var(--muted)}
+.wc-cond{font-size:13px;color:var(--muted)}
+.wc-bar{height:6px;background:var(--soft);display:block}.wc-bar i{display:block;height:100%;background:var(--accent);transition:width .4s}
+.wc-num{font-size:12px;color:var(--muted)}
+.wc-act{justify-content:flex-end}
+.wcard.st-open{border-color:var(--ink);background:color-mix(in srgb,var(--accent) 22%,var(--surface,#f5f5f1))}
+.wcard.st-open .wc-ico{background:var(--accent);color:var(--ink)}
+.wcard.st-used{opacity:.6}.wcard.st-used b{text-decoration:line-through}
+
+/* 움직임 (effects): one shot, or looping with .fx-loop */
+.fx-wrap{display:block}
+.fx-bounce{animation:fx-k-bounce .7s ease}.fx-shake{animation:fx-k-shake .5s ease}.fx-float{animation:fx-k-float 1.6s ease-in-out}
+.fx-pulse{animation:fx-k-pulse .9s ease}.fx-spin{animation:fx-k-spin .8s ease}.fx-pop{animation:fx-k-pop .45s ease-out}
+.fx-glow{animation:fx-k-glow 1.2s ease}
+.fx-sparkle{position:relative;animation:fx-k-pop .45s ease-out}
+.fx-sparkle::after{content:'✦ ✧ ✦';position:absolute;inset:-6px 0 auto;text-align:center;color:var(--accent);font-size:18px;letter-spacing:12px;pointer-events:none;animation:fx-k-twinkle 1.2s ease forwards}
+.fx-confetti{position:relative;animation:fx-k-pop .45s ease-out}
+.fx-confetti::after{content:'🎉';position:absolute;top:-10px;right:8px;font-size:22px;pointer-events:none;animation:fx-k-twinkle 1.4s ease forwards}
+.fx-loop{animation-iteration-count:infinite}.fx-loop::after{animation-iteration-count:infinite}
+@keyframes fx-k-bounce{30%{transform:translateY(-8px)}55%{transform:translateY(0)}75%{transform:translateY(-3px)}}
+@keyframes fx-k-shake{20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}
+@keyframes fx-k-float{50%{transform:translateY(-5px)}}
+@keyframes fx-k-pulse{50%{transform:scale(1.04)}}
+@keyframes fx-k-spin{to{transform:rotate(360deg)}}
+@keyframes fx-k-pop{0%{transform:scale(.9)}60%{transform:scale(1.04)}100%{transform:none}}
+@keyframes fx-k-glow{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 60%,transparent),0 0 18px var(--accent)}}
+@keyframes fx-k-twinkle{0%{opacity:0;transform:translateY(6px) scale(.7)}30%{opacity:1}100%{opacity:0;transform:translateY(-14px) scale(1.1)}}
+@media (prefers-reduced-motion:reduce){[class*="fx-"]{animation:none!important}[class*="fx-"]::after{display:none}}
+
+/* 상황 picker */
+.sig-pick{display:grid;gap:6px}.sig-args{gap:6px;align-items:center}
+.num{width:64px}.time-in{width:auto}
+
+/* 규칙 카드: 언제 (yellow) · 만약 (orange) · 하기 (blue) · 효과 (purple) */
+.rules{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.rule{display:grid;gap:6px;padding:10px;border:1px solid var(--line);background:var(--surface,#f5f5f1)}
+.rule.off{opacity:.55}
+.rule-top{display:flex;align-items:center;gap:8px}.rule-name{flex:1;min-width:0;border-color:transparent;background:transparent;font-weight:600}
+.rc{position:relative;display:grid;gap:6px;padding:8px 10px 8px 12px;border-left:5px solid;background:#fff}
+.rc-when{border-color:#f2c230;background:#fdf6dc}.rc-if{border-color:#e8833a;background:#fdeee2}
+.rc-do{border-color:#3a66b8;background:#e8eefa}.rc-fx{border-color:#8a5cc4;background:#f1eafa}
+.rc-k{font:600 12px var(--mono);color:var(--muted)}
+.rc-line{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rc-sets{display:grid;gap:6px}
+.rc-x{position:absolute;top:2px;right:2px}
+.rc-add{display:flex;flex-wrap:wrap;gap:6px}
+.chip-sel,.chip-in{border:1px solid color-mix(in srgb,var(--ink) 25%,transparent);background:#fff;border-radius:14px;padding:3px 10px;font-size:14px}
+.chip-sel.add{border-style:dashed;background:transparent}
+.chip-in.num{width:70px}
+.chip-tag{font-size:12px;padding:2px 8px;border-radius:10px;background:var(--soft)}.chip-tag.sig{background:#fdf6dc}
+.sig-chip{position:relative;display:inline-block}
+.sig-pop{position:absolute;z-index:20;top:calc(100% + 4px);left:0;width:min(320px,80vw);padding:10px;background:var(--surface,#f5f5f1);border:1px solid var(--ink);box-shadow:0 6px 16px #0002}
+.rule-sentence{font-size:13px;color:var(--muted);border-top:1px dashed var(--line);padding-top:6px}
+.rule-code textarea{font-family:var(--mono);font-size:12.5px;line-height:1.5;white-space:pre;overflow:auto}
+.rule-code{display:grid;gap:6px}
+
+/* 에디터 · 화면 */
+.sp-title{margin:16px 0 4px;font-size:15px}
+.palettes{display:flex;flex-wrap:wrap;gap:8px}
+.pal{display:grid;grid-template-columns:repeat(3,18px);gap:0;align-items:center;padding:4px;background:var(--surface,#f5f5f1);border:1px solid var(--line)}
+.pal span{height:18px}.pal em{grid-column:1/-1;font-style:normal;font-size:12px;text-align:center}
+.pal.on{border:2px solid var(--ink)}
+.cheat summary{cursor:pointer;font-family:var(--mono);font-size:13px}.cheat ul{margin:4px 0 0;padding-left:18px}
+.made-code{width:100%;border:0;display:block;background:transparent}
+.inline.wrap{flex-wrap:wrap}
+.sp>*,.rules>li,.rule,.rc,.rc-line>*{min-width:0}
+.rc select,.rc input,.chip-sel{max-width:100%}
+.rule-top{flex-wrap:wrap}.rule-name{width:0;flex:1 1 120px}
+.sp>.inline{flex-wrap:wrap}
+/* A widget shown as a sticker: bare on the page */
+.wg.wg-stk,.m-card.m-stk{background:transparent!important;border-color:transparent!important;box-shadow:none!important}
+.wg-stk>.wg-head .wg-title,.m-stk .m-head{display:none}
+.m-stk{position:relative}.m-stk .m-headrow{position:absolute;top:0;right:0;z-index:2;border:0;background:none}
+.m-stk .m-body,.wg-stk .wg-body{padding:0;overflow:visible}

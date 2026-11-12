@@ -1,13 +1,15 @@
 import {useBack} from '../back.ts';
 import {useEffect, useMemo, useState} from 'react';
 import {createPortal} from 'react-dom';
-import {FIELD_KINDS, LOGIC_BLOCKS, AGGS, BLOCK_GROUPS, Logic, MadeOptions, PERIODS, TypeDef, VERB_NAMES, blockInfo, checkTemplate, flowSentence, newBlock, newLogicId, tabsOf,
+import {FIELD_KINDS, LOGIC_BLOCKS, AGGS, BLOCK_GROUPS, EFFECTS, Flow as FlowSchema, Logic, MadeOptions, PERIODS, TypeDef, blockInfo, checkTemplate, flowSentence, newBlock, newLogicId, tabsOf,
   type Flow, type FieldDef, type LogicBlock, type PlannerSpec, type SavedFilter, type TabSpec, type Widget} from '@workspace/planner-spec';
-import {VERBS, type Settings} from '@workspace/life-contract';
+import type {Settings} from '@workspace/life-contract';
+import {ofKind} from '../data.ts';
 import type {Planner} from '../data.ts';
 import type {Ctx, Nav} from '../screens/day.ts';
 import {MadeWidget} from './MadeWidget.tsx';
-import {CondsEditor, FlowEditor, newFlow} from './FlowEditor.tsx';
+import {CondsEditor} from './FlowEditor.tsx';
+import {RuleCards, newRule} from './RuleCards.tsx';
 import {ICON_NAMES, Icon} from './icons.tsx';
 import {PRESETS, type Seed} from './presets.ts';
 import {importLegacy, legacyCount} from './legacy.ts';
@@ -60,16 +62,17 @@ function Picker({logic, pick, close}: {logic: Logic; pick: (p: (typeof PRESETS)[
       <header className="studio-bar"><button className="ghost" onClick={close} aria-label="닫기">←</button><h2>위젯 만들기</h2></header>
       {([['old', '기존 위젯을 블록으로'], ['new', '새로 만들기']] as const).map(([g, n]) => <section key={g} className="picker-sec"><h3>{n}</h3>
         <ul className="picker-grid">{PRESETS.filter(pr => pr.group === g || (g === 'new' && pr.id === 'blank' && false)).map(pr => <li key={pr.id}><button className="picker-card" onClick={() => pick(pr)}><Icon name={pr.icon} size={26} /><b>{pr.name}</b><span>{pr.desc}</span></button></li>)}</ul></section>)}
-      {logic.types.length > 0 && <p className="muted small">지금 있는 기록 묶음: {logic.types.map(t => t.name).join(' · ')}</p>}
+      {logic.types.length > 0 && <p className="muted small">지금 있는 DB: {logic.types.map(t => t.name).join(' · ')}</p>}
     </div>
   </div>;
 }
 
-const STEPS = [['data', '데이터'], ['blocks', '블록'], ['links', '연결·자동화'], ['design', '디자인'], ['preview', '미리보기']] as const;
+// 화면 (parts, look, sticker, console) · 동작 (rules as cards) · 저장 칸 (the DB) · 미리보기 (phones; beside the panel on wide screens)
+const STEPS = [['screen', '화면'], ['rules', '동작'], ['data', '저장 칸'], ['preview', '미리보기']] as const;
 type Step = (typeof STEPS)[number][0];
 
 function Studio({draft, setDraft, spec, ctx, today, save, close}: {draft: Draft; setDraft: (d: Draft) => void; spec: PlannerSpec; ctx: Ctx; today: string; save: (d: Draft) => Promise<void>; close: () => void}) {
-  const [step, setStep] = useState<Step>(draft.options.blocks.length ? 'blocks' : 'data'), [busy, setBusy] = useState(false);
+  const [step, setStep] = useState<Step>(draft.options.type ? 'screen' : 'data'), [busy, setBusy] = useState(false);
   const type = draft.types.find(t => t.id === draft.options.type);
   const put = (p: Partial<Draft>) => setDraft({...draft, ...p});
   const setOpts = (p: Partial<MadeOptions>) => put({options: {...draft.options, ...p}});
@@ -86,9 +89,15 @@ function Studio({draft, setDraft, spec, ctx, today, save, close}: {draft: Draft;
       <div className="studio-body">
         <section className={`studio-panel ${step === 'preview' ? 'hide-phone' : ''}`}>
           {step === 'data' && <DataPanel draft={draft} put={put} type={type} setType={setType} spec={spec} />}
-          {step === 'blocks' && type && <BlocksPanel blocks={draft.options.blocks} type={type} setType={setType} onChange={blocks => setOpts({blocks})} />}
-          {step === 'links' && type && <LinksPanel draft={draft} put={put} type={type} setType={setType} spec={spec} />}
-          {step === 'design' && <DesignPanel draft={draft} setOpts={setOpts} type={type} />}
+          {step === 'screen' && type && <>
+            <LookPanel draft={draft} setOpts={setOpts} type={type} />
+            <h3 className="sp-title">부품</h3>
+            <BlocksPanel blocks={draft.options.blocks} type={type} setType={setType} onChange={blocks => setOpts({blocks})} />
+            <h3 className="sp-title">꾸미기</h3>
+            <DesignPanel draft={draft} setOpts={setOpts} type={type} />
+          </>}
+          {step === 'rules' && type && <RulesPanel draft={draft} put={put} type={type} spec={spec} goals={ofKind(ctx.p.records, 'goal').map(g => ({id: g.id, title: g.body.title}))} />}
+          {(step === 'screen' || step === 'rules') && !type && <p className="muted">저장 칸에서 DB를 먼저 골라요.</p>}
           {step === 'preview' && <div className="only-phone">{preview}</div>}
         </section>
         <aside className={`studio-preview ${step === 'preview' ? '' : 'hide-phone'}`}><span className="k">미리보기 · 실제 기록</span>{preview}</aside>
@@ -100,13 +109,13 @@ function Studio({draft, setDraft, spec, ctx, today, save, close}: {draft: Draft;
 // ── 1. 데이터: the type (collection) this widget reads and writes ─────────────────────────────────
 function DataPanel({draft, put, type, setType, spec}: {draft: Draft; put: (p: Partial<Draft>) => void; type: TypeDef | undefined; setType: (t: TypeDef) => void; spec: PlannerSpec}) {
   const sharing = type ? allWidgets(spec).filter(x => x.w.type === 'made' && x.w.options.type === type.id && x.w.id !== draft.widgetId) : [];
-  const newType = () => { let id = 'mine', n = 2; while (draft.types.some(t => t.id === id)) id = `mine${n++}`; const t = TypeDef.parse({id, name: '새 기록'}); put({types: [...draft.types, t], options: {...draft.options, type: id}}); };
+  const newType = () => { let id = 'mine', n = 2; while (draft.types.some(t => t.id === id)) id = `mine${n++}`; const t = TypeDef.parse({id, name: '새 DB'}); put({types: [...draft.types, t], options: {...draft.options, type: id}}); };
   const field = (i: number, p: Partial<FieldDef>) => type && setType({...type, fields: type.fields.map((f, j) => j === i ? {...f, ...p} : f)});
   return <div className="sp">
-    <label className="sp-row"><span className="k">기록 묶음</span>
+    <label className="sp-row"><span className="k">이 위젯의 DB</span>
       <span className="inline"><select value={draft.options.type} onChange={e => put({options: {...draft.options, type: e.target.value}})}><option value="" disabled>고르기</option>{draft.types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-        <button className="ghost small" onClick={newType}>+ 새 묶음</button></span></label>
-    {sharing.length > 0 && <p className="sp-share"><Icon name="people" size={14} /> 같은 기록을 보는 위젯: {sharing.map(x => `${x.w.title || '만든 위젯'}(${x.page})`).join(', ')}</p>}
+        <button className="ghost small" onClick={newType}>+ 새 DB</button></span></label>
+    {sharing.length > 0 && <p className="sp-share"><Icon name="people" size={14} /> 같은 DB를 쓰는 위젯: {sharing.map(x => `${x.w.title || '만든 위젯'}(${x.page})`).join(', ')}</p>}
     {type && <>
       <div className="sp-grid">
         <label><span className="k">이름</span><input value={type.name} maxLength={30} onChange={e => setType({...type, name: e.target.value || ' '})} /></label>
@@ -149,27 +158,32 @@ function BlocksPanel({blocks, type, setType, onChange}: {blocks: LogicBlock[]; t
   return <div className="sp">
     <ol className="sp-blocks">{blocks.map((b, i) => <li key={b.id} className={`sp-block ${open === b.id ? 'open' : ''}`}>
       <div className="sp-bhead"><button className="link" onClick={() => setOpen(open === b.id ? null : b.id)} aria-expanded={open === b.id}><b>{blockInfo(b.kind).name}</b> <span className="muted">{b.label || b.text || ''}</span></button>
-        <span className="mono muted small" title="HTML 디자인에서 부르는 이름">{b.id}</span>
+        <span className="mono muted small" title="HTML·콘솔에서 부르는 이름">{b.id}</span>
         <button className="ghost small" disabled={i === 0} onClick={() => move(i, -1)} aria-label="위로">↑</button><button className="ghost small" disabled={i === blocks.length - 1} onClick={() => move(i, 1)} aria-label="아래로">↓</button>
-        <button className="ghost small danger" onClick={() => onChange(blocks.filter(x => x.id !== b.id))} aria-label="블록 지우기">×</button></div>
+        <button className="ghost small danger" onClick={() => onChange(blocks.filter(x => x.id !== b.id))} aria-label="부품 지우기">×</button></div>
       {open === b.id && <BlockConfig b={b} type={type} setType={setType} set={p => set(b.id, p)} />}
     </li>)}</ol>
     {palette ? <div className="palette">{(Object.keys(BLOCK_GROUPS) as (keyof typeof BLOCK_GROUPS)[]).map(g => <div key={g}><h4 className="sp-h">{BLOCK_GROUPS[g]}</h4>
       <div className="palette-row">{LOGIC_BLOCKS.filter(x => x.group === g).map(x => <button key={x.kind} className="palette-item" onClick={() => add(x.kind)}><b>{x.name}</b><span>{x.desc}</span></button>)}</div></div>)}
       {blocks.length > 0 && <button className="ghost small" onClick={() => setPalette(false)}>닫기</button>}</div>
-      : <button className="small" onClick={() => setPalette(true)}>+ 블록</button>}
+      : <button className="small" onClick={() => setPalette(true)}>+ 부품</button>}
   </div>;
 }
 
 function BlockConfig({b, type, setType, set}: {b: LogicBlock; type: TypeDef; setType: (t: TypeDef) => void; set: (p: Partial<LogicBlock>) => void}) {
   const fs = type.fields, nums = fs.filter(f => ['number', 'score', 'duration'].includes(f.kind));
-  const input = ['button', 'toggle', 'counter', 'check', 'score', 'form', 'stopwatch', 'timer'].includes(b.kind), view = ['list', 'table', 'gallery', 'timeline'].includes(b.kind), calc = ['stat', 'calendar', 'chart'].includes(b.kind);
-  const addField = (kind: FieldDef['kind'], name: string) => { const id = newLogicId(); setType({...type, fields: [...fs, {id, name, kind, desc: '', unit: '', options: kind === 'choice' ? ['집중', '휴식'] : [], max: 10, to: 'goal'}]}); return id; };
+  const view = ['list', 'table', 'gallery', 'timeline'].includes(b.kind), calc = ['stat', 'calendar', 'chart'].includes(b.kind);
+  const addField = (kind: FieldDef['kind'], name: string, options?: string[]) => { const id = newLogicId(); setType({...type, fields: [...fs, {id, name, kind, desc: '', unit: '', options: options ?? (kind === 'choice' ? ['집중', '휴식'] : []), max: 10, to: 'goal'}]}); return id; };
   const ofSel = <select value={b.of} onChange={e => set({of: e.target.value})} aria-label="무엇의"><option value="">값{type.unit ? `(${type.unit})` : ''}</option><option value="duration">걸린 시간</option>{nums.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select>;
   return <div className="sp-bconf">
     {b.kind !== 'note' && b.kind !== 'heading' && <div className="inline"><label><span className="k">이름</span><input value={b.label} maxLength={40} onChange={e => set({label: e.target.value})} /></label><label><span className="k">아이콘</span><IconPick value={b.icon} onChange={icon => set({icon})} /></label></div>}
     {b.kind === 'heading' && <div className="inline"><input className="wide" value={b.text} maxLength={500} onChange={e => set({text: e.target.value})} aria-label="문구" /><select value={b.style || 'm'} onChange={e => set({style: e.target.value})} aria-label="크기"><option value="s">작게</option><option value="m">보통</option><option value="l">크게</option></select></div>}
-    {input && <label className="inline"><span className="k">기록할 동작</span><select value={b.verb ?? ''} onChange={e => set({verb: (e.target.value || undefined) as LogicBlock['verb']})}><option value="">기본</option>{VERBS.map(v => <option key={v} value={v}>{VERB_NAMES[v]}</option>)}</select></label>}
+    {b.kind === 'cards' && <div className="inline wrap">
+      <label className="inline"><span className="k">조건(상황) 속성</span><select value={b.field} onChange={e => set({field: e.target.value === '+' ? addField('signal', '조건') : e.target.value})}><option value="">없음</option>{fs.filter(f => f.kind === 'signal').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}<option value="+">+ 새 상황 속성</option></select></label>
+      <label className="inline"><span className="k">상태 속성</span><select value={b.stateField} onChange={e => set({stateField: e.target.value === '+' ? addField('choice', '상태', ['잠김', '열림', '사용함']) : e.target.value})}><option value="">없음</option>{fs.filter(f => f.kind === 'choice').map(f => <option key={f.id} value={f.id}>{f.name} ({f.options.join('·')})</option>)}<option value="+">+ 새 상태 속성</option></select></label></div>}
+    {b.kind !== 'note' && <div className="inline wrap"><span className="k">움직임</span>
+      <select value={b.anim} onChange={e => set({anim: e.target.value as LogicBlock['anim']})} aria-label="움직임"><option value="">없음</option>{EFFECTS.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
+      {b.anim && <select value={b.animWhen} onChange={e => set({animWhen: e.target.value as LogicBlock['animWhen']})} aria-label="언제"><option value="tap">누를 때</option><option value="appear">나타날 때</option><option value="always">계속</option></select>}</div>}
     {(b.kind === 'toggle' || b.kind === 'stopwatch') && <div className="inline"><label><span className="k">시작 버튼</span><input value={b.startLabel} maxLength={20} onChange={e => set({startLabel: e.target.value})} placeholder="시작" /></label><label><span className="k">끝 버튼</span><input value={b.endLabel} maxLength={20} onChange={e => set({endLabel: e.target.value})} placeholder="끝" /></label></div>}
     {(b.kind === 'button' || b.kind === 'toggle' || b.kind === 'counter' || b.kind === 'stopwatch') && <label className="inline"><span className="k">모양</span><select value={b.style} onChange={e => set({style: e.target.value})}><option value="">기본</option><option value="pill">알약</option><option value="big">크게</option><option value="round">동그랗게</option><option value="flat">납작하게</option></select></label>}
     {(b.kind === 'toggle' || b.kind === 'stopwatch' || b.kind === 'check') && <label className="inline"><span className="k">{b.kind === 'check' ? '항목별로 (선택 속성)' : '과목별로 나누기 (선택 속성)'}</span>
@@ -180,7 +194,7 @@ function BlockConfig({b, type, setType, set}: {b: LogicBlock; type: TypeDef; set
       <label><span className="k">빨강 (이하)</span><input className="num" value={b.red} onChange={e => set({red: Number(e.target.value) || 0})} /></label></div>
       <details><summary>점수별 메시지</summary>{Array.from({length: fs.find(f => f.id === b.of)?.max ?? 10}, (_, i) => (fs.find(f => f.id === b.of)?.max ?? 10) - i).map(n => <label key={n} className="score-msg"><span className={`m-light ${n >= b.green ? 'blue' : n <= b.red ? 'red' : 'amber'}`} />{n}
         <input value={b.msgs[String(n)] ?? ''} maxLength={160} onChange={e => set({msgs: {...b.msgs, [String(n)]: e.target.value}})} aria-label={`${n}점 메시지`} /></label>)}</details></>}
-    {b.kind === 'grid10' && <div className="inline"><select value={b.scope} onChange={e => set({scope: e.target.value as LogicBlock['scope']})} aria-label="무엇을 칠할지"><option value="all">잰 시간 전부 (타이머·다른 위젯 포함)</option><option value="type">이 기록 묶음만</option></select>
+    {b.kind === 'grid10' && <div className="inline"><select value={b.scope} onChange={e => set({scope: e.target.value as LogicBlock['scope']})} aria-label="무엇을 칠할지"><option value="all">잰 시간 전부 (타이머·다른 위젯 포함)</option><option value="type">이 DB만</option></select>
       <label><span className="k">시작 시각</span><select value={b.startHour} onChange={e => set({startHour: Number(e.target.value)})}>{[0, 4, 5, 6, 7, 8, 9, 10].map(h => <option key={h} value={h}>{h}시</option>)}</select></label></div>}
     {b.kind === 'breakdown' && <div className="inline wrap">
       <select value={b.field} onChange={e => set({field: e.target.value})} aria-label="무엇으로 나눌지"><option value="">나눌 속성</option>{fs.filter(f => f.kind === 'choice' || f.kind === 'multi').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
@@ -190,7 +204,7 @@ function BlockConfig({b, type, setType, set}: {b: LogicBlock; type: TypeDef; set
       <select value={b.show} onChange={e => set({show: e.target.value as LogicBlock['show']})} aria-label="모양"><option value="list">막대 목록</option><option value="donut">원형</option></select></div>}
     {b.kind === 'counter' && <div className="inline"><label><span className="k">한 번에</span><input className="num" value={b.amount} onChange={e => set({amount: Number(e.target.value) || 1})} /></label><label><span className="k">하루 목표</span><input className="num" value={b.target ?? ''} onChange={e => set({target: e.target.value ? Number(e.target.value) : null})} /></label></div>}
     {b.kind === 'score' && <label className="inline"><span className="k">점수 속성</span><select value={b.field} onChange={e => set({field: e.target.value === '+' ? addField('score', '점수') : e.target.value})}><option value="">값으로</option>{fs.filter(f => f.kind === 'score' || f.kind === 'number').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}<option value="+">+ 새 점수 속성</option></select></label>}
-    {b.kind === 'form' && <div className="checks"><span className="k">칸</span>{fs.map(f => <label key={f.id} className="row-check"><input type="checkbox" checked={b.fields.includes(f.id)} onChange={e => set({fields: e.target.checked ? [...b.fields, f.id] : b.fields.filter(x => x !== f.id)})} /> {f.name}</label>)}{!fs.length && <span className="muted small">데이터에서 속성을 먼저 만들어요</span>}</div>}
+    {b.kind === 'form' && <div className="checks"><span className="k">칸</span>{fs.map(f => <label key={f.id} className="row-check"><input type="checkbox" checked={b.fields.includes(f.id)} onChange={e => set({fields: e.target.checked ? [...b.fields, f.id] : b.fields.filter(x => x !== f.id)})} /> {f.name}</label>)}{!fs.length && <span className="muted small">저장 칸에서 속성을 먼저 만들어요</span>}</div>}
     {b.kind === 'timer' && <>
       {(b.steps.length ? b.steps : [{name: '집중', min: 25}]).map((s, i, all) => <div key={i} className="inline"><input value={s.name} maxLength={20} onChange={e => set({steps: all.map((x, j) => j === i ? {...x, name: e.target.value || ' '} : x)})} aria-label="단계 이름" />
         <input className="num" inputMode="decimal" value={s.min} onChange={e => set({steps: all.map((x, j) => j === i ? {...x, min: Math.max(0.1, Number(e.target.value) || 1)} : x)})} aria-label="분" />분
@@ -226,25 +240,55 @@ function SavedFilters({filters, type, onChange}: {filters: SavedFilter[]; type: 
   </div>;
 }
 
-// ── 3. 연결·자동화 ────────────────────────────────────────────────────────────────────────────────
-function LinksPanel({draft, put, type, setType, spec}: {draft: Draft; put: (p: Partial<Draft>) => void; type: TypeDef; setType: (t: TypeDef) => void; spec: PlannerSpec}) {
-  const [edit, setEdit] = useState<string | null>(null);
+// ── 동작: this widget's rules as cards, and all of them as code ──────────────────────────────────
+function RulesPanel({draft, put, type, spec, goals}: {draft: Draft; put: (p: Partial<Draft>) => void; type: TypeDef; spec: PlannerSpec; goals: {id: string; title: string}[]}) {
+  const [code, setCode] = useState(false), [text, setText] = useState(''), [err, setErr] = useState('');
   const sharing = allWidgets(spec).filter(x => x.w.type === 'made' && x.w.options.type === type.id && x.w.id !== draft.widgetId);
-  const related = draft.flows.filter(f => f.on.type === type.id || f.do.some(a => 'type' in a && a.type === type.id));
-  const links = type.fields.filter(f => f.kind === 'link');
+  const mine = (f: Flow) => f.on.type === type.id || f.do.some(a => 'type' in a && a.type === type.id);
+  const related = draft.flows.filter(mine);
   const setFlow = (f: Flow) => put({flows: draft.flows.map(x => x.id === f.id ? f : x)});
   return <div className="sp">
-    <h4 className="sp-h">같은 기록을 보는 위젯</h4>
-    {sharing.length ? <ul className="sp-list">{sharing.map(x => <li key={x.w.id}>{x.w.title || '만든 위젯'} <span className="muted small">{x.page}</span></li>)}</ul> : <p className="muted small">아직 없어요. 다른 위젯에서 이 묶음({type.name})을 고르면 기록을 함께 봐요.</p>}
-    <h4 className="sp-h">연결 속성</h4>
-    <ul className="sp-list">{links.map(f => <li key={f.id}>{f.name} → {({goal: '목표', task: '할 일', persona: '페르소나'} as Record<string, string>)[f.to] ?? draft.types.find(t => t.id === f.to)?.name ?? f.to}</li>)}</ul>
-    <button className="ghost small" onClick={() => setType({...type, fields: [...type.fields, {id: newLogicId(), name: '목표', kind: 'link', to: 'goal', desc: '', unit: '', options: [], max: 10}]})}>+ 연결 속성</button>
-    <h4 className="sp-h">자동화</h4>
-    <ul className="sp-flows">{related.map(f => <li key={f.id} className={f.enabled ? '' : 'off'}>
-      {edit === f.id ? <FlowEditor flow={f} types={draft.types} onChange={setFlow} onDelete={() => { put({flows: draft.flows.filter(x => x.id !== f.id)}); setEdit(null); }} />
-        : <button className="link flow-line" onClick={() => setEdit(f.id)}>{f.name && <b>{f.name} · </b>}{flowSentence(f, draft.types)}</button>}
-      {edit === f.id && <button className="ghost small" onClick={() => setEdit(null)}>접기</button>}</li>)}</ul>
-    <button className="small" onClick={() => { const f = newFlow(type.id); put({flows: [...draft.flows, f]}); setEdit(f.id); }}>+ 자동화</button>
+    <div className="inline"><span className="muted small">{related.length ? '위에서 아래로 읽어요. 색칸을 눌러 바꿔요.' : '아직 규칙이 없어요.'}</span>
+      <span className="seg small" role="radiogroup" aria-label="보기" style={{marginLeft: 'auto'}}>{([['card', '카드'], ['code', '코드']] as const).map(([k, n]) => <button key={k} role="radio" aria-checked={code === (k === 'code')} className={code === (k === 'code') ? 'on' : ''}
+        onClick={() => { setCode(k === 'code'); setText(JSON.stringify(related, null, 2)); setErr(''); }}>{n}</button>)}</span></div>
+    {code ? <div className="rule-code">
+      <textarea spellCheck={false} rows={20} value={text} onChange={e => setText(e.target.value)} aria-label="이 위젯의 규칙 코드" />
+      {err && <p className="error small">{err}</p>}
+      <button className="small primary" onClick={() => { try { const arr = JSON.parse(text); if (!Array.isArray(arr)) throw new Error('규칙 목록([ ... ])이어야 해요'); const out: Flow[] = [];
+        for (const [i, x] of arr.entries()) { const r = FlowSchema.safeParse(x); if (!r.success) throw new Error(`${i + 1}번째 규칙 · ${r.error.issues[0]?.path.join('.')}: ${r.error.issues[0]?.message}`); out.push(r.data); }
+        put({flows: [...draft.flows.filter(f => !mine(f)), ...out]}); setErr(''); setCode(false); } catch (e) { setErr((e as Error).message); } }}>적용</button>
+    </div> : <>
+      <ul className="rules">{related.map(f => <li key={f.id}><RuleCards flow={f} types={draft.types} goals={goals} onChange={setFlow} onDelete={() => put({flows: draft.flows.filter(x => x.id !== f.id)})} /></li>)}</ul>
+      <button className="small" onClick={() => put({flows: [...draft.flows, newRule(type.id)]})}>+ 규칙</button>
+    </>}
+    {sharing.length > 0 && <p className="sp-share"><Icon name="people" size={14} /> 같은 DB를 쓰는 위젯도 이 규칙을 따라요: {sharing.map(x => `${x.w.title || '만든 위젯'}(${x.page})`).join(', ')}</p>}
+  </div>;
+}
+
+// ── 화면 · 보이는 방식: as it is, or a sticker (cut-out icon, icon in a shape, the user's picture) that opens it ─
+function LookPanel({draft, setOpts, type}: {draft: Draft; setOpts: (p: Partial<MadeOptions>) => void; type: TypeDef}) {
+  const L = draft.options.launch, set = (p: Partial<typeof L>) => setOpts({launch: {...L, ...p}});
+  const choice = type.fields.filter(f => f.kind === 'choice');
+  const pickImage = (file: File) => { const img = new Image(), url = URL.createObjectURL(file); img.onload = () => {
+    const k = Math.min(1, 360 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); set({image: c.toDataURL('image/png'), mode: 'image'}); }; img.src = url; };
+  return <div className="sp">
+    <h3 className="sp-title">보이는 방식</h3>
+    <div className="seg" role="radiogroup" aria-label="보이는 방식">{([['off', '펼쳐 두기'], ['sticker', '칼선 스티커'], ['shape', '도형 아이콘'], ['image', '내 이미지']] as const).map(([k, n]) =>
+      <button key={k} role="radio" aria-checked={L.mode === k} className={L.mode === k ? 'on' : ''} onClick={() => set({mode: k})}>{n}</button>)}</div>
+    {L.mode !== 'off' && <div className="sp-grid">
+      {L.mode !== 'image' && <label><span className="k">아이콘</span><IconPick value={L.icon} onChange={icon => set({icon: icon || 'gift'})} /></label>}
+      {L.mode !== 'image' && <label><span className="k">색</span><input type="color" value={L.color} onChange={e => set({color: e.target.value})} /></label>}
+      {L.mode === 'shape' && <label><span className="k">도형</span><select value={L.shape} onChange={e => set({shape: e.target.value as typeof L.shape})}><option value="circle">원</option><option value="square">둥근 네모</option><option value="star">별</option><option value="heart">하트</option><option value="cloud">구름</option><option value="label">라벨</option></select></label>}
+      {L.mode === 'image' && <label className="wide"><span className="k">이미지 (투명 배경 PNG면 모양대로)</span><input type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) pickImage(f); }} /></label>}
+      {L.mode === 'image' && <label><span className="k">따기</span><select value={L.imageCut} onChange={e => set({imageCut: e.target.value as typeof L.imageCut})}><option value="as-is">그대로 (투명 부분은 칼선)</option><option value="circle">원</option><option value="heart">하트</option><option value="star">별</option><option value="cloud">구름</option></select></label>}
+      <label><span className="k">크기</span><input type="range" min={48} max={200} value={L.size} onChange={e => set({size: Number(e.target.value)})} /></label>
+      <label><span className="k">기울기</span><input type="range" min={-30} max={30} value={L.rotate} onChange={e => set({rotate: Number(e.target.value)})} /></label>
+      <label><span className="k">누르면</span><select value={L.open} onChange={e => set({open: e.target.value as typeof L.open})}><option value="sheet">아래에서 올라오기</option><option value="popup">가운데 팝업</option><option value="page">새 페이지</option></select></label>
+      <label><span className="k">숫자 배지</span><select value={L.badge ? `${L.badge.field}|${L.badge.value}` : ''} onChange={e => { const [field = '', value = ''] = e.target.value.split('|'); set({badge: e.target.value ? {field, value} : null}); }}>
+        <option value="">없음</option><option value="|">항목 수</option>{choice.flatMap(f => f.options.map(o => <option key={`${f.id}|${o}`} value={`${f.id}|${o}`}>{f.name}: {o}</option>))}</select></label>
+      <label><span className="k">이름표</span><input value={L.label} maxLength={30} onChange={e => set({label: e.target.value})} /></label>
+    </div>}
   </div>;
 }
 
@@ -254,12 +298,30 @@ function DesignPanel({draft, setOpts, type}: {draft: Draft; setOpts: (p: Partial
   const err = d.mode === 'html' ? checkTemplate(d.html) : '';
   const color = (k: 'accent' | 'bg' | 'ink', label: string) => <label className="sk-color">{label}<input type="color" value={d[k] || (k === 'bg' ? '#ffffff' : '#151515')} onChange={e => set({[k]: e.target.value})} />{d[k] && <button className="ghost small" onClick={() => set({[k]: ''})} aria-label={`${label} 기본으로`}>↺</button>}</label>;
   return <div className="sp">
-    <div className="seg" role="radiogroup" aria-label="디자인 방식">{([['blocks', '블록 그대로'], ['html', 'HTML · CSS']] as const).map(([k, n]) => <button key={k} role="radio" aria-checked={d.mode === k} className={d.mode === k ? 'on' : ''} onClick={() => set({mode: k, ...(k === 'html' && !d.html ? {html: starterHtml(draft.options.blocks), css: THEMES[0]!.css} : {})})}>{n}</button>)}</div>
-    <h4 className="sp-h">색·모양 (디자인 토큰)</h4>
+    <h4 className="sp-h">컬러 차트</h4>
+    <div className="palettes">{PALETTES.map(pl => <button key={pl.id} className={`pal ${d.palette === pl.id ? 'on' : ''}`} onClick={() => set({palette: pl.id, accent: pl.accent, bg: pl.bg, ink: pl.ink})} aria-label={pl.name}>
+      <span style={{background: pl.bg}} /><span style={{background: pl.accent}} /><span style={{background: pl.ink}} /><em>{pl.name}</em></button>)}</div>
+    <h4 className="sp-h">색·모양 (직접)</h4>
     <div className="inline wrap">{color('accent', '강조')}{color('bg', '배경')}{color('ink', '글자')}
       <label><span className="k">모서리</span><input type="range" min={0} max={40} value={d.radius ?? 10} onChange={e => set({radius: Number(e.target.value)})} /></label>
       <select value={d.density} onChange={e => set({density: e.target.value as typeof d.density})} aria-label="간격"><option value="compact">촘촘</option><option value="normal">보통</option><option value="airy">여유</option></select>
       <select value={d.align} onChange={e => set({align: e.target.value as typeof d.align})} aria-label="정렬"><option value="left">왼쪽</option><option value="center">가운데</option></select></div>
+    <h4 className="sp-h">만드는 방식</h4>
+    <div className="seg" role="radiogroup" aria-label="만드는 방식">{([['blocks', '부품 그대로'], ['html', 'HTML · CSS'], ['code', '개발자 콘솔']] as const).map(([k, n]) => <button key={k} role="radio" aria-checked={d.mode === k} className={d.mode === k ? 'on' : ''}
+      onClick={() => set({mode: k, ...(k === 'html' && !d.html ? {html: starterHtml(draft.options.blocks), css: THEMES[0]!.css} : {}), ...(k === 'code' && !d.js ? {html: CONSOLE_HTML, css: CONSOLE_CSS, js: CONSOLE_JS} : {})})}>{n}</button>)}</div>
+    {d.mode === 'code' && <>
+      <p className="muted small">HTML · CSS · JavaScript를 그대로 써요. 격리된 칸에서 돌고, 이 위젯의 데이터와 부품만 lit.made로 다뤄요. 묶어 올린 라이브러리는 쓸 수 있고, 인터넷 접속은 막혀 있어요.</p>
+      <label className="code-ed"><span className="k">HTML</span><textarea spellCheck={false} rows={8} value={d.html} onChange={e => set({html: e.target.value})} /></label>
+      <label className="code-ed"><span className="k">CSS (애니메이션 @keyframes 가능)</span><textarea spellCheck={false} rows={8} value={d.css} onChange={e => set({css: e.target.value})} /></label>
+      <label className="code-ed"><span className="k">JavaScript</span><textarea spellCheck={false} rows={12} value={d.js} onChange={e => set({js: e.target.value})} /></label>
+      <details className="cheat"><summary>lit.made</summary><ul className="mono small">
+        <li>await lit.made.data() → {'{title, entries:[{time, 값, 속성 이름…}], blocks:{부품id:…}}'}</li>
+        <li>lit.on('change', data =&gt; …) — 기록이 바뀌면</li>
+        <li>lit.made.press('부품id') — 그 부품의 버튼 동작</li>
+        <li>lit.made.add({'{속성 이름: 값}'}) · lit.made.update(항목id, {'{속성 이름: 값}'})</li>
+        {draft.options.blocks.map(b => <li key={b.id}>{b.id} — {blockInfo(b.kind).name} {b.label}</li>)}
+      </ul></details>
+    </>}
     {d.mode === 'html' && <>
       <div className="inline wrap"><span className="k">테마</span>{THEMES.map(t => <button key={t.id} className="small" onClick={() => set({css: t.css, ...(t.html ? {html: t.html(draft.options.blocks)} : {})})}>{t.name}</button>)}
         <button className="ghost small" onClick={() => set({html: starterHtml(draft.options.blocks)})}>블록으로 다시 시작</button></div>
@@ -278,11 +340,22 @@ function DesignPanel({draft, setOpts, type}: {draft: Draft; setOpts: (p: Partial
   </div>;
 }
 
+const PALETTES = [
+  {id: 'paper', name: '종이', bg: '#fffdf6', accent: '#b0552f', ink: '#3b352a'}, {id: 'mint', name: '민트', bg: '#eef8f3', accent: '#2f9585', ink: '#1f3b33'},
+  {id: 'sky', name: '하늘', bg: '#eef4ff', accent: '#3a66b8', ink: '#1d2a44'}, {id: 'peach', name: '복숭아', bg: '#fff1ea', accent: '#e8833a', ink: '#4a2d1d'},
+  {id: 'berry', name: '베리', bg: '#fdf0f5', accent: '#c4689a', ink: '#45213a'}, {id: 'night', name: '밤', bg: '#1d2235', accent: '#f2c230', ink: '#eef1ff'},
+  {id: 'mono', name: '계기판', bg: '#f5f5f1', accent: '#151515', ink: '#151515'},
+];
+const CONSOLE_HTML = '<div class="box">\n  <h3 id="title"></h3>\n  <ul id="list"></ul>\n</div>';
+const CONSOLE_CSS = '.box{padding:12px;border-radius:14px;background:var(--lit-surface)}\n#list li{animation:rise .4s ease both}\n@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}';
+const CONSOLE_JS = "async function draw(d){\n  d = d || await lit.made.data();\n  document.getElementById('title').textContent = d.title;\n  document.getElementById('list').innerHTML = d.entries.map(function(e){ return '<li>' + e.time + '</li>'; }).join('');\n}\nlit.on('change', draw);\ndraw();";
+
 // ── 로직: every type (the data dictionary people and AI read) and every automation, in one place ────────
 export function LogicPage({spec, p, saveSpec, close}: {spec: PlannerSpec; p: Planner; saveSpec: (change: (s: PlannerSpec) => PlannerSpec) => Promise<void>; close: () => void}) {
   const [tab, setTab] = useState<'types' | 'flows'>('types'), [edit, setEdit] = useState<string | null>(null);
   const [logic, setLogic] = useState(() => Logic.parse(spec.logic ?? {})), [dirty, setDirty] = useState(false);
   const put = (l: Logic) => { setLogic(l); setDirty(true); };
+  const goals = ofKind(p.records, 'goal').map(g => ({id: g.id, title: g.body.title}));
   const count = (id: string) => p.records.filter(r => r.kind === 'entry' && !r.deletedAt && (r.body as {type: string}).type === id).length;
   const exportAll = () => {
     const lines = p.records.filter(r => r.kind === 'entry' && !r.deletedAt).map(r => { const b = r.body as {type: string; fields: Record<string, unknown>}; const t = logic.types.find(x => x.id === b.type);
@@ -294,7 +367,7 @@ export function LogicPage({spec, p, saveSpec, close}: {spec: PlannerSpec; p: Pla
     <header className="studio-bar"><button className="ghost" onClick={close} aria-label="닫기">←</button><h2>로직</h2>
       <button className="ghost small" onClick={exportAll}>내보내기</button>
       <button className="primary" disabled={!dirty} onClick={async () => { await saveSpec(s => ({...s, logic})); setDirty(false); close(); }}>저장</button></header>
-    <nav className="studio-steps" role="tablist">{([['types', '기록 묶음'], ['flows', '자동화']] as const).map(([k, n]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{n}</button>)}</nav>
+    <nav className="studio-steps" role="tablist">{([['types', 'DB'], ['flows', '규칙']] as const).map(([k, n]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{n}</button>)}</nav>
     <div className="studio-body single">
       {tab === 'types' && <ul className="dict">{logic.types.map(t => <li key={t.id}>
         <div className="dict-head">{t.icon && <Icon name={t.icon} size={18} />}<b>{t.name}</b><span className="mono muted small">{t.id} · {count(t.id)}줄</span>
@@ -302,12 +375,12 @@ export function LogicPage({spec, p, saveSpec, close}: {spec: PlannerSpec; p: Pla
         {t.desc && <p className="small">{t.desc}</p>}
         {t.from && legacyCount(p.records, t) > 0 && <ImportButton t={t} p={p} />}
         <ul className="dict-fields">{t.fields.map(f => <li key={f.id}><b>{f.name}</b> <span className="muted">{FIELD_KINDS.find(k => k.id === f.kind)?.name}{f.unit ? ` · ${f.unit}` : ''}{f.options.length ? ` · ${f.options.join('/')}` : ''}</span>{f.desc && <span className="small"> — {f.desc}</span>}</li>)}</ul>
-      </li>)}{!logic.types.length && <li className="muted">아직 만든 기록 묶음이 없어요.</li>}</ul>}
+      </li>)}{!logic.types.length && <li className="muted">아직 만든 DB가 없어요.</li>}</ul>}
       {tab === 'flows' && <><ul className="sp-flows">{logic.flows.map(f => <li key={f.id} className={f.enabled ? '' : 'off'}>
-        {edit === f.id ? <><FlowEditor flow={f} types={logic.types} onChange={x => put({...logic, flows: logic.flows.map(y => y.id === x.id ? x : y)})} onDelete={() => { put({...logic, flows: logic.flows.filter(y => y.id !== f.id)}); setEdit(null); }} /><button className="ghost small" onClick={() => setEdit(null)}>접기</button></>
+        {edit === f.id ? <><RuleCards flow={f} types={logic.types} goals={goals} onChange={x => put({...logic, flows: logic.flows.map(y => y.id === x.id ? x : y)})} onDelete={() => { put({...logic, flows: logic.flows.filter(y => y.id !== f.id)}); setEdit(null); }} /><button className="ghost small" onClick={() => setEdit(null)}>접기</button></>
           : <div className="inline"><input type="checkbox" checked={f.enabled} onChange={e => put({...logic, flows: logic.flows.map(y => y.id === f.id ? {...y, enabled: e.target.checked} : y)})} aria-label="켜기" />
-            <button className="link flow-line" onClick={() => setEdit(f.id)}>{f.name && <b>{f.name} · </b>}{flowSentence(f, logic.types)}</button></div>}</li>)}</ul>
-        {logic.types.length > 0 && <button className="small" onClick={() => { const f = newFlow(logic.types[0]!.id); put({...logic, flows: [...logic.flows, f]}); setEdit(f.id); }}>+ 자동화</button>}</>}
+            <button className="link flow-line" onClick={() => setEdit(f.id)}>{f.name && <b>{f.name} · </b>}{flowSentence(f, logic.types, goals)}</button></div>}</li>)}</ul>
+        <button className="small" onClick={() => { const f = newRule(logic.types[0]?.id ?? ''); put({...logic, flows: [...logic.flows, f]}); setEdit(f.id); }}>+ 규칙</button></>}
     </div>
   </div></div>;
 }

@@ -1,3 +1,4 @@
+import {useBack} from '../back.ts';
 import {useState} from 'react';
 import {addDays, dayCondition, type Settings} from '@workspace/life-contract';
 import {Logic, entryFocusMin, type PlannerSpec, type Widget} from '@workspace/planner-spec';
@@ -61,6 +62,7 @@ function Summary({p, day, logic, did}: {p: Planner; day: string; logic: Logic; d
 /** Phone: one + button; adding happens in a sheet from the bottom instead of input boxes inside every card. */
 function AddButton({p, day, did}: {p: Planner; day: string; did: boolean}) {
   const [open, setOpen] = useState(false), [text, setText] = useState(''), [cat, setCat] = useState('must'), [time, setTime] = useState('');
+  useBack(open, () => setOpen(false));
   const add = async () => {
     const parsed = parseEntry(text, day);
     if (!parsed.title.trim()) return;

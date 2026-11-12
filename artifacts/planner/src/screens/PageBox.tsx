@@ -1,3 +1,4 @@
+import {useBack} from '../back.ts';
 import {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import type {LifeRecord, Note, PageBlock} from '@workspace/life-contract';
@@ -28,6 +29,7 @@ export function PageBox({w, ctx}: {w: Widget; ctx: Ctx}) {
   const L = useL(), glyph = boxGlyph(w);
   const pages = ofKind(ctx.p.records, 'note').filter(n => n.body.signifier === 'entry' && n.body.table === w.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const [ask, setAsk] = useState(false), [title, setTitle] = useState(''), [openId, setOpenId] = useState<string | null>(null);
+  useBack(ask, () => setAsk(false)); useBack(!!openId, () => setOpenId(null));
   const tpl = (w.options.template as Template | undefined) ?? {};
   const go = async () => {
     setAsk(false);

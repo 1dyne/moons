@@ -1,3 +1,4 @@
+import {useBack} from '../back.ts';
 import {useState} from 'react';
 import {addDays, goalPercent, goalProgress, logicalDay, periodContains, personaShare, suggestGoal, routineDue, routineRate, type AnyRecord, type LifeRecord, type Settings, type Task} from '@workspace/life-contract';
 import {modulesFor, uses, type ModuleSpec, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
@@ -132,6 +133,7 @@ function TaskRow({t, ctx, index, handle, dragging}: {t: LifeRecord<'task'>; ctx:
   const defs = ctx.spec?.props?.task ?? [];
   const {p, nav, timer, color} = ctx;
   const [open, setOpen] = useState(false), [amount, setAmount] = useState(''), [reason, setReason] = useState(''), [postpone, setPostpone] = useState(false);
+  useBack(open, () => { setOpen(false); setPostpone(false); });
   const o = t.body.outcome, target = t.body.plan.target, day = t.logicalDay!;
   const goals = ofKind(p.records, 'goal').filter(g => t.body.goalIds.includes(g.id)), personas = ofKind(p.records, 'persona').filter(x => t.body.personaIds.includes(x.id));
   const spent = ofKind(p.records, 'session').filter(s => s.body.taskId === t.id).reduce((m, s) => m + Math.max(0, (new Date(s.body.end ?? ctx.now()).getTime() - new Date(s.body.start).getTime()) / 60000), 0);

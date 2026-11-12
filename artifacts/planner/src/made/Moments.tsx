@@ -1,3 +1,4 @@
+import {useBack} from '../back.ts';
 import {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {addDays, routineRate, type Settings} from '@workspace/life-contract';
@@ -18,6 +19,7 @@ const mark = (id: string, day: string) => { try { localStorage.setItem(firedKey(
 export function MomentHost({spec, p, today, settings}: {spec: PlannerSpec; p: Planner; today: string; settings: Settings}) {
   const [pop, setPop] = useState<{what: OpenWhat; day: string} | null>(null), [notes, setNotes] = useState<string[]>([]);
   const live = useRef({spec, p, today}); live.current = {spec, p, today};
+  useBack(!!pop, () => setPop(null));
   useEffect(() => {
     const open = (e: Event) => { const d = (e as CustomEvent<{what: OpenWhat; day?: string}>).detail, t = live.current.today; setPop({what: d.what, day: d.day ?? (d.what === 'receipt-yesterday' ? addDays(t, -1) : t)}); };
     addEventListener('lit:open', open); return () => removeEventListener('lit:open', open);

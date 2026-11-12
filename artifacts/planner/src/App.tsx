@@ -1,3 +1,4 @@
+import {useBack} from './back.ts';
 import {createContext, useContext, useEffect, useState} from 'react';
 import {useClerk} from '@clerk/react';
 import {logicalDay, type AnyRecord, type Availability, type Settings} from '@workspace/life-contract';
@@ -54,6 +55,7 @@ function Home({loaded, edit, reload}: {loaded: Loaded & {planner: NonNullable<Lo
   const {spec} = loaded.planner;
   const p = usePlanner(httpBackend, loaded.records);
   const [settingsOpen, setSettingsOpen] = useState(false), [decorating, setDecorating] = useState(false), [menu, setMenu] = useState(false);
+  useBack(menu, () => setMenu(false)); useBack(settingsOpen, () => setSettingsOpen(false)); useBack(decorating, () => { editModePage(null); setDecorating(false); });
   const library = useLibraryState(), phone = usePhone();
   const sp = skinProps(spec.skin);
   const sync = useSync(async () => p.setRecords(await api.recordsWithQueue()));

@@ -108,9 +108,25 @@ export function usePlanner(backend: Backend, initial: AnyRecord[]) {
   // Writes to one record go out one after another (a check right after creating waits for the create), each on the
   // latest saved revision, and only the newest answer is shown.
   const chains = useRef(new Map<string, Promise<AnyRecord | null>>()), seq = useRef(new Map<string, number>());
-  const write = useCallback(async (id: string | null, w: Write) => {
+  // Undo: each change the user makes is remembered with what was there before; changes within a moment form one step
+  // (moving a task writes two records). 되돌리기 puts back the last step.
+  const latest = useRef(records); latest.current = records;
+  const journal = useRef<{at: number; items: {id: string; before: AnyRecord | null}[]}[]>([]);
+  const [lastStep, setLastStep] = useState<{at: number; label: string} | null>(null);
+  const remember = (id: string, before: AnyRecord | null, label: string) => {
+    const now = Date.now(), top = journal.current.at(-1);
+    if (top && now - top.at < 700) { if (!top.items.some(x => x.id === id)) top.items.push({id, before}); top.at = now; }
+    else journal.current = [...journal.current.slice(-19), {at: now, items: [{id, before}]}];
+    setLastStep({at: now, label});
+  };
+  const write = useCallback(async (id: string | null, w: Write, opts: {quiet?: boolean} = {}) => {
     setError('');
     const live = backend === httpBackend, rid = id ?? w.id ?? ulid(), n = (seq.current.get(rid) ?? 0) + 1;
+    if (!opts.quiet && live) {
+      const prior = latest.current.find(x => x.id === rid) ?? null;
+      const kindName = ({task: '할 일', condition: '컨디션', sleep: '수면', entry: '기록', note: '메모', session: '집중', routine: '루틴', goal: '목표'} as Record<string, string>)[w.kind] ?? '기록';
+      remember(rid, prior, `${kindName} ${prior ? '수정' : '추가'}`);
+    }
     seq.current.set(rid, n);
     let before: AnyRecord | undefined;
     if (live) setRecords(list => {
@@ -132,15 +148,28 @@ export function usePlanner(backend: Backend, initial: AnyRecord[]) {
       return null;
     }
   }, [backend]);
-  const remove = useCallback(async (id: string) => {
+  const remove = useCallback(async (id: string, opts: {quiet?: boolean} = {}) => {
     setError('');
+    if (!opts.quiet && backend === httpBackend) { const prior = latest.current.find(x => x.id === id); if (prior) remember(id, prior, '지우기'); }
     let before: AnyRecord | undefined;
     if (backend === httpBackend) setRecords(list => { before = list.find(x => x.id === id); return list.filter(x => x.id !== id); });
     try { put(await backend.remove(id)); } catch (e) { setError((e as Error).message); if (before) { const b = before; setRecords(list => [...list, b]); } }
   }, [backend]);
   // Rows the server adds by itself (log tables) after a session or goal write: pull them in (real planner only).
   const refresh = useCallback(async () => { if (backend === httpBackend) { try { setRecords(await api.recordsWithQueue()); } catch { /* offline: next sync */ } } }, [backend]);
-  return {records, write, remove, error, setRecords, refresh};
+  const undo = useCallback(async () => {
+    const step = journal.current.pop();
+    setLastStep(null);
+    if (!step) return;
+    for (const {id, before} of [...step.items].reverse()) {
+      const now = latest.current.find(x => x.id === id);
+      if (!before) { if (now) await remove(id, {quiet: true}); continue; }
+      const back = {kind: before.kind, logicalDay: before.logicalDay, body: before.body, ...(before.ext ? {ext: before.ext} : {}), ...(before.privateFields ? {privateFields: before.privateFields} : {})};
+      // Put the old version back; a deleted record comes back as a new one with the same content.
+      if (now) await write(id, {...back, baseRevision: now.revision}, {quiet: true}); else await write(null, back, {quiet: true});
+    }
+  }, [write, remove]); // eslint-disable-line react-hooks/exhaustive-deps
+  return {records, write, remove, error, setRecords, refresh, undo, lastStep, clearStep: () => setLastStep(null)};
 }
 export type Planner = ReturnType<typeof usePlanner>;
 export const ofKind = <K extends Kind>(records: AnyRecord[], kind: K) => records.filter(r => r.kind === kind && !r.deletedAt) as unknown as LifeRecord<K>[];

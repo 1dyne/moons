@@ -1,3 +1,4 @@
+import {useBack} from '../back.ts';
 import {useEffect, useMemo, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {FIELD_KINDS, LOGIC_BLOCKS, AGGS, BLOCK_GROUPS, Logic, MadeOptions, PERIODS, TypeDef, VERB_NAMES, blockInfo, checkTemplate, flowSentence, newBlock, newLogicId, tabsOf,
@@ -30,8 +31,9 @@ export function StudioHost({spec, settings, p, nav, today, tab, saveSpec}: {spec
     const found = allWidgets(spec).find(x => x.w.id === open.widgetId)?.w;
     if (found) setDraft({widgetId: found.id, title: found.title ?? '', options: MadeOptions.parse(found.options), types: logic.types, flows: logic.flows});
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!open || !saveSpec) return null;
   const close = () => { setOpen(null); setDraft(null); };
+  useBack(!!open, close);
+  if (!open || !saveSpec) return null;
   const ctxBase = {p, nav, now: () => new Date().toISOString(), timer: null, color: () => '#888', settings} as const;
   if ('logic' in open) return createPortal(<LogicPage spec={spec} p={p} saveSpec={saveSpec} close={close} />, document.body);
   // The user's own subjects (from timer widgets) and routines, so block versions start with them.

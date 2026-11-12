@@ -1,3 +1,4 @@
+import {useBack} from '../back.ts';
 import {useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Flow, Logic, WIDGET_LABELS, widgetInfo, type PlannerSpec, type Widget} from '@workspace/planner-spec';
@@ -27,6 +28,7 @@ export function useWidgetSettings(w: Widget, ctx: Ctx) {
 }
 
 function Panel({w, ctx, close}: {w: Widget; ctx: Ctx; close: () => void}) {
+  useBack(true, close);
   const [o, setO] = useState<Record<string, unknown>>(w.options), [title, setTitle] = useState(w.title ?? ''), [busy, setBusy] = useState(false);
   const spec = ctx.spec as PlannerSpec;
   const draft = {...w, options: o};

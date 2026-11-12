@@ -1,3 +1,4 @@
+import {useBack} from '../back.ts';
 import {useEffect, useState} from 'react';
 import {logicalDay, type Settings} from '@workspace/life-contract';
 import {BUILTIN_TABS, tabsOf, type PlannerSpec, type TabSpec} from '@workspace/planner-spec';
@@ -34,6 +35,7 @@ export function PlannerView({spec, settings, p, saveSpec}: {spec: PlannerSpec; s
     {phone ? <BottomTabs tabs={tabs} active={tab.id} pick={pickTab} save={saveSpec ? next => saveSpec(s => ({...s, tabs: next})) : undefined} />
       : <TabBar tabs={tabs} active={tab.id} pick={pickTab} save={saveSpec ? next => saveSpec(s => ({...s, tabs: next})) : undefined} />}
     <Toast text={p.error} />
+    <UndoBar p={p} />
     {tab.kind === 'today' && <DayPage spec={spec} settings={settings} p={p} nav={nav} today={today} saveSpec={saveSpec} />}
     {tab.kind === 'page' && <DayPage spec={spec} settings={settings} p={p} nav={nav} today={today} saveSpec={saveSpec} page={tab.widgets ?? []} />}
     {tab.kind === 'week' && <Week spec={spec} settings={settings} p={p} nav={nav} today={today} />}
@@ -89,6 +91,7 @@ function Toast({text}: {text: string}) {
 /** Phone: the first four tabs at the thumb, the rest (and tab editing) under 더보기. */
 function BottomTabs({tabs, active, pick, save}: {tabs: TabSpec[]; active: string; pick: (id: string) => void; save?: (tabs: TabSpec[]) => Promise<void>}) {
   const [more, setMore] = useState(false);
+  useBack(more, () => setMore(false));
   const main = tabs.slice(0, 4), rest = tabs.slice(4), inRest = rest.some(t => t.id === active);
   return <>
     <nav className="bottom-tabs" role="tablist">
@@ -103,4 +106,14 @@ function BottomTabs({tabs, active, pick, save}: {tabs: TabSpec[]; active: string
       </div>
     </div>}
   </>;
+}
+
+/** 되돌리기: shown for a few seconds after a change; the button (or the back button) puts the last change back. */
+function UndoBar({p}: {p: Planner}) {
+  const step = p.lastStep, [, tick] = useState(0);
+  const live = !!step && Date.now() - step.at < 6000;
+  useEffect(() => { if (!step) return; const t = setTimeout(() => tick(n => n + 1), 6100 - (Date.now() - step.at)); return () => clearTimeout(t); }, [step]);
+  useBack(live, () => void p.undo());
+  if (!live) return null;
+  return <div className="undo-bar" role="status"><span>{step!.label}</span><button onClick={() => void p.undo()}>되돌리기</button><button className="ghost" onClick={p.clearStep} aria-label="닫기">✕</button></div>;
 }

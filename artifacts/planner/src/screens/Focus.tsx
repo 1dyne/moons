@@ -58,7 +58,7 @@ export function useTimer(p: Planner, settings: Settings) {
 export type Timer = ReturnType<typeof useTimer>;
 
 export function FocusBar({p, day, timer, color}: {p: Planner; day: string; timer: Timer; color: (k: string) => string}) {
-  const now = useClock();
+  const now = useClock(timer.running ? 1000 : 60_000);
   const [label, setLabel] = useState(''), [note, setNote] = useState('');
   const focus = focusOf(p.records, day, now);
   const done = timer.stopped;
@@ -235,7 +235,8 @@ export type Subject = {name: string; color: string};
 export const SUBJECT_COLORS = ['#3a66b8', '#2f9585', '#e9a317', '#d0342c', '#7b6bc4', '#00838f', '#c4689a', '#5d5d57'];
 export function SubjectTimer({p, day, timer, subjects, showTasks, askCondition, onSubjects, view = 'list', onView, show = ['goal'], defs = []}: {p: Planner; day: string; timer: Timer; subjects: Subject[]; showTasks: boolean; askCondition: boolean; onSubjects?: (s: Subject[]) => void;
   view?: string; onView?: (v: 'list' | 'time') => void; show?: string[]; defs?: PropDef[]}) {
-  const now = useClock(1000), L = useL();
+  // Ticks every second only while something is being timed; otherwise once a minute.
+  const now = useClock(timer.running ? 1000 : 60_000), L = useL();
   const [adding, setAdding] = useState(''), [note, setNote] = useState('');
   const sessions = ofKind(p.records, 'session').filter(s => s.logicalDay === day);
   const spent = (match: (s: LifeRecord<'session'>) => boolean) => sessions.filter(match).reduce((m, s) => m + Math.max(0, (new Date(s.body.end ?? now.toISOString()).getTime() - new Date(s.body.start).getTime()) / 60000), 0);

@@ -82,8 +82,8 @@ export const LOGIC_BLOCKS: {kind: BlockKind; group: BlockGroup; name: string; de
   {kind: 'note', group: 'deco', name: '안내 없는 빈 줄', desc: '간격'},
 ];
 export const blockInfo = (k: BlockKind) => LOGIC_BLOCKS.find(b => b.kind === k)!;
-export const AGGS = [{id: 'count', name: '개수'}, {id: 'sum', name: '합계'}, {id: 'avg', name: '평균'}, {id: 'max', name: '최대'}, {id: 'min', name: '최소'}, {id: 'streak', name: '연속 일수'}, {id: 'days', name: '기록한 날 수'}, {id: 'last', name: '마지막 값'}] as const;
-export type Agg = (typeof AGGS)[number]['id'];
+import {AGGS, type Agg} from './agg.ts';
+export {AGGS, type Agg} from './agg.ts';
 export const Step = z.object({name: z.string().trim().min(1).max(20), min: z.number().min(0.1).max(600)});
 export const LogicBlock = z.object({
   id: z.string().regex(/^[a-z0-9]{1,12}$/),

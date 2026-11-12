@@ -8,3 +8,4 @@ export * from './widgets.ts';
 export * from './logic.ts';
 export * from './template.ts';
 export * from './modes.ts';
+export * from './signals.ts';

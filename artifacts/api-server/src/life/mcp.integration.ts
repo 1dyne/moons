@@ -170,7 +170,7 @@ test('wish box: an item rule opens a wish on the server when its own 상황 is m
   const type = {id: 'wishx', name: '소원', fields: [{id: 'wish', name: '소원', kind: 'text'}, {id: 'cond', name: '여는 조건', kind: 'signal'}, {id: 'state', name: '상태', kind: 'choice', options: ['잠김', '열림', '사용함']}]};
   const rules = [{on: {type: 'wishx'}, if: [{field: 'state', op: 'empty', value: ''}], do: [{do: 'update', fields: {state: {set: '잠김'}}}]},
     {on: {kind: 'item', type: 'wishx', field: 'cond'}, if: [{field: 'state', op: 'eq', value: '잠김'}], do: [{do: 'update', fields: {state: {set: '열림'}}}, {do: 'effect', name: 'sparkle'}, {do: 'notify', text: '{이름} 열렸어요'}]}];
-  await call('make_widget', {type, blocks: [{kind: 'form', fields: ['wish', 'cond']}, {kind: 'cards', field: 'cond', stateField: 'state'}], flows: rules, launch: {mode: 'sticker', icon: 'gift', badge: {field: 'state', value: '열림'}}});
+  await call('make_widget', {type, blocks: [{kind: 'form', fields: ['wish', 'cond']}, {kind: 'cards', field: 'cond', stateField: 'state'}], flows: rules, launch: JSON.stringify({mode: 'sticker', icon: 'gift', badge: {field: 'state', value: '열림'}})});
   const again = await call('make_widget', {type, blocks: [{kind: 'cards', field: 'cond', stateField: 'state'}], flows: rules});
   assert.equal((again.flows as string[]).filter(x => x.startsWith('소원')).length, 2, 'the same two rules, not four');
   const at = '2026-11-12T01:00:00.000Z';

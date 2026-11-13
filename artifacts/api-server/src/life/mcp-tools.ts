@@ -385,9 +385,11 @@ export function registerPlannerTools(tool: Tool) {
       signals: SIGNALS, effects: EFFECTS};
   });
 
+  // A client holding an older copy of this tool's schema sends objects it does not know as JSON text.
+  const json = (v: unknown) => { if (typeof v !== 'string') return v; try { return JSON.parse(v); } catch { return v; } };
   tool('make_widget', '부품으로 위젯을 만든다(또는 widgetId로 고친다): type(DB, 새로 만들거나 기존 id) + blocks(부품) + flows(규칙: on→if/when→do; 주면 이 DB의 기존 규칙을 바꾼다) + design(blocks|html|code) + launch(스티커). 같은 DB를 쓰는 위젯끼리는 기록을 함께 본다. 사용자에게 무엇을 만들지 말하고 OK를 받은 뒤에 부른다.',
     {type: TypeDef, blocks: z.array(LogicBlock.partial({id: true}).extend({kind: z.enum(BLOCK_KINDS)})).min(1).max(30), flows: z.array(Flow.partial({id: true}).extend({do: z.array(Action).min(1).max(8)})).max(20).optional(),
-      design: Design.partial().optional(), launch: Launch.partial().optional(), title: z.string().max(40).optional(), widgetId: z.string().optional(), tab: z.string().optional()},
+      design: z.preprocess(json, Design.partial().optional()), launch: z.preprocess(json, Launch.partial().optional()), title: z.string().max(40).optional(), widgetId: z.string().optional(), tab: z.string().optional()},
     async ({type, blocks, flows, design, launch, title, widgetId, tab}, owner) => {
       const current = (await getSpec(owner))?.spec as PlannerSpec | undefined;
       if (!current) throw new WorkspaceError(400, '먼저 build_planner로 플래너를 만든다.');
@@ -396,7 +398,7 @@ export function registerPlannerTools(tool: Tool) {
       // New rules for this DB replace its old ones (as the editor's 동작 tab does); other DBs' rules stay.
       const mine = (f: Flow) => f.on.type === type.id || f.do.some(a => 'type' in a && a.type === type.id);
       const fl = [...(flows ? logic.flows.filter(f => !mine(f)) : logic.flows), ...(flows ?? []).map(f => Flow.parse({...f, id: f.id ?? newLogicId()}))];
-      const options = MadeOptions.parse({type: type.id, blocks: blocks.map(b => LogicBlock.parse({...b, id: b.id ?? newLogicId()})), design: design ?? {}, launch: launch ?? {}});
+      const options = MadeOptions.parse({type: type.id, blocks: blocks.map(b => LogicBlock.parse({...b, id: b.id ?? newLogicId()})), design: json(design) ?? {}, launch: json(launch) ?? {}});
       const place = (ws: Widget[]) => {
         if (widgetId && ws.some(w => w.id === widgetId)) return ws.map(w => w.id === widgetId ? {...w, title: title ?? w.title, options} : w);
         const bottom = ws.reduce((m, w) => Math.max(m, w.y + w.h), 0);

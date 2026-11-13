@@ -169,7 +169,7 @@ export function usePlanner(backend: Backend, initial: AnyRecord[]) {
       if (now) await write(id, {...back, baseRevision: now.revision}, {quiet: true}); else await write(null, back, {quiet: true});
     }
   }, [write, remove]); // eslint-disable-line react-hooks/exhaustive-deps
-  return {records, write, remove, error, setRecords, refresh, undo, lastStep, clearStep: () => setLastStep(null)};
+  return {records, live: () => latest.current, write, remove, error, setRecords, refresh, undo, lastStep, clearStep: () => setLastStep(null)};
 }
 export type Planner = ReturnType<typeof usePlanner>;
 export const ofKind = <K extends Kind>(records: AnyRecord[], kind: K) => records.filter(r => r.kind === kind && !r.deletedAt) as unknown as LifeRecord<K>[];

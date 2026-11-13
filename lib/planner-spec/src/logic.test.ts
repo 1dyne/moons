@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import type {AnyRecord} from '@workspace/life-contract';
-import {Flow, Logic, aggregate, checkTemplate, cleanCss, entriesOf, flowSentence, matches, periodRange, renderTemplate, runFlows, suggestLinks, type E} from './index.ts';
+import {Flow, Logic, MadeOptions, aggregate, checkTemplate, cleanCss, entriesOf, flowSentence, matches, periodRange, renderTemplate, runFlows, suggestLinks, type E} from './index.ts';
 
 let n = 0;
 const entry = (type: string, day: string, body: Record<string, unknown> = {}, revision = 1) => ({id: `E${++n}`, kind: 'entry', revision, logicalDay: day, deletedAt: null, createdAt: '', updatedAt: '', tz: 'Asia/Seoul', source: {type: 'planner', confirmed: true},
@@ -89,10 +89,35 @@ test('wishes: each item opens when its own 상황 is met, once; 상황 condition
   assert.equal(runItems(f, logic, [sea, kb, task('unknown')], day).writes.length, 0, 'tasks not done yet');
   const out = runItems(f, logic, [sea, kb, task('done')], day);
   assert.deepEqual(out.writes.map(w => [w.id, w.body.fields.state]), [[sea.id, '열림']]);
-  assert.deepEqual(out.effects, [{name: 'sparkle', entry: sea.id}]);
+  assert.deepEqual(out.effects, [{name: 'sparkle', entry: sea.id, type: 'wish'}]);
   assert.deepEqual(out.notices, ['바다 열렸어요']);
   const opened = {...sea, body: {...(sea as unknown as {body: object}).body, fields: {wish: '바다', cond: JSON.stringify({kind: 'tasksAll'}), state: '열림'}}} as unknown as AnyRecord;
   assert.equal(runItems(f, logic, [opened, kb, task('done')], day).writes.length, 0, 'an opened wish does not open again');
   assert.equal(flowSentence(f, logic.types), '소원의 항목마다, 그 항목의 조건이 되면 · 상태가 잠김이면 → 상태를 열림으로, 그 카드에 반짝 효과, 알림 "{이름} 열렸어요"');
   assert.equal(josa('상태', '을를'), '상태를'); assert.equal(josa('목표', '이가'), '목표가'); assert.equal(josa('열림', '으로'), '열림으로'); assert.equal(josa('잠김', '이가'), '잠김이');
+});
+
+test('상황 rule: the mission rule acts only once its situation is met, and plays on its own DB only', async () => {
+  const {runMoment} = await import('./index.ts');
+  const day = '2026-11-12', logic = Logic.parse({types: [{id: 'focus', name: '집중', focus: true}]});
+  const f = Flow.parse({id: 'mis', on: {kind: 'signal', type: 'focus', signal: {kind: 'tasksAll'}}, do: [{do: 'notify', text: '자유시간'}, {do: 'effect', name: 'confetti', target: 'widget'}]});
+  const task = (r: string) => ({id: `T${r}`, kind: 'task', revision: 1, logicalDay: day, deletedAt: null, createdAt: '', updatedAt: '', body: {title: 't', category: 'must', plan: {}, outcome: {result: r}}}) as unknown as AnyRecord;
+  assert.equal(runMoment(f, logic, [task('unknown')], day).notices.length, 0);
+  const out = runMoment(f, logic, [task('done')], day);
+  assert.deepEqual(out.notices, ['자유시간']);
+  assert.deepEqual(out.effects, [{name: 'confetti', entry: null, type: 'focus'}]);
+});
+
+test('packages: install shares a same-shaped DB, renames a clashing one, skips rules already there, refuses newer contracts', async () => {
+  const {packOf, installPack, LOGIC_CONTRACT} = await import('./index.ts');
+  const wish = {id: 'wish', name: '소원', fields: [{id: 'wish', name: '소원', kind: 'text'}]};
+  const mine = Logic.parse({types: [wish], flows: [{id: 'a', on: {type: 'wish'}, do: [{do: 'notify', text: '새 소원'}]}]});
+  const pack = packOf('소원 상자', MadeOptions.parse({type: 'wish'}), mine);
+  assert.equal(pack.contract, LOGIC_CONTRACT); assert.equal(pack.flows.length, 1);
+  const same = installPack(mine, pack);
+  assert.equal(same.logic.types.length, 1); assert.equal(same.logic.flows.length, 1); assert.equal(same.options.type, 'wish');
+  const other = Logic.parse({types: [{id: 'wish', name: '다른', fields: [{id: 'x', name: 'x', kind: 'number'}]}]});
+  const moved = installPack(other, pack);
+  assert.equal(moved.options.type, 'wish2'); assert.equal(moved.logic.flows[0]!.on.type, 'wish2');
+  assert.throws(() => installPack(mine, {...pack, contract: LOGIC_CONTRACT + 1}), /새로운 lit/);
 });

@@ -53,7 +53,7 @@ export function MomentHost({spec, p, today, settings}: {spec: PlannerSpec; p: Pl
           seen.push(key);
           const name = titleOfEntry(r.body, logic.types.find(t => t.id === r.body.type));
           applyRef.current({writes: [], opens: [], notices: f.do.flatMap(a => a.do === 'notify' ? [a.text.replace('{이름}', name)] : []),
-            effects: f.do.flatMap(a => a.do === 'effect' ? [{name: a.name, entry: a.target === 'item' ? r.id : null}] : [])}, day);
+            effects: f.do.flatMap(a => a.do === 'effect' ? [{name: a.name, entry: a.target === 'item' ? r.id : null, type: r.body.type}] : [])}, day);
         }
       }
       saveSeen(seen);
@@ -87,7 +87,7 @@ export function MomentHost({spec, p, today, settings}: {spec: PlannerSpec; p: Pl
       for (const w of out.writes) void pl.write(w.id, {kind: 'entry', logicalDay: w.logicalDay, body: w.body, ...(w.baseRevision !== undefined ? {baseRevision: w.baseRevision} : {})}, {quiet: true});
       if (out.notices.length) { setNotes(n => [...n, ...out.notices]); setTimeout(() => setNotes(n => n.slice(out.notices.length)), 6000); }
       // Effects play once the card has re-rendered with its new state.
-      if (out.effects.length) setTimeout(() => { for (const fx of out.effects) playEffect(fx.name, fx.entry); }, 350);
+      if (out.effects.length) setTimeout(() => { for (const fx of out.effects) playEffect(fx.name, fx.entry, fx.type); }, 350);
       const o = out.opens.at(-1) as OpenWhat | undefined;
       if (o) setPop({what: o, day: o === 'receipt-yesterday' ? addDays(day, -1) : day});
     };

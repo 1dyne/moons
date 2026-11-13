@@ -1,5 +1,6 @@
 import {z} from 'zod';
 import {PROP_TYPES, Skin, Widget, type PropType} from './canvas.ts';
+import {MadePack} from './pack.ts';
 
 // lit widget platform (docs/lit/WIDGET_PLATFORM.md).
 // One package format for everyone: a manifest (JSON). Non-developers (and AI) compose built-in blocks;
@@ -75,13 +76,15 @@ export function codeHash(m: Pick<WidgetManifest, 'code' | 'html' | 'css' | 'perm
 }
 
 /** 내 라이브러리: saved widgets (a configured built-in), page templates, skins, and manifest widgets. */
-export const LIBRARY_KINDS = ['widget', 'template', 'skin', 'custom'] as const;
+export const LIBRARY_KINDS = ['widget', 'template', 'skin', 'custom', 'made'] as const;
 export type LibraryKind = typeof LIBRARY_KINDS[number];
 export const LibraryData = {
   widget: z.object({widget: Widget}),
   template: z.object({widgets: z.array(Widget).max(80), skin: Skin.optional()}),
   skin: z.object({skin: Skin}),
   custom: z.object({manifest: WidgetManifest}),
+  // A made widget with its DBs and rules (pack.ts); console code needs the same approval as a code widget.
+  made: z.object({pack: MadePack}),
 } as const;
 export type LibraryItem<K extends LibraryKind = LibraryKind> = {
   id: string; kind: K; name: string; data: z.infer<(typeof LibraryData)[K]>;

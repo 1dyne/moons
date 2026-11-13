@@ -1,5 +1,5 @@
 import {createHash, randomBytes} from 'node:crypto';
-import {LIBRARY_KINDS, LibraryData, codeHash, isCode, type LibraryItem, type LibraryKind, type WidgetManifest} from '@workspace/planner-spec';
+import {LIBRARY_KINDS, LibraryData, codeHash, isCode, packCode, type MadePack, type LibraryItem, type LibraryKind, type WidgetManifest} from '@workspace/planner-spec';
 import {q, json} from '../moons/lib/server/db.ts';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 
@@ -17,6 +17,13 @@ type Row = {id: string; kind: LibraryKind; name: string; data: unknown; enabled:
 const item = (r: Row): LibraryItem => ({id: r.id, kind: r.kind, name: r.name, data: r.data as never, enabled: r.enabled, approved: r.approved, source: r.source, createdAt: new Date(r.created_at).toISOString(), updatedAt: new Date(r.updated_at).toISOString()});
 const MAX_ITEMS = 300;
 
+/** The code a library item runs (a code widget, or a made widget drawn in the developer console), which needs approval. */
+function codeOf(kind: LibraryKind, data: Record<string, unknown>) {
+  if (kind === 'custom') { const m = data.manifest as WidgetManifest; return isCode(m) ? m : null; }
+  if (kind === 'made') return packCode(data.pack as MadePack);
+  return null;
+}
+
 export async function listLibrary(owner: string): Promise<LibraryItem[]> {
   await init();
   return (await q<Row>('select id,kind,name,data,enabled,approved,source,created_at,updated_at from lit_library where owner_id=$1 order by kind,updated_at desc', [owner])).map(item);
@@ -32,11 +39,12 @@ export async function saveLibrary(owner: string, raw: {id?: string; kind: string
   const data = parsed.data as Record<string, unknown>;
   const manifest = kind === 'custom' ? (data.manifest as WidgetManifest) : null;
   const id = manifest ? `w-${manifest.id}` : raw.id && /^[a-z0-9-]{1,60}$/.test(raw.id) ? raw.id : `${kind}-${randomBytes(5).toString('hex')}`;
-  const name = (manifest?.name ?? raw.name ?? '').trim().slice(0, 40) || '이름 없음';
+  const name = (manifest?.name ?? raw.name ?? (kind === 'made' ? (data.pack as MadePack).title : '')).trim().slice(0, 40) || '이름 없음';
   const before = (await q<{data: {manifest?: WidgetManifest}; approved: string | null}>('select data,approved from lit_library where owner_id=$1 and id=$2', [owner, id]))[0];
   if (!before && Number((await q<{n: string}>('select count(*)::text n from lit_library where owner_id=$1', [owner]))[0]!.n) >= MAX_ITEMS) throw new WorkspaceError(400, '라이브러리가 가득 찼어요.');
   // Approval survives an update only when code and permissions are unchanged.
-  const approved = manifest && isCode(manifest) && before?.approved && before.approved === codeHash(manifest) ? before.approved : null;
+  const code = codeOf(kind, data);
+  const approved = code && before?.approved && before.approved === codeHash(code) ? before.approved : null;
   await q(`insert into lit_library(owner_id,id,kind,name,data,enabled,approved,source) values($1,$2,$3,$4,$5,$6,$7,$8)
     on conflict(owner_id,id) do update set kind=excluded.kind,name=excluded.name,data=excluded.data,enabled=excluded.enabled,approved=excluded.approved,source=excluded.source,updated_at=now()`,
     [owner, id, kind, name, json(data), raw.enabled ?? true, approved, source]);
@@ -47,7 +55,7 @@ export async function setLibraryState(owner: string, id: string, patch: {enabled
   await init();
   const row = (await q<Row>('select id,kind,name,data,enabled,approved,source,created_at,updated_at from lit_library where owner_id=$1 and id=$2', [owner, id]))[0];
   if (!row) throw new WorkspaceError(404, 'Not in your library.');
-  const m = row.kind === 'custom' ? (row.data as {manifest: WidgetManifest}).manifest : null;
+  const m = codeOf(row.kind, row.data as Record<string, unknown>);
   const approved = patch.approve === undefined ? row.approved : patch.approve && m ? codeHash(m) : null;
   await q('update lit_library set enabled=$3,approved=$4,name=$5,updated_at=now() where owner_id=$1 and id=$2',
     [owner, id, patch.enabled ?? row.enabled, approved, (patch.name ?? row.name).trim().slice(0, 40) || row.name]);

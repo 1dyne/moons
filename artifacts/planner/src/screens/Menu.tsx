@@ -4,7 +4,8 @@ import {libraryApi, useLibrary} from '../library.tsx';
 import {hiddenOnPhone, openByDefault, phoneOrder} from '../phone.tsx';
 import {currentTab} from './PlannerView.tsx';
 import {canvasOf} from './Canvas.tsx';
-import {openStudio} from '../made/Studio.tsx';
+import {downloadPack, openStudio} from '../made/Studio.tsx';
+import {Logic, MadePack, installPack} from '@workspace/planner-spec';
 import {editModePage} from '../mode.ts';
 import {Mode} from '@workspace/planner-spec';
 
@@ -12,7 +13,7 @@ import {Mode} from '@workspace/planner-spec';
 // Sections follow plugin managers (Obsidian: installed list with toggles, code gated until approved;
 // Figma: manifest permissions, sandboxed frame) and Notion's sidebar (templates and settings tucked aside).
 type Section = 'home' | 'library' | 'make' | 'installed' | 'dev' | 'mobile' | 'modes';
-const KIND_NAME = {widget: '저장한 위젯', template: '페이지 틀', skin: '스킨', custom: '내 위젯'} as const;
+const KIND_NAME = {made: '만든 위젯 (DB·규칙째)', widget: '저장한 위젯', template: '페이지 틀', skin: '스킨', custom: '내 위젯'} as const;
 
 export function MenuDrawer({open, close, spec, saveSpec, openSettings, openDecorate}: {open: boolean; close: () => void; spec: PlannerSpec; saveSpec: (s: PlannerSpec) => Promise<void>; openSettings: () => void; openDecorate?: () => void}) {
   const [section, setSection] = useState<Section>('home'), lib = useLibrary();
@@ -58,19 +59,33 @@ export function placeCustom(spec: PlannerSpec, item: LibraryItem<'custom'>): Pla
   return {...spec, canvas: {day: [...day, sized], mode: 'free'}};
 }
 
+/** Put a made widget package on the day page: its DBs and rules join the user's logic (installPack). */
+export function placeMade(spec: PlannerSpec, item: LibraryItem<'made'>): PlannerSpec {
+  const {logic, options, title} = installPack(Logic.parse(spec.logic ?? {}), item.data.pack);
+  const day = spec.canvas.day ?? [], w = placeNew(day, 'made', `made-${Date.now().toString(36)}`, 'free');
+  return {...spec, logic, canvas: {day: [...day, {...w, w: 24, h: 30, title, options: {...options, from: item.id} as unknown as Record<string, unknown>}], mode: 'free'}};
+}
+
 function LibraryView({spec, saveSpec, close}: {spec: PlannerSpec; saveSpec: (s: PlannerSpec) => Promise<void>; close: () => void}) {
   const lib = useLibrary();
   const [renaming, setRenaming] = useState<string | null>(null), [confirm, setConfirm] = useState<string | null>(null), [msg, setMsg] = useState('');
   if (!lib) return null;
-  const groups = (['template', 'skin', 'widget', 'custom'] as const).map(k => [k, lib.items.filter(x => x.kind === k)] as const);
+  const groups = (['made', 'template', 'skin', 'widget', 'custom'] as const).map(k => [k, lib.items.filter(x => x.kind === k)] as const);
   const apply = async (it: LibraryItem) => {
     if (it.kind === 'template') { const d = (it as LibraryItem<'template'>).data; await saveSpec({...spec, canvas: {day: d.widgets, mode: 'free'}, ...(d.skin ? {skin: d.skin} : {})}); }
     if (it.kind === 'skin') await saveSpec({...spec, skin: (it as LibraryItem<'skin'>).data.skin});
     if (it.kind === 'custom') await saveSpec(placeCustom(spec, it as LibraryItem<'custom'>));
+    if (it.kind === 'made') await saveSpec(placeMade(spec, it as LibraryItem<'made'>));
     setConfirm(null); close();
   };
+  const importFile = async (f: File) => {
+    try { const r = MadePack.safeParse(JSON.parse(await f.text()));
+      if (!r.success) { setMsg(`꾸러미를 읽지 못했어요: ${r.error.issues[0]?.message}`); return; }
+      const it = await lib.save({kind: 'made', name: r.data.title, data: {pack: r.data}}); setMsg(`${it.name}을(를) 라이브러리에 넣었어요. "오늘 페이지에 넣기"로 써요.`);
+    } catch (e) { setMsg((e as Error).message); } };
   return <div className="drawer-body">
     {msg && <p className="muted small">{msg}</p>}
+    <label className="small lib-import">위젯 꾸러미 파일(.lit.json) 가져오기 <input type="file" accept=".json,application/json" onChange={e => { const f = e.target.files?.[0]; if (f) void importFile(f); e.target.value = ''; }} /></label>
     {lib.items.length === 0 && <p className="muted">아직 비어 있어요. 꾸미기에서 위젯을 고른 뒤 "내 위젯으로 저장", 페이지는 "틀로 저장"을 눌러요.</p>}
     {groups.filter(([, l]) => l.length).map(([k, list]) => <section key={k} className="lib-group"><h3>{KIND_NAME[k]}</h3>
       <ul className="lib-list">{list.map(it => <li key={it.id}>
@@ -82,6 +97,7 @@ function LibraryView({spec, saveSpec, close}: {spec: PlannerSpec; saveSpec: (s: 
             : <button className="small" onClick={() => setConfirm(it.id)}>이 틀 쓰기</button>)}
           {it.kind === 'skin' && <button className="small" onClick={() => void apply(it)}>이 스킨 쓰기</button>}
           {it.kind === 'custom' && <button className="small" onClick={() => void apply(it)}>오늘 페이지에 넣기</button>}
+          {it.kind === 'made' && <><button className="small" onClick={() => void apply(it)}>오늘 페이지에 넣기</button><button className="ghost small" onClick={() => downloadPack((it as LibraryItem<'made'>).data.pack)}>파일로</button></>}
           {it.kind === 'widget' && <span className="muted small">꾸미기 → 내 위젯</span>}
           <button className="ghost small" onClick={() => setRenaming(it.id)}>이름</button>
           <button className="ghost small danger" onClick={async () => { await lib.remove(it.id); setMsg(`${it.name}을(를) 지웠어요.`); }}>지우기</button>

@@ -177,6 +177,10 @@ export const MadeOptions = z.object({
   design: Design.default({}),
   // Follow the day picked elsewhere on the page (week strip, ‹ ›) instead of always today.
   followDay: z.boolean().default(true),
+  // Installed from the library (a package): its console code runs once the user approved that exact code.
+  from: z.string().max(80).default(''),
+  // Follow the goal tapped in a goal widget (only for DBs with a goal link): its records narrow to that goal.
+  followGoal: z.boolean().default(true),
 });
 export type MadeOptions = z.infer<typeof MadeOptions>;
 
@@ -316,7 +320,7 @@ export function runFlows(logic: Logic, records: AnyRecord[], changed: AnyRecord,
     for (const a of f.do) {
       if (a.do === 'notify') out.notices.push(a.text);
       if (a.do === 'open') out.opens.push(a.what);
-      if (a.do === 'effect') out.effects.push({name: a.name, entry: a.target === 'item' ? e.id : null});
+      if (a.do === 'effect') out.effects.push({name: a.name, entry: a.target === 'item' ? e.id : null, type: e.body.type});
       if (a.do === 'create') {
         const fields = Object.fromEntries(Object.entries(a.fields).map(([k, x]) => [k, value(x, e.body, nowIso)]));
         out.writes.push({id: null, logicalDay: day, flow: f.id, body: {type: a.type, verb: a.verb, at: nowIso, end: null, value: null, fields: fields as Entry['fields'], links: a.link ? [{rel: 'after', to: e.id}] : []}});
@@ -329,7 +333,7 @@ export function runFlows(logic: Logic, records: AnyRecord[], changed: AnyRecord,
   return out;
 }
 
-export type FlowOut = {writes: FlowWrite[]; notices: string[]; opens: string[]; effects: {name: string; entry: string | null}[]};
+export type FlowOut = {writes: FlowWrite[]; notices: string[]; opens: string[]; effects: {name: string; entry: string | null; type: string}[]};  // type: only widgets on that DB play it ('' = every made widget)
 const emptyOut = (): FlowOut => ({writes: [], notices: [], opens: [], effects: []});
 
 /** A flow started by a moment rather than a record written: a time of day, the day starting, 일어났어요, or a 상황
@@ -346,7 +350,7 @@ export function runMoment(f: Flow, logic: Logic, records: AnyRecord[], day: stri
   for (const a of f.do) {
     if (a.do === 'notify') out.notices.push(a.text);
     if (a.do === 'open') out.opens.push(a.what);
-    if (a.do === 'effect') out.effects.push({name: a.name, entry: null});
+    if (a.do === 'effect') out.effects.push({name: a.name, entry: null, type: f.on.type});
     if (a.do === 'create') out.writes.push({id: null, logicalDay: day, flow: f.id, body: {type: a.type, verb: a.verb, at: now.toISOString(), end: null, value: null, fields: set(a.fields), links: []}});
     if (a.do === 'updateWhere') for (const t of entriesOf(records, a.type).filter(x => matches(x.body, a.conds, now.getTime())).sort((x, y) => x.body.at.localeCompare(y.body.at)).slice(0, a.limit))
       out.writes.push({id: t.id, logicalDay: t.logicalDay, baseRevision: t.revision, flow: f.id, body: {...t.body, fields: {...t.body.fields, ...set(a.fields)}}});
@@ -369,7 +373,7 @@ export function runItems(f: Flow, logic: Logic, records: AnyRecord[], day: strin
     if (!sg?.success || !evalSignal(sg.data, records, logic, day, now).met) continue;
     for (const a of f.do) {
       if (a.do === 'notify') out.notices.push(a.text.replace('{이름}', titleOfEntry(e.body, logic.types.find(t => t.id === e.body.type))));
-      if (a.do === 'effect') out.effects.push({name: a.name, entry: a.target === 'item' ? e.id : null});
+      if (a.do === 'effect') out.effects.push({name: a.name, entry: a.target === 'item' ? e.id : null, type: e.body.type});
       if (a.do === 'open') out.opens.push(a.what);
       if (a.do === 'update') out.writes.push({id: e.id, logicalDay: e.logicalDay, baseRevision: e.revision, flow: f.id, body: {...e.body, fields: {...e.body.fields, ...Object.fromEntries(Object.entries(a.fields).map(([k, x]) => [k, value(x, e.body, nowIso)]))} as Entry['fields']}});
       if (a.do === 'create') out.writes.push({id: null, logicalDay: day, flow: f.id, body: {type: a.type, verb: a.verb, at: nowIso, end: null, value: null, fields: Object.fromEntries(Object.entries(a.fields).map(([k, x]) => [k, value(x, e.body, nowIso)])) as Entry['fields'], links: a.link ? [{rel: 'after', to: e.id}] : []}});

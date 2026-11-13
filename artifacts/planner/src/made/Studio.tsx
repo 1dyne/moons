@@ -1,10 +1,11 @@
 import {useBack} from '../back.ts';
 import {useEffect, useMemo, useState} from 'react';
 import {createPortal} from 'react-dom';
-import {FIELD_KINDS, LOGIC_BLOCKS, AGGS, BLOCK_GROUPS, EFFECTS, Flow as FlowSchema, Logic, MadeOptions, PERIODS, TypeDef, blockInfo, checkTemplate, flowSentence, newBlock, newLogicId, tabsOf,
+import {LOGIC_CONTRACT, packOf, type MadePack, FIELD_KINDS, LOGIC_BLOCKS, AGGS, BLOCK_GROUPS, EFFECTS, Flow as FlowSchema, Logic, MadeOptions, PERIODS, TypeDef, blockInfo, checkTemplate, flowSentence, newBlock, newLogicId, tabsOf,
   type Flow, type FieldDef, type LogicBlock, type PlannerSpec, type SavedFilter, type TabSpec, type Widget} from '@workspace/planner-spec';
 import type {Settings} from '@workspace/life-contract';
 import {ofKind} from '../data.ts';
+import {useLibrary} from '../library.tsx';
 import type {Planner} from '../data.ts';
 import type {Ctx, Nav} from '../screens/day.ts';
 import {MadeWidget} from './MadeWidget.tsx';
@@ -45,7 +46,9 @@ export function StudioHost({spec, settings, p, nav, today, tab, saveSpec}: {spec
   const save = async (d: Draft) => {
     await saveSpec(s => {
       const next: PlannerSpec = {...s, logic: {types: d.types, flows: d.flows}};
-      const patch = (ws: Widget[]) => ws.map(w => w.id === d.widgetId ? {...w, title: d.title || undefined, options: d.options as unknown as Record<string, unknown>} : w);
+      // Changing an installed widget's console code makes it the user's own (no approval of someone else's code left).
+      const own = (w: Widget) => JSON.stringify((w.options as {design?: unknown}).design ?? null) === JSON.stringify(d.options.design) ? d.options : {...d.options, from: ''};
+      const patch = (ws: Widget[]) => ws.map(w => w.id === d.widgetId ? {...w, title: d.title || undefined, options: own(w) as unknown as Record<string, unknown>} : w);
       if (d.widgetId) return {...next, canvas: {...next.canvas, day: next.canvas.day ? patch(next.canvas.day) : next.canvas.day}, tabs: next.tabs?.map(t => t.widgets ? {...t, widgets: patch(t.widgets)} : t), modes: next.modes?.map(m => m.widgets ? {...m, widgets: patch(m.widgets)} : m)};
       const add = (ws: Widget[]): Widget[] => [...ws, {id: `made-${Date.now().toString(36)}`, type: 'made', x: 0, y: ws.reduce((m, w) => Math.max(m, w.y + w.h), 0), w: 24, h: 30, title: d.title || undefined, options: d.options as unknown as Record<string, unknown>}];
       if (tab.kind === 'page') return {...next, tabs: tabsOf(next).map(t => t.id === tab.id ? {...t, widgets: add(t.widgets ?? [])} : t)};
@@ -95,6 +98,7 @@ function Studio({draft, setDraft, spec, ctx, today, save, close}: {draft: Draft;
             <BlocksPanel blocks={draft.options.blocks} type={type} setType={setType} onChange={blocks => setOpts({blocks})} />
             <h3 className="sp-title">꾸미기</h3>
             <DesignPanel draft={draft} setOpts={setOpts} type={type} />
+            <SharePanel draft={draft} type={type} />
           </>}
           {step === 'rules' && type && <RulesPanel draft={draft} put={put} type={type} spec={spec} goals={ofKind(ctx.p.records, 'goal').map(g => ({id: g.id, title: g.body.title}))} />}
           {(step === 'screen' || step === 'rules') && !type && <p className="muted">저장 칸에서 DB를 먼저 골라요.</p>}
@@ -265,6 +269,23 @@ function RulesPanel({draft, put, type, spec, goals}: {draft: Draft; put: (p: Par
   </div>;
 }
 
+// ── 나누기: the widget as one package (its DBs, rules and screen) for the library, a file, or someone else ───
+export const downloadPack = (pack: MadePack) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(pack, null, 2)], {type: 'application/json'}));
+  a.download = `${pack.title.replace(/[\\/:*?"<>|]/g, '')}.lit.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
+function SharePanel({draft, type}: {draft: Draft; type: TypeDef}) {
+  const lib = useLibrary(), [msg, setMsg] = useState('');
+  const pack = () => packOf(draft.title || type.name, {...draft.options, from: ''}, {types: draft.types, flows: draft.flows}, type.desc);
+  return <div className="sp">
+    <h3 className="sp-title">나누기</h3>
+    <p className="muted small">이 위젯을 DB·규칙·화면째 한 꾸러미로 묶어요 (위젯 계약 v{LOGIC_CONTRACT}). 기록과 목표는 들어가지 않아요. 받은 사람은 메뉴 → 내 라이브러리에서 넣어요.</p>
+    <div className="inline wrap">
+      {lib && <button className="small" onClick={async () => { try { const it = await lib.save({kind: 'made', name: draft.title || type.name, data: {pack: pack()}}); setMsg(`라이브러리에 저장했어요: ${it.name}`); } catch (e) { setMsg((e as Error).message); } }}>라이브러리에 저장</button>}
+      <button className="small" onClick={() => downloadPack(pack())}>파일로 내보내기</button>
+    </div>
+    {msg && <p className="muted small" role="status">{msg}</p>}
+  </div>;
+}
+
 // ── 화면 · 보이는 방식: as it is, or a sticker (cut-out icon, icon in a shape, the user's picture) that opens it ─
 function LookPanel({draft, setOpts, type}: {draft: Draft; setOpts: (p: Partial<MadeOptions>) => void; type: TypeDef}) {
   const L = draft.options.launch, set = (p: Partial<typeof L>) => setOpts({launch: {...L, ...p}});
@@ -276,6 +297,7 @@ function LookPanel({draft, setOpts, type}: {draft: Draft; setOpts: (p: Partial<M
     <h3 className="sp-title">보이는 방식</h3>
     <div className="seg" role="radiogroup" aria-label="보이는 방식">{([['off', '펼쳐 두기'], ['sticker', '칼선 스티커'], ['shape', '도형 아이콘'], ['image', '내 이미지']] as const).map(([k, n]) =>
       <button key={k} role="radio" aria-checked={L.mode === k} className={L.mode === k ? 'on' : ''} onClick={() => set({mode: k})}>{n}</button>)}</div>
+    {type.fields.some(f => f.kind === 'link' && f.to === 'goal') && <label className="row-check small"><input type="checkbox" checked={draft.options.followGoal} onChange={e => setOpts({followGoal: e.target.checked})} /> 목표 위젯에서 ◎로 고른 목표만 보기 (새 항목은 그 목표에 연결)</label>}
     {L.mode !== 'off' && <div className="sp-grid">
       {L.mode !== 'image' && <label><span className="k">아이콘</span><IconPick value={L.icon} onChange={icon => set({icon: icon || 'gift'})} /></label>}
       {L.mode !== 'image' && <label><span className="k">색</span><input type="color" value={L.color} onChange={e => set({color: e.target.value})} /></label>}

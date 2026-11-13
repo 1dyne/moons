@@ -2,15 +2,17 @@ import {createElement, useEffect, useLayoutEffect, useMemo, useRef, useState} fr
 import {createRoot, type Root} from 'react-dom/client';
 import {logicalDay, type AnyRecord, type Entry} from '@workspace/life-contract';
 import {Logic, MadeOptions, aggregate, timeStretches, type Stretch, checkTemplate, cleanCss, durationMin, entriesOf, inRange, matches, periodRange, read, renderTemplate, runFlows, suggestLinks,
-  type E, type FieldDef, type LogicBlock, type TypeDef} from '@workspace/planner-spec';
+  codeHash, type E, type FieldDef, type LogicBlock, type TypeDef} from '@workspace/planner-spec';
 import {ofKind} from '../data.ts';
 import type {Ctx} from '../screens/day.ts';
 import {Icon, iconSvg} from './icons.tsx';
+import {useLibrary} from '../library.tsx';
+import {setGoalFocus, useGoalFocus} from '../goalFocus.ts';
 import {Animated, CardsBlock, CodeDesign, SignalPicker, Sticker, playEffect, useEffectsOn} from './parts.tsx';
 
 // A made widget: blocks over one type of entries (docs/lit/BLOCKS.md §3). The same component draws the live widget,
 // the preview in the studio, and the blocks inside an HTML design.
-export type M = {ctx: Ctx; logic: Logic; type: TypeDef | undefined; wid: string; opts: MadeOptions; today: string; notify: (s: string) => void};
+export type M = {ctx: Ctx; logic: Logic; type: TypeDef | undefined; wid: string; opts: MadeOptions; today: string; notify: (s: string) => void; goal?: {id: string; field: string} | null};
 
 export const logicOf = (ctx: Ctx, override?: Logic) => override ?? Logic.parse(ctx.spec?.logic ?? {});
 const hm = (min: number) => `${Math.floor(min / 60)}:${String(Math.round(min % 60)).padStart(2, '0')}`;
@@ -26,13 +28,16 @@ export function MadeWidget({w, ctx, today, logic: override, options}: {w: {id: s
     setNotices(n => [...n, s]); setTimeout(() => setNotices(n => n.slice(1)), 5000);
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') { try { new Notification('lit', {body: s}); } catch { /* not here */ } }
   };
-  const m: M = {ctx: opts.followDay ? ctx : {...ctx, day: today}, logic, type, wid: w.id, opts, today, notify};
+  const focus = useGoalFocus(), goalField = type?.fields.find(f => f.kind === 'link' && f.to === 'goal')?.id;
+  const goal = focus && opts.followGoal && goalField ? {id: focus, field: goalField} : null;
+  const m: M = {ctx: opts.followDay ? ctx : {...ctx, day: today}, logic, type, wid: w.id, opts, today, notify, goal};
   const box = useRef<HTMLDivElement>(null);
-  useEffectsOn(box);
+  useEffectsOn(box, opts.type);
   if (!type) return <p className="muted small made-empty">{ctx.saveSpec ? '두 번 눌러 이 위젯의 기록 묶음을 정해요' : '–'}</p>;
   const d = opts.design;
   const style = {...(d.accent ? {'--accent': d.accent, '--btn': d.accent} : {}), ...(d.bg ? {background: d.bg, '--wg-bg': d.bg} : {}), ...(d.ink ? {color: d.ink, '--ink': d.ink} : {}), ...(d.radius !== null ? {'--radius': `${d.radius}px`} : {})} as React.CSSProperties;
   const body = <div ref={box} className={`made density-${d.density} align-${d.align} pal-${d.palette || 'own'}`} style={style} data-made={w.id}>
+    {goal && <p className="made-goal"><span className="chip on">목표: {ofKind(ctx.p.records, 'goal').find(g => g.id === goal.id)?.body.title ?? '…'}</span><button className="ghost small" onClick={() => setGoalFocus(null)} aria-label="목표로 거르기 끄기">×</button></p>}
     {d.mode === 'html' && d.html.trim() ? <HtmlDesign m={m} /> : d.mode === 'code' ? <CodeConsole m={m} /> : opts.blocks.map(b => <Animated key={b.id} b={b}><BlockView b={b} m={m} /></Animated>)}
     {notices.length > 0 && <div className="made-notice" role="status">{notices.map((n, i) => <p key={i}>{n}</p>)}</div>}
   </div>;
@@ -46,6 +51,19 @@ export function MadeWidget({w, ctx, today, logic: override, options}: {w: {id: s
 
 /** 개발자 콘솔 over this widget's own data and parts. */
 function CodeConsole({m}: {m: M}) {
+  const lib = useLibrary(), d = m.opts.design;
+  // Console code from a package (library, Claude, someone else's file) runs only once this exact code is approved.
+  if (m.opts.from) {
+    const item = lib?.items.find(x => x.id === m.opts.from), hash = codeHash({code: d.js, html: d.html, css: d.css, permissions: []});
+    if (lib && !lib.ready) return null;
+    if (!item) return <p className="muted small">라이브러리에서 지운 꾸러미의 코드라 멈춰 있어요. 메뉴 → 내 라이브러리에서 다시 넣어요.</p>;
+    if (item.approved !== hash) return <div className="cw-consent">
+      <strong>{item.name}</strong> <span className="muted small">{item.source === 'claude' ? 'Claude가 만든 꾸러미' : item.source === 'developer' ? '개발자 도구로 올린 꾸러미' : '가져온 꾸러미'}</span>
+      <p className="small">이 위젯은 개발자 콘솔 코드로 그려요. 인터넷에는 접속할 수 없고, 이 위젯의 DB만 읽고 써요.</p>
+      <details className="small"><summary>코드 보기</summary><pre className="mono small cw-code">{`${d.html}\n\n<style>\n${d.css}\n</style>\n\n<script>\n${d.js}\n</script>`}</pre></details>
+      <button className="primary small" onClick={() => void lib?.patch(item.id, {approve: true, enabled: true})}>승인하고 켜기</button>
+    </div>;
+  }
   const byName = (f: Record<string, unknown>) => Object.fromEntries(Object.entries(f).map(([k, v]) => [m.type?.fields.find(x => x.name === k || x.id === k)?.id ?? k, v])) as Entry['fields'];
   return <CodeDesign m={m} data={() => designData(m)} press={id => { const b = m.opts.blocks.find(x => x.id === id); if (b) void press(m, b); }}
     add={f => write(m, null, {verb: 'noted', at: atFor(m), fields: byName(f)})}
@@ -57,11 +75,15 @@ async function write(m: M, id: string | null, body: Partial<Entry>, ext?: Record
   const at = body.at ?? base?.body.at ?? new Date().toISOString();
   const settings = m.ctx.settings;
   const full = {type: m.opts.type, verb: 'did', end: null, value: null, fields: {}, links: [], ...base?.body, ...body, at} as Entry;
+  // A new item written while a goal is picked belongs to that goal.
+  if (!id && m.goal && !full.fields[m.goal.field]) full.fields = {...full.fields, [m.goal.field]: m.goal.id};
   const rec = await m.ctx.p.write(id, {kind: 'entry', logicalDay: base?.logicalDay ?? (settings ? logicalDay(at, settings) : m.ctx.day), body: full, ...(ext ? {ext} : base?.ext ? {ext: base.ext} : {}), ...(base ? {baseRevision: base.revision} : {})});
   if (rec) {
-    const {notices, writes, opens} = runFlows(m.logic, [...m.ctx.p.records.filter(r => r.id !== rec.id), rec], rec, {day: rec.logicalDay ?? m.ctx.day});
+    // The newest records (taps in quick succession write before the screen re-renders).
+    const now = m.ctx.p.live?.() ?? m.ctx.p.records;
+    const {notices, writes, opens, effects} = runFlows(m.logic, [...now.filter(r => r.id !== rec.id), rec], rec, {day: rec.logicalDay ?? m.ctx.day});
     notices.forEach(m.notify);
-    for (const fx of runFlows(m.logic, [...m.ctx.p.records.filter(r => r.id !== rec.id), rec], rec, {day: rec.logicalDay ?? m.ctx.day}).effects) playEffect(fx.name, fx.entry);
+    for (const fx of effects) playEffect(fx.name, fx.entry, fx.type);
     if (opens.length) dispatchEvent(new CustomEvent('lit:open', {detail: {what: opens.at(-1)}}));
     if (writes.length) setTimeout(() => void m.ctx.p.refresh(), 500);
   }
@@ -70,7 +92,8 @@ async function write(m: M, id: string | null, body: Partial<Entry>, ext?: Record
 /** When the visible day is not today, inputs without a clock (check, score, form) are written to the visible day. */
 const atFor = (m: M) => m.ctx.day === m.today ? new Date().toISOString() : noon(m.ctx.day);
 const entries = (m: M) => entriesOf(m.ctx.p.records, m.opts.type);
-const ofPeriod = (m: M, b: LogicBlock) => entries(m).filter(e => inRange(e, periodRange(b.period, m.ctx.day, m.today)) && matches(e.body, b.conds));
+const ofGoal = (m: M, e: E) => !m.goal || e.body.fields[m.goal.field] === m.goal.id || (Array.isArray(e.body.fields[m.goal.field]) && (e.body.fields[m.goal.field] as unknown[]).includes(m.goal.id)) || e.body.links.some(l => l.to === m.goal!.id);
+const ofPeriod = (m: M, b: LogicBlock) => entries(m).filter(e => inRange(e, periodRange(b.period, m.ctx.day, m.today)) && matches(e.body, b.conds) && ofGoal(m, e));
 const fieldOf = (m: M, id: string) => m.type?.fields.find(f => f.id === id);
 
 /** What a block's main button does — shared by the drawn block and data-lit-press in HTML designs. */
@@ -195,16 +218,18 @@ function ScoreBlock({b, m}: {b: LogicBlock; m: M}) {
 function FormBlock({b, m, entry, done}: {b: LogicBlock; m: M; entry?: E; done?: () => void}) {
   const shown = (b.fields.length ? b.fields : m.type?.fields.map(f => f.id) ?? []).map(id => fieldOf(m, id)).filter((f): f is FieldDef => !!f);
   const [v, setV] = useState<Record<string, unknown>>(() => entry ? {...entry.body.fields} : {});
+  // While a goal is picked (◎), a new item's goal field starts on it.
+  const shownV = (id: string) => v[id] ?? (!entry && m.goal?.field === id ? m.goal.id : undefined);
   const save = async () => {
-    const fields = Object.fromEntries(Object.entries(v).filter(([, x]) => x !== '' && x !== undefined)) as Entry['fields'];
+    const fields = Object.fromEntries(Object.entries({...(!entry && m.goal && v[m.goal.field] === undefined ? {[m.goal.field]: m.goal.id} : {}), ...v}).filter(([, x]) => x !== '' && x !== undefined)) as Entry['fields'];
     const links = shown.filter(f => f.kind === 'link' && typeof fields[f.id] === 'string' && fields[f.id]).map(f => ({rel: 'part_of' as const, to: String(fields[f.id])}));
     if (entry) await write(m, entry.id, {fields, links}, undefined, entry);
-    else { if (!Object.keys(fields).length) return; await write(m, null, {verb: b.verb ?? 'noted', at: atFor(m), fields, links}); setV({}); }
+    else { if (!Object.keys(v).length) return; await write(m, null, {verb: b.verb ?? 'noted', at: atFor(m), fields, links}); setV({}); }
     done?.();
   };
   const title = String(shown.map(f => v[f.id]).find(x => typeof x === 'string' && x) ?? '');
   return <form className="mb-formgrid" onSubmit={e => { e.preventDefault(); void save(); }}>
-    {shown.map(f => <label key={f.id} className={`mf mf-${f.kind}`}><span className="k">{f.name}</span><FieldInput f={f} m={m} value={v[f.id]} title={title} onChange={x => setV(s => ({...s, [f.id]: x}))} /></label>)}
+    {shown.map(f => <label key={f.id} className={`mf mf-${f.kind}`}><span className="k">{f.name}</span><FieldInput f={f} m={m} value={shownV(f.id)} title={title} onChange={x => setV(s => ({...s, [f.id]: x}))} /></label>)}
     <div className="inline"><button className="primary small">{entry ? '저장' : b.label && b.kind === 'form' ? '저장' : '저장'}</button>{done && <button type="button" className="ghost small" onClick={done}>닫기</button>}</div>
   </form>;
 }

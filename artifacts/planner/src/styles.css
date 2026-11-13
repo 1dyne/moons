@@ -1696,3 +1696,7 @@ lit-block{display:block;min-width:0;max-width:100%}
 .wg-stk>.wg-head .wg-title,.m-stk .m-head{display:none}
 .m-stk{position:relative}.m-stk .m-headrow{position:absolute;top:0;right:0;z-index:2;border:0;background:none}
 .m-stk .m-body,.wg-stk .wg-body{padding:0;overflow:visible}
+.lib-import{display:grid;gap:4px;margin-bottom:10px}.cw-code{max-height:240px;overflow:auto;white-space:pre-wrap;background:var(--soft);padding:8px}
+.goal-pick{padding:2px 6px;font-size:15px;color:var(--muted)}.goal-pick.on{color:var(--ink);background:var(--accent)}
+.goal-row.goal-focus{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.made-goal{display:flex;align-items:center;gap:4px;margin:0 0 6px}

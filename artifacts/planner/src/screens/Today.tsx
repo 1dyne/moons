@@ -1,3 +1,4 @@
+import {setGoalFocus, useGoalFocus} from '../goalFocus.ts';
 import {useBack} from '../back.ts';
 import {useState} from 'react';
 import {addDays, goalPercent, goalProgress, logicalDay, periodContains, personaShare, suggestGoal, routineDue, routineRate, type AnyRecord, type LifeRecord, type Settings, type Task} from '@workspace/life-contract';
@@ -261,13 +262,16 @@ const HORIZON: Record<string, string> = {year: '연간', quarter: '분기', mont
 export const horizonLabel = (h: string) => HORIZON[h] ?? h;
 
 export function DayGoals({ctx}: {ctx: Ctx}) {
+  const focus = useGoalFocus();
   const order = ['week', 'milestone', 'month', 'quarter', 'year'];
   const goals = linkableGoals(ctx.p.records, ctx.day).sort((a, b) => order.indexOf(a.body.horizon) - order.indexOf(b.body.horizon) || a.body.period.localeCompare(b.body.period)).slice(0, 8);
   if (!goals.length) return ctx.preview ? <ul className="rows">{[['주간', '예시 목표', 64], ['월간', '예시 목표', 30]].map(([h, t, n]) => <li key={h} className="row goal-row"><span><span className="horizon">{h}</span>{t}</span><Gauge pct={n as number} size="sm" /></li>)}</ul>
     : <Tip id="goals-empty" block>이 날에 걸린 목표가 없어요.</Tip>;
-  return <ul className="rows">{goals.map(g => <li key={g.id} className="row goal-row">
+  return <ul className="rows">{goals.map(g => <li key={g.id} className={`row goal-row ${focus === g.id ? 'goal-focus' : ''}`}>
     <button className="link" onClick={() => ctx.nav.openGoal(g.id)}><span className="horizon">{horizonLabel(g.body.horizon)}</span>{g.body.title}</button>
     <GoalBar g={g} records={ctx.p.records} />
+    <button className={`ghost small goal-pick ${focus === g.id ? 'on' : ''}`} aria-pressed={focus === g.id} onClick={() => setGoalFocus(focus === g.id ? null : g.id)}
+      title="다른 위젯을 이 목표로 거르기" aria-label={`${g.body.title}로 다른 위젯 거르기`}>◎</button>
   </li>)}</ul>;
 }
 

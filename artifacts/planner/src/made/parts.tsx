@@ -86,25 +86,27 @@ function cutSvg(name: string, color: string) {
 }
 
 /** Plays a movement on cards (data-entry) or the widget when a rule asks for it ('lit:effect'). */
-export function useEffectsOn(box: React.RefObject<HTMLElement | null>) {
+export function useEffectsOn(box: React.RefObject<HTMLElement | null>, type: string) {
   useEffect(() => {
     const on = (e: Event) => {
-      const d = (e as CustomEvent<{name: string; entry: string | null}>).detail, root = box.current;
-      if (!root) return;
+      const d = (e as CustomEvent<{name: string; entry: string | null; type?: string}>).detail, root = box.current;
+      if (!root || (!d.entry && d.type && d.type !== type)) return;
       const els = d.entry ? [...root.querySelectorAll<HTMLElement>(`[data-entry="${CSS.escape(d.entry)}"]`)] : [root];
       for (const el of els) { el.classList.remove(`fx-${d.name}`); void el.offsetWidth; el.classList.add(`fx-${d.name}`); setTimeout(() => el.classList.remove(`fx-${d.name}`), 1600); }
     };
     addEventListener('lit:effect', on); return () => removeEventListener('lit:effect', on);
-  }, [box]);
+  }, [box, type]);
 }
-export const playEffect = (name: string, entry: string | null) => dispatchEvent(new CustomEvent('lit:effect', {detail: {name, entry}}));
+export const playEffect = (name: string, entry: string | null, type = '') => dispatchEvent(new CustomEvent('lit:effect', {detail: {name, entry, type}}));
 
 /** A part's own movement: always, when it appears, or when it is tapped. */
 export function Animated({b, children}: {b: LogicBlock; children: React.ReactNode}) {
-  const [tap, setTap] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
   if (!b.anim) return <>{children}</>;
-  const cls = b.animWhen === 'always' ? `fx-${b.anim} fx-loop` : b.animWhen === 'appear' ? `fx-${b.anim}` : tap ? `fx-${b.anim}` : '';
-  return <div key={tap} className={`fx-wrap ${cls}`} onClickCapture={b.animWhen === 'tap' ? () => setTap(n => n + 1) : undefined}>{children}</div>;
+  const cls = b.animWhen === 'always' ? `fx-${b.anim} fx-loop` : b.animWhen === 'appear' ? `fx-${b.anim}` : '';
+  // On tap the class is restarted on the same element: the part is never remounted, so its own click still lands.
+  const tap = () => { const el = box.current; if (!el) return; el.classList.remove(`fx-${b.anim}`); void el.offsetWidth; el.classList.add(`fx-${b.anim}`); };
+  return <div ref={box} className={`fx-wrap ${cls}`} onPointerUp={b.animWhen === 'tap' ? tap : undefined} onAnimationEnd={b.animWhen === 'tap' ? e => { if (e.target === box.current) box.current.classList.remove(`fx-${b.anim}`); } : undefined}>{children}</div>;
 }
 
 /** 개발자 콘솔: the widget drawn by the developer's own HTML, CSS and JavaScript in a sandboxed frame.

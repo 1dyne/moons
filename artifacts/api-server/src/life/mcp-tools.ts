@@ -2,7 +2,7 @@ import {z} from 'zod';
 import './autolog.ts';
 import './flows.ts';
 import {LINK_RELS, VERBS, ALL_SCOPES, Availability, addDays, availableOn, buildNow, dayCondition, estimateAccuracy, goalPercent, goalSchedule, logicalDay, periodSummary, personaShare, weeklyFocus, type AnyRecord, type LifeRecord} from '@workspace/life-contract';
-import {Mode, AGGS, Action, EFFECTS, Launch, SIGNALS, BLOCK_KINDS, Design, FIELD_KINDS, Flow, LOGIC_BLOCKS, Logic, LogicBlock, MadeOptions, PERIODS, TypeDef, VERB_NAMES, durationMin, entriesOf, flowSentence, newLogicId, type Widget, BLOCKS, PERMISSIONS, isCode, BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
+import {Mode, AGGS, Action, EFFECTS, Launch, SIGNALS, MadePack, installPack, packCode, packOf, BLOCK_KINDS, Design, FIELD_KINDS, Flow, LOGIC_BLOCKS, Logic, LogicBlock, MadeOptions, PERIODS, TypeDef, VERB_NAMES, durationMin, entriesOf, flowSentence, newLogicId, type Widget, BLOCKS, PERMISSIONS, isCode, BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 import {listLibrary, saveLibrary} from './library.ts';
 import {allRecords, deleteRecord, getSettings, getSpec, lastActivity, putAvailability, putSettings, saveSpec, writeRecord} from './store.ts';
@@ -188,8 +188,36 @@ export function registerPlannerTools(tool: Tool) {
         note: code ? '코드 위젯이라 사용자가 lit의 메뉴 → 설치한 위젯(또는 위젯 칸)에서 권한을 보고 승인해야 실행된다고 알려 준다.' : '꾸미기 → 내 위젯에서 언제든 다시 붙일 수 있다고 알려 준다.'};
     });
 
-  tool('list_widgets', '사용자 lit 라이브러리의 내 위젯·저장한 위젯·페이지 틀·스킨 목록(설명서 포함).', {}, async (_a, owner) =>
-    (await listLibrary(owner)).map(i => ({id: i.id, kind: i.kind, name: i.name, enabled: i.enabled, approved: !!i.approved, source: i.source, ...(i.kind === 'custom' ? {manifest: (i.data as {manifest: unknown}).manifest} : {})})));
+  tool('list_widgets', '사용자 lit 라이브러리의 내 위젯·저장한 위젯·만든 위젯 꾸러미·페이지 틀·스킨 목록(설명서 포함).', {}, async (_a, owner) =>
+    (await listLibrary(owner)).map(i => ({id: i.id, kind: i.kind, name: i.name, enabled: i.enabled, approved: !!i.approved, source: i.source,
+      ...(i.kind === 'custom' ? {manifest: (i.data as {manifest: unknown}).manifest} : {}),
+      ...(i.kind === 'made' ? {contract: (i.data as {pack: MadePack}).pack.contract, dbs: (i.data as {pack: MadePack}).pack.types.map(t => t.name), rules: (i.data as {pack: MadePack}).pack.flows.length} : {})})));
+
+  tool('share_widget', '만든 위젯 하나를 DB·규칙·화면째 꾸러미(위젯 계약 버전 포함)로 묶어 라이브러리에 넣는다. 기록과 목표는 들어가지 않는다. 다른 사람에게 줄 파일은 lit의 메뉴 → 내 라이브러리 → 파일로.',
+    {widgetId: z.string(), desc: z.string().max(300).optional()},
+    async ({widgetId, desc}, owner) => {
+      const spec = (await getSpec(owner))?.spec as PlannerSpec | undefined;
+      const w = spec && [...(spec.canvas.day ?? []), ...tabsOf(spec).flatMap(t => t.widgets ?? [])].find(x => x.id === widgetId && x.type === 'made');
+      if (!spec || !w) throw new WorkspaceError(404, '그 id의 만든 위젯이 없어요. get_planner로 위젯 id를 확인한다.');
+      const options = MadeOptions.parse(w.options), logic = logicOf(spec);
+      const pack = packOf(w.title || logic.types.find(t => t.id === options.type)?.name || '만든 위젯', {...options, from: ''}, logic, desc ?? '');
+      const item = await saveLibrary(owner, {kind: 'made', name: pack.title, data: {pack}}, 'claude');
+      return {id: item.id, name: item.name, contract: pack.contract, dbs: pack.types.map(t => t.name), rules: pack.flows.length};
+    });
+
+  tool('install_widget', '라이브러리의 만든 위젯 꾸러미(또는 꾸러미 JSON)를 오늘 페이지에 넣는다. 같은 모양의 DB가 있으면 그 DB를 함께 쓴다. 개발자 콘솔 코드가 있으면 사용자가 lit에서 승인해야 그려진다. 사용자 OK를 받은 뒤에 부른다.',
+    {id: z.string().optional(), pack: z.record(z.unknown()).optional()},
+    async ({id, pack}, owner) => {
+      const spec = (await getSpec(owner))?.spec as PlannerSpec | undefined;
+      if (!spec) throw new WorkspaceError(400, '먼저 build_planner로 플래너를 만든다.');
+      const item = id ? (await listLibrary(owner)).find(x => x.id === id && x.kind === 'made')
+        : pack ? await saveLibrary(owner, {kind: 'made', data: {pack}}, 'claude') : undefined;
+      if (!item) throw new WorkspaceError(404, '라이브러리에 그 꾸러미가 없어요. list_widgets로 id를 확인한다.');
+      const p = (item.data as {pack: MadePack}).pack, out = installPack(logicOf(spec), p);
+      const day = spec.canvas.day ?? toFree([]), bottom = day.reduce((m, w) => Math.max(m, w.y + w.h), 0);
+      const saved = await saveSpec(owner, {...spec, logic: out.logic, canvas: {day: [...day, {id: `made-${Date.now().toString(36)}`, type: 'made' as const, x: 0, y: bottom, w: 24, h: 30, title: out.title, options: {...out.options, from: item.id}}], mode: 'free'}});
+      return {version: saved.version, library: item.id, needsApproval: !!packCode(p), flows: out.logic.flows.map(f => flowSentence(f, out.logic.types))};
+    });
 
   tool('get_today', '사용자의 오늘(또는 지금) 상태: 할 일과 결과, 목표 진행률, 지금 집중 중인 일, 컨디션·수면.', {}, async (_a, owner) => {
     const settings = await getSettings(owner), spec = (await getSpec(owner))?.spec as PlannerSpec | undefined;

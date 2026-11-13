@@ -184,6 +184,28 @@ test('wish box: an item rule opens a wish on the server when its own 상황 is m
   assert.ok(spec.canvas.day!.some(w => w.type === 'made' && w.options.type === 'wishx' && (w.options as {launch: {mode: string}}).launch.mode === 'sticker'));
 });
 
+test('packages: a made widget is shared with its DB and rules, installed again without doubling, newer contracts refused', async () => {
+  const spec = (await getSpec(owner))!.spec, w = spec.canvas.day!.find(x => x.type === 'made' && x.options.type === 'wishx')!;
+  const shared = await call('share_widget', {widgetId: w.id});
+  assert.deepEqual(shared.dbs, ['소원']); assert.equal(shared.rules, 2); assert.equal(shared.contract, 1);
+  const before = (await getSpec(owner))!.spec.logic!, n = spec.canvas.day!.filter(x => x.type === 'made' && x.options.type === 'wishx').length;
+  await call('install_widget', {id: shared.id as string});
+  const after = (await getSpec(owner))!.spec;
+  assert.equal(after.logic!.types.length, before.types.length, 'same-shaped DB is shared, not copied');
+  assert.equal(after.logic!.flows.length, before.flows.length, 'its rules are already there');
+  assert.equal(after.canvas.day!.filter(x => x.type === 'made' && x.options.type === 'wishx').length, n + 1);
+  const list = await call('list_widgets', {}) as unknown as {id: string; kind: string}[];
+  assert.ok(list.some(i => i.id === shared.id && i.kind === 'made'));
+  // Someone else's package with a clashing DB id gets its own DB; console code needs approval.
+  const pack = {contract: 1, title: '다른 소원', options: {type: 'wishx', blocks: [], design: {mode: 'code', html: '<b>hi</b>', css: '', js: 'lit.on("change",function(){})'}},
+    types: [{id: 'wishx', name: '남의 소원', fields: [{id: 'x', name: '엑스', kind: 'number'}]}], flows: [{on: {type: 'wishx'}, do: [{do: 'notify', text: '새 소원'}]}]};
+  const inst = await call('install_widget', {pack});
+  assert.equal(inst.needsApproval, true);
+  const s2 = (await getSpec(owner))!.spec, last = s2.canvas.day!.at(-1)!;
+  assert.equal(last.options.type, 'wishx2'); assert.ok(s2.logic!.flows.some(f => f.on.type === 'wishx2'));
+  await assert.rejects(call('install_widget', {pack: {...pack, contract: 99}}), /새로운 lit/);
+});
+
 test('modes: an energy-driven mode can be set from chat and is listed back', async () => {
   const r = await call('set_modes', {modes: [{name: '에너지 긴축모드', energyAtOrBelow: 4, taskStyle: 'did'}]});
   assert.deepEqual((r.modes as {name: string; energyAtOrBelow: number}[]).map(m => [m.name, m.energyAtOrBelow]), [['에너지 긴축모드', 4]]);

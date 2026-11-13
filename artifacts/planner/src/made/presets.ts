@@ -1,11 +1,13 @@
-import {Flow, LogicBlock, MadeOptions, TypeDef, newLogicId, type Logic} from '@workspace/planner-spec';
+import {Flow, LogicBlock, MadeOptions, Signal, TypeDef, newLogicId, type Logic} from '@workspace/planner-spec';
 
 // Starting points in the studio. Each is only blocks + a type (+ automations) — the same pieces the user can change,
 // so a preset is a filled-in example, never a separate feature.
 /** What the user already has, so a block version starts with their own subjects and routines (nothing invented). */
 export type Seed = {subjects: string[]; routines: string[]};
 export type Preset = {id: string; name: string; icon: string; desc: string; group: 'old' | 'new'; make: (logic: Logic, seed: Seed) => {title: string; types: TypeDef[]; options: MadeOptions; flows: Flow[]}};
-const B = (kind: LogicBlock['kind'], x: Partial<LogicBlock> = {}) => LogicBlock.parse({id: newLogicId(), kind, ...x});
+// Input parts answer a tap with a small movement (the new editor's 움직임); shown parts stay still.
+const TAP: Partial<Record<LogicBlock['kind'], LogicBlock['anim']>> = {button: 'pop', toggle: 'pop', counter: 'bounce', check: 'pop', score: 'pop', timer: 'pulse', stopwatch: 'pop'};
+const B = (kind: LogicBlock['kind'], x: Partial<LogicBlock> = {}) => LogicBlock.parse({id: newLogicId(), kind, ...(TAP[kind] ? {anim: TAP[kind], animWhen: 'tap'} : {}), ...x});
 const T = (x: {id: string; name: string; fields?: Record<string, unknown>[]} & Record<string, unknown>) => TypeDef.parse(x);
 const F = (x: Omit<Partial<Flow>, 'do' | 'on'> & {on: Partial<Flow['on']> & {type: string}; do: Flow['do']}) => Flow.parse({id: newLogicId(), ...x});
 const opts = (type: string, blocks: LogicBlock[]) => MadeOptions.parse({type, blocks});
@@ -40,10 +42,10 @@ const OLD: Preset[] = [
     const {t, add} = focusType(logic, seed);
     return {title: '하루 영수증', types: add, flows: [], options: opts(t.id, [B('stat', {label: '순집중 합계', agg: 'sum', of: 'duration', period: 'day'}), B('breakdown', {field: choiceOf(t), agg: 'sum', of: 'duration', period: 'day'}), B('timeline', {period: 'day'})])};
   }},
-  {id: 'mission', group: 'old', name: '오늘의 미션', icon: 'target', desc: '순집중 목표를 채우면 알림 (자유시간)', make: (logic, seed) => {
+  {id: 'mission', group: 'old', name: '오늘의 미션', icon: 'target', desc: '순집중 8시간 또는 할 일 전부, 먼저 찬 쪽에서 축하와 알림 (자유시간)', make: (logic, seed) => {
     const {t, add} = focusType(logic, seed);
     return {title: '오늘의 미션', types: add, options: opts(t.id, [B('stat', {label: '순집중', agg: 'sum', of: 'duration', period: 'day', target: 480, show: 'ring'})]),
-      flows: [F({name: '미션 달성', on: {type: t.id, event: 'changed', verbs: []}, if: [{field: 'duration', op: 'filled', value: ''}], ifAgg: [{type: t.id, agg: 'sum', of: 'duration', period: 'today', op: 'gte', value: 480}], do: [{do: 'notify', text: '오늘 미션 달성! 지금부터 자유시간이에요'}]})]};
+      flows: [F({name: '미션 달성', on: {kind: 'signal', type: t.id, signal: Signal.parse({kind: 'mission', n: 8})}, do: [{do: 'notify', text: '오늘 미션 달성! 지금부터 자유시간이에요'}, {do: 'effect', name: 'confetti', target: 'widget'}]})]};
   }},
   {id: 'me', group: 'old', name: '오늘의 나', icon: 'user', desc: '오늘 시간을 어디에 썼는지 원형으로', make: (logic, seed) => {
     const {t, add} = focusType(logic, seed);
@@ -59,12 +61,13 @@ const OLD: Preset[] = [
       {id: 'event', name: '사건', kind: 'longtext'}, {id: 'body', name: '몸의 신호', kind: 'longtext'}, {id: 'thought', name: '생각·감정', kind: 'longtext'}]})],
       options: opts(id, [B('stat', {label: '지금', agg: 'last', of: 'score', period: 'day', show: 'light', msgs: SCALE}), B('score', {field: 'score', verb: 'felt'}),
         B('form', {fields: ['reason', 'why', 'deep', 'event', 'body', 'thought'], verb: 'noted'}), B('list', {period: 'day', fields: ['score', 'reason', 'why']})]),
-      flows: [F({name: '낮은 점수', on: {type: id, event: 'created', verbs: []}, if: [{field: 'score', op: 'lt', value: 5}], do: [{do: 'notify', text: '점수가 낮아요. 이유를 남겨 둘까요?'}]})]};
+      flows: [F({name: '낮은 점수', on: {type: id, event: 'created', verbs: []}, if: [{field: 'score', op: 'lt', value: 5}], do: [{do: 'notify', text: '점수가 낮아요. 이유를 남겨 둘까요?'}, {do: 'effect', name: 'shake', target: 'widget'}]})]};
   }},
   {id: 'routine', group: 'old', name: '오늘의 루틴', icon: 'list', desc: '루틴 항목마다 체크, 오늘 한 개수, 한 달 달력', make: (logic, seed) => {
     const id = freeId(logic, 'routine');
     return {title: '오늘의 루틴', types: [T({id, name: '루틴', icon: 'check', fields: [{id: 'item', name: '항목', kind: 'choice', options: seed.routines}]})],
-      options: opts(id, [B('check', {field: 'item'}), B('stat', {label: '오늘', agg: 'count', period: 'day', target: seed.routines.length || null, show: 'gauge'}), B('calendar', {agg: 'count'})]), flows: []};
+      options: opts(id, [B('check', {field: 'item'}), B('stat', {label: '오늘', agg: 'count', period: 'day', target: seed.routines.length || null, show: 'gauge'}), B('calendar', {agg: 'count'})]),
+      flows: seed.routines.length ? [F({name: '루틴 다 했어요', on: {type: id}, ifAgg: [{type: id, agg: 'count', of: '', period: 'today', op: 'eq', value: seed.routines.length}], do: [{do: 'notify', text: '오늘 루틴 끝!'}, {do: 'effect', name: 'confetti', target: 'widget'}]})] : []};
   }},
   {id: 'review', group: 'old', name: '하루 돌아보기', icon: 'notebook', desc: '하루 한 줄, 지난 7일', make: logic => {
     const id = freeId(logic, 'diary');
@@ -74,7 +77,7 @@ const OLD: Preset[] = [
 ];
 
 const NEW: Preset[] = [
-  {id: 'blank', group: 'new', name: '빈 위젯', icon: 'plus', desc: '기록 묶음과 블록을 처음부터', make: logic => { const id = freeId(logic, 'mine'); return {title: '새 위젯', types: [T({id, name: '새 기록'})], options: opts(id, []), flows: []}; }},
+  {id: 'blank', group: 'new', name: '빈 위젯', icon: 'plus', desc: 'DB와 부품을 처음부터', make: logic => { const id = freeId(logic, 'mine'); return {title: '새 위젯', types: [T({id, name: '새 DB'})], options: opts(id, []), flows: []}; }},
   {id: 'sleep', group: 'old', name: '수면 (기상·취침)', icon: 'moon', desc: '시작·끝 버튼 + 평균 + 7일 막대', make: logic => {
     const id = freeId(logic, 'sleep');
     return {title: '수면', types: [T({id, name: '수면', desc: '잠든 시각부터 일어난 시각까지 한 줄', icon: 'moon', from: 'sleep', fields: [{id: 'q', name: '잠의 질', kind: 'score', max: 5, desc: '1 나쁨 ~ 5 개운함'}]})],
@@ -84,11 +87,13 @@ const NEW: Preset[] = [
     const id = logic.types.some(t => t.id === 'pomo') ? freeId(logic, 'pomo') : 'pomo';
     return {title: '뽀모도로', types: [T({id, name: '뽀모도로', desc: '타이머 한 단계가 끝날 때마다 한 줄', icon: 'timer', unit: '분', fields: [{id: 'step', name: '단계', kind: 'choice', options: ['집중', '휴식']}]})],
       options: opts(id, [B('timer', {steps: [{name: '집중', min: 25}, {name: '휴식', min: 5}], loop: 4, field: 'step'}), B('stat', {label: '오늘 뽀모도로', agg: 'count', period: 'day', conds: [{field: 'step', op: 'eq', value: '집중'}], target: 8, show: 'ring'}),
-        B('chart', {label: '최근 7일', agg: 'count', period: 'last7', conds: [{field: 'step', op: 'eq', value: '집중'}]})]), flows: []};
+        B('chart', {label: '최근 7일', agg: 'count', period: 'last7', conds: [{field: 'step', op: 'eq', value: '집중'}]})]),
+      flows: [F({name: '오늘 8번', on: {type: id}, if: [{field: 'step', op: 'eq', value: '집중'}], ifAgg: [{type: id, agg: 'count', of: '', period: 'today', op: 'eq', value: 8}], do: [{do: 'notify', text: '오늘 뽀모도로 8번!'}, {do: 'effect', name: 'glow', target: 'widget'}]})]};
   }},
   {id: 'water', group: 'new', name: '물 마시기', icon: 'water', desc: '+1 카운터와 하루 목표', make: logic => {
     const id = freeId(logic, 'water');
-    return {title: '물', types: [T({id, name: '물', unit: '잔', icon: 'water', desc: '한 잔 마실 때마다 한 줄'})], options: opts(id, [B('counter', {label: '오늘', icon: 'water', target: 8}), B('chart', {agg: 'sum', period: 'last7', target: 8})]), flows: []};
+    return {title: '물', types: [T({id, name: '물', unit: '잔', icon: 'water', desc: '한 잔 마실 때마다 한 줄'})], options: opts(id, [B('counter', {label: '오늘', icon: 'water', target: 8}), B('chart', {agg: 'sum', period: 'last7', target: 8})]),
+      flows: [F({name: '오늘 8잔', on: {type: id}, ifAgg: [{type: id, agg: 'count', of: '', period: 'today', op: 'eq', value: 8}], do: [{do: 'notify', text: '오늘 물 8잔 채웠어요'}, {do: 'effect', name: 'sparkle', target: 'widget'}]})]};
   }},
   {id: 'read', group: 'new', name: '독서 기록', icon: 'read', desc: '책·쪽수·목표 연결, 이달 합계, 카드', make: logic => {
     const id = freeId(logic, 'read');
@@ -97,7 +102,8 @@ const NEW: Preset[] = [
   }},
   {id: 'habit', group: 'new', name: '습관 체크', icon: 'check', desc: '오늘 체크 + 연속 일수 + 달력', make: logic => {
     const id = freeId(logic, 'habit');
-    return {title: '습관', types: [T({id, name: '습관', icon: 'check'})], options: opts(id, [B('check', {label: '오늘 했어요'}), B('stat', {label: '연속', agg: 'streak'}), B('calendar', {agg: 'count'})]), flows: []};
+    return {title: '습관', types: [T({id, name: '습관', icon: 'check'})], options: opts(id, [B('check', {label: '오늘 했어요'}), B('stat', {label: '연속', agg: 'streak'}), B('calendar', {agg: 'count'})]),
+      flows: [F({name: '체크하면 반짝', on: {type: id}, do: [{do: 'effect', name: 'sparkle', target: 'widget'}]})]};
   }},
   {id: 'spend', group: 'new', name: '지출', icon: 'wallet', desc: '항목·금액·분류, 이달 합계, 필터 칩', make: logic => {
     const id = freeId(logic, 'spend');

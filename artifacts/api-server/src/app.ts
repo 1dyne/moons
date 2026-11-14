@@ -14,6 +14,13 @@ import {mcpRouter} from "./moons/mcp-router";
 
 const app: Express = express();
 
+// One hop: the platform's edge proxy sets X-Forwarded-For, and its rightmost entry is the
+// address that connected to it. Without this, req.ip is the proxy for every request, so
+// per-client rate limits — ours in http.ts and the MCP SDK's own on /mcp and the OAuth
+// routes — all count into a single bucket, and one noisy client can 429 everybody.
+// Not `true`: trusting the whole chain would let a client set its own X-Forwarded-For.
+app.set('trust proxy', 1);
+
 app.use(
   pinoHttp({
     logger,

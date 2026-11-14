@@ -7,7 +7,7 @@ import {initV5, initialWorkspace, loadWorkspace, persistWorkspace, validateStore
 import {claimWorkspace} from '../lib/server/v5/claim.ts';
 import {saveProject, getProject, getProposal, proposalAction, projectHub, rotateTelemetry, acceptEvent, parseEvent, setGithubKey} from '../lib/server/projects/service.ts';
 import {changedProjectSparks} from '../lib/server/projects/queue.ts';
-import {runProjectJob} from '../lib/server/projects/worker.ts';
+import {runProjectJob, startProjectWorker} from '../lib/server/projects/worker.ts';
 import {discussProposal} from '../lib/server/projects/review.ts';
 import {openai} from '../lib/server/ai/openai.ts';
 import type {Entry} from '../lib/server/v5/types.ts';
@@ -165,4 +165,39 @@ test('projects: anonymous project data follows an account claim across devices',
   assert.equal((await getProposal(other, proposal.id)).briefs.length, 2);
   assert.equal((await projectHub(other)).events.length, 3);
   await assert.rejects(() => getProject(owner, projectId), (e: {status: number}) => e.status === 404);
+});
+
+// Regression guard: the worker used to poll every 5 seconds, which kept a serverless
+// Postgres from ever suspending its compute and burned a month of quota while idle.
+test('projects: an idle worker issues no queries, and a save wakes it without polling', async () => {
+  const solo = newId();
+  await q('insert into guests(id) values($1)', [solo]);
+  const opened = await loadWorkspace(solo);
+  const project = await saveProject(solo, {name: 'Wake the worker', goal: '저장이 워커를 깨우는지 확인', repository: '', website: '', noteIds: []}, opened.store);
+  await q(`update connected_projects set data=jsonb_set(data,'{watch}','true') where owner_id=$1 and id=$2`, [solo, project.id]);
+  await q('delete from project_jobs');
+
+  const slot = globalThis as unknown as {__moonsDb: Promise<Driver>};
+  const real = await slot.__moonsDb;
+  let queries = 0;
+  slot.__moonsDb = Promise.resolve({query: (s, p) => {queries++; return real.query(s, p);}, transaction: real.transaction!.bind(real)});
+  const errors: unknown[] = [];
+  const stop = startProjectWorker(e => errors.push(e));
+  try {
+    await new Promise(r => setTimeout(r, 150));
+    const swept = queries;
+    assert.ok(swept > 0, 'the worker looks for abandoned jobs once on start');
+    await new Promise(r => setTimeout(r, 500));
+    assert.equal(queries, swept, 'an idle worker must hold no timer: polling never lets the database suspend');
+
+    const current = await loadWorkspace(solo), store = structuredClone(current.store);
+    store.settings = {...store.settings, satellites: ['projects']} as typeof store.settings;
+    const woken = newId(), body = '잠든 워커를 깨워서 처리할 새 아이디어.';
+    store.entries.push({id: woken, kind: 'dump', body, sentences: [body], planetIds: [], projectIds: [project.id], locked: true, status: 'saved', createdAt: new Date().toISOString()} as Entry);
+    await persistWorkspace(solo, current.revision, validateStore(store, current.store));
+    const state = async () => (await q<{state: string}>('select state from project_jobs where entry_id=$1', [woken]))[0]?.state;
+    for (let i = 0; i < 100 && ['queued', 'running'].includes(await state() ?? 'queued'); i++) await new Promise(r => setTimeout(r, 50));
+    assert.equal(await state(), 'complete', 'the committed save wakes the worker on its own');
+    assert.deepEqual(errors, []);
+  } finally {stop(); slot.__moonsDb = Promise.resolve(real);}
 });

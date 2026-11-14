@@ -13,11 +13,21 @@ export function changedProjectSparks(previous: Store, next: Store) {
   });
 }
 
+// The worker registers here, so a queued job starts as soon as it is written rather than
+// being discovered by a poll. Unset while no worker runs in this process.
+let wake: (() => void) | undefined;
+export function onProjectWork(handler: (() => void) | undefined) {wake = handler;}
+export function kickProjectWorker() {wake?.();}
+
 // Written in the same transaction as the original: a browser closing cannot lose the trigger.
+// Returns how many jobs were added, so the caller can wake the worker once the write commits.
 export async function enqueueProjectSparks(tx: Driver, owner: string, previous: Store, next: Store) {
+  let queued = 0;
   for (const spark of changedProjectSparks(previous, next)) {
-    await tx.query(`insert into project_jobs(id,owner_id,entry_id,tag_key)
+    const written = await tx.query(`insert into project_jobs(id,owner_id,entry_id,tag_key)
       select $1,$2,$3,$4 where exists(select 1 from connected_projects where owner_id=$2 and data->>'watch'='true')
-      on conflict(owner_id,entry_id,tag_key) do nothing`, [crypto.randomUUID(), owner, spark.entryId, JSON.stringify(spark.tags)]);
+      on conflict(owner_id,entry_id,tag_key) do nothing returning id`, [crypto.randomUUID(), owner, spark.entryId, JSON.stringify(spark.tags)]);
+    queued += written.rows.length;
   }
+  return queued;
 }

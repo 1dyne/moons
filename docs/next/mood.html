@@ -1,0 +1,222 @@
+<title>moons 무드 견본</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* layout: two phone screens side by side — 밤(My Space) and 도감(박물관 카탈로그) — each a deliberate single look; page chrome follows the viewer theme */
+:root{
+  --page:#E9E7E3; --page-ink:#2a2826; --page-muted:#7c776f;
+  --night:#06080C; --night-2:#0d1117; --glass:rgba(255,255,255,.07); --glass-line:rgba(255,255,255,.10); --n-ink:#E8ECF2; --n-muted:#8a93a3;
+  --museum:#EDEBE7; --m-ink:#1f1d1b; --m-muted:#8a857e; --m-line:rgba(31,29,27,.12);
+  --moon:#7BA4F8; --moon-deep:#3B66BE; --teal:#3FAE94; --arch:#F2E4D4;
+  --hl-red:rgba(232,96,96,.38); --hl-green:rgba(63,174,148,.36); --hl-blue:rgba(123,164,248,.42);
+  --serif:"Noto Serif KR","Nanum Myeongjo",serif; --sans:"Noto Sans KR",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--page:#111216;--page-ink:#e6e4e0;--page-muted:#8f8a83;color-scheme:dark}}
+:root[data-theme="dark"]{--page:#111216;--page-ink:#e6e4e0;--page-muted:#8f8a83;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--page);color:var(--page-ink);font-family:var(--sans)}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
+header{margin-bottom:26px;max-width:640px}
+header h1{font-family:var(--serif);font-weight:500;font-size:30px;margin:0 0 6px;letter-spacing:-.01em}
+header p{margin:0;color:var(--page-muted);line-height:1.6}
+.phones{display:grid;grid-template-columns:repeat(2,minmax(0,390px));gap:40px;justify-content:center}
+.col{display:grid;gap:14px;min-width:0}
+.cap{font-size:13px;color:var(--page-muted);line-height:1.55}
+.cap b{color:var(--page-ink);font-weight:500}
+.phone{position:relative;width:100%;aspect-ratio:390/844;border-radius:44px;overflow:hidden;box-shadow:0 30px 60px -30px rgba(0,0,0,.45),0 0 0 1px rgba(0,0,0,.08)}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+button:focus-visible{outline:2px solid var(--moon);outline-offset:3px}
+
+/* ================= NIGHT ================= */
+.night{background:radial-gradient(120% 70% at 50% 62%,#0f1622 0%,var(--night) 60%);color:var(--n-ink)}
+.n-top{position:absolute;top:58px;left:28px;right:28px;display:flex;justify-content:space-between;font-size:12px;letter-spacing:.12em;color:var(--n-muted)}
+.n-count{position:absolute;top:118px;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:12px}
+.n-count svg{height:64px;width:auto;overflow:visible}
+.n-count .t{font-size:16px;font-weight:500}
+.pills{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:0 20px}
+.pill{background:var(--glass);border:1px solid var(--glass-line);border-radius:999px;padding:7px 14px;font-size:13px;color:#c9d0db;backdrop-filter:blur(10px)}
+.pill.warn{color:#f3b4a6}
+.dots{display:flex;gap:7px;justify-content:center;margin-top:4px}
+.dots i{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.25)}
+.dots i.on{background:#fff}
+.sky{position:absolute;left:0;right:0;top:300px;height:330px}
+.orb{position:absolute;transform:translate(-50%,-50%);cursor:pointer;display:flex;flex-direction:column;align-items:center}
+.orb canvas{display:block}
+.orb span{font-size:10px;letter-spacing:.14em;color:var(--n-muted);margin-top:4px;white-space:nowrap}
+.horizon{position:absolute;left:0;right:0;top:560px;height:90px;pointer-events:none}
+.horizon .line{position:absolute;left:0;right:0;top:0;height:2px;background:radial-gradient(circle,rgba(200,220,255,.85) 0 1px,transparent 1.4px) 0 0/9px 2px;filter:drop-shadow(0 0 4px rgba(150,190,255,.6))}
+.horizon .glow{position:absolute;left:-10%;right:-10%;top:-30px;height:110px;background:radial-gradient(50% 50% at 50% 30%,rgba(120,160,230,.22),transparent 70%)}
+.moon-wrap{position:absolute;left:0;right:0;top:240px;height:320px;overflow:hidden;pointer-events:none}
+.moon-wrap canvas{position:absolute;left:50%;bottom:-160px;transform:translateX(-50%)}
+.start{position:absolute;left:50%;transform:translateX(-50%);top:676px;width:220px;height:58px;border-radius:29px;background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.04));border:1px solid var(--glass-line);font-size:17px;font-weight:500;color:#eef2f8}
+.tabbar{position:absolute;left:22px;right:22px;bottom:20px;height:70px;border-radius:35px;background:rgba(30,34,42,.72);border:1px solid var(--glass-line);display:grid;grid-template-columns:repeat(4,1fr);padding:6px;backdrop-filter:blur(16px)}
+.tabbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11px;color:#b9c1cd;border-radius:29px}
+.tabbar button.on{background:rgba(255,255,255,.08);color:#fff}
+.tabbar svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6}
+@media (prefers-reduced-motion:no-preference){
+  .moon-wrap canvas{animation:rise 7s ease-in-out infinite}
+  @keyframes rise{0%,100%{transform:translateX(-50%) translateY(0) scale(1)}50%{transform:translateX(-50%) translateY(-6px) scale(1.025)}}
+  .orb.live canvas{animation:pulse 5s ease-in-out infinite}
+  .orb.live:nth-child(2) canvas{animation-delay:-2s}
+  @keyframes pulse{50%{filter:brightness(1.25);transform:scale(1.04)}}
+}
+
+/* ================= MUSEUM ================= */
+.museum{background:var(--museum);color:var(--m-ink);overflow-y:auto;scrollbar-width:none}
+.museum::-webkit-scrollbar{display:none}
+.m-inner{padding:60px 26px 40px}
+.m-done{position:absolute;top:58px;right:22px;z-index:3;background:rgba(255,255,255,.65);border:1px solid var(--m-line);border-radius:999px;padding:9px 18px;font-size:15px;backdrop-filter:blur(8px)}
+.m-title{font-family:var(--serif);font-weight:500;font-size:38px;margin:44px 0 18px;letter-spacing:-.02em}
+.stats{display:flex;gap:34px;margin-bottom:30px}
+.stat b{display:block;font-family:var(--serif);font-weight:400;font-size:30px;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:lining-nums}
+.stat span{font-size:12px;color:var(--m-muted)}
+.mtabs{display:flex;gap:22px;margin-bottom:30px}
+.mtabs button{font-family:var(--serif);font-size:24px;color:#b5b0a8;padding-bottom:6px;border-bottom:2px solid transparent}
+.mtabs button[aria-pressed="true"]{color:var(--m-ink);border-color:var(--m-ink)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:30px 18px}
+.piece{cursor:pointer;min-width:0}
+.object{height:160px;display:flex;align-items:flex-end;justify-content:center;position:relative;perspective:700px}
+.object canvas{display:block}
+.pcard{position:relative;width:132px;height:88px;background:#fbfaf7;border-radius:4px;transform:rotateX(18deg) rotateZ(-4deg);transform-origin:bottom;box-shadow:0 1px 0 rgba(0,0,0,.06),18px 22px 18px -14px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;font-size:13px;line-height:1.35;margin-bottom:20px;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+.piece:hover .pcard{transform:rotateX(8deg) rotateZ(-1deg) translateY(-6px)}
+.pcard .tape{position:absolute;top:-1px;right:12px;width:8px;height:20px;border-radius:0 0 2px 2px}
+.pcard.dusty{filter:saturate(.5) brightness(.96)}
+.pcard.dusty::after{content:"";position:absolute;inset:0;border-radius:inherit;background:radial-gradient(circle,rgba(120,105,85,.45) .8px,transparent 1.2px) 0 0/6px 7px,radial-gradient(circle,rgba(120,105,85,.35) .7px,transparent 1.1px) 3px 4px/9px 6px}
+.pcard mark{background:var(--c);color:inherit;border-radius:2px;padding:0 1px}
+.pno{font-size:12px;color:var(--m-muted);margin-top:10px;font-variant-numeric:tabular-nums}
+.pname{font-size:18px;margin-top:2px;line-height:1.3;overflow-wrap:anywhere}
+.pmeta{font-family:var(--serif);font-size:13px;color:var(--m-muted);margin-top:2px}
+.found{opacity:.4}
+.found .pname{color:var(--m-muted)}
+
+@media (max-width:860px){.phones{grid-template-columns:minmax(0,390px)}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>두 가지 무드</h1>
+    <p>호흡 앱의 밤 화면은 My Space로, 조각 컬렉션의 박물관 화면은 도감으로 옮겨 봤어요. 둘 다 눌러 볼 수 있어요.</p>
+  </header>
+
+  <div class="phones">
+    <div class="col">
+      <div class="phone night" id="night">
+        <div class="n-top"><span>오늘 3분</span><span>연속 6일</span></div>
+        <div class="n-count">
+          <svg id="dotNum" aria-label="7"></svg>
+          <div class="t">오늘 털 것</div>
+          <div class="pills"><span class="pill warn">착각 2</span><span class="pill">복습 3</span><span class="pill">먼지 2</span></div>
+          <div class="dots"><i></i><i class="on"></i><i></i></div>
+        </div>
+        <div class="moon-wrap" id="moonWrap" aria-hidden="true"></div>
+        <div class="sky" id="sky"></div>
+        <div class="horizon"><div class="glow"></div><div class="line"></div></div>
+        <button class="start" id="start">시작</button>
+        <nav class="tabbar" aria-label="화면">
+          <button class="on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke-dasharray="1.2 2.6" stroke-linecap="round"/></svg>My Space</button>
+          <button><svg viewBox="0 0 24 24"><circle cx="7" cy="8" r="3"/><circle cx="17" cy="15" r="4"/><path d="M9.5 9.5l4 3.5"/></svg>지도</button>
+          <button><svg viewBox="0 0 24 24"><rect x="4" y="5" width="7" height="9" rx="1"/><rect x="13" y="10" width="7" height="9" rx="1"/></svg>도감</button>
+          <button><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>기록</button>
+        </nav>
+      </div>
+      <p class="cap"><b>밤 · My Space.</b> 가운데 떠오르는 달이 오늘 털 카드예요. 점으로 찍힌 숫자가 장수, 하늘의 빛나는 점들이 모행성이고 밝을수록 요즘 많이 다룬 곳이에요. 행성을 누르면 그 행성 이름이 위에 떠요.</p>
+    </div>
+
+    <div class="col">
+      <div class="phone museum" id="museum">
+        <button class="m-done">닫기</button>
+        <div class="m-inner">
+          <h2 class="m-title">도감</h2>
+          <div class="stats">
+            <div class="stat"><b>48</b><span>카드</span></div>
+            <div class="stat"><b>6시간 12분</b><span>공부 시간</span></div>
+            <div class="stat"><b>6/23</b><span>설명 가능</span></div>
+          </div>
+          <div class="mtabs" role="group" aria-label="도감 종류">
+            <button aria-pressed="true" data-t="cards">카드</button>
+            <button aria-pressed="false" data-t="planets">행성</button>
+          </div>
+          <div class="grid" id="grid"></div>
+        </div>
+      </div>
+      <p class="cap"><b>도감.</b> 내가 만든 카드와 행성이 박물관 소장품처럼 놓여요. 번호 · 이름 · 어디 속하는지와 언제 봤는지만. 오래 안 본 건 먼지가 앉고, 아직 설명 못 하는 개념은 흐리게 남아 있다가 설명하면 채워져요.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- dot-matrix numerals ---------- */
+const FONT={'0':['01110','10001','10011','10101','11001','10001','01110'],'1':['00100','01100','00100','00100','00100','00100','01110'],'2':['01110','10001','00001','00010','00100','01000','11111'],'3':['11110','00001','00001','01110','00001','00001','11110'],'4':['00010','00110','01010','10010','11111','00010','00010'],'5':['11111','10000','11110','00001','00001','10001','01110'],'6':['00110','01000','10000','11110','10001','10001','01110'],'7':['11111','00001','00010','00100','01000','01000','01000'],'8':['01110','10001','10001','01110','10001','10001','01110'],'9':['01110','10001','10001','01111','00001','00010','01100']};
+function dotNumber(svg,str){const s=9,gap=2*s;let x=0,h='';
+  for(const ch of str){const g=FONT[ch];g.forEach((row,r)=>[...row].forEach((b,c)=>{if(b==='1')h+=`<circle cx="${x+c*s+s/2}" cy="${r*s+s/2}" r="2.6" fill="#f4f7fb"/>`}));x+=5*s+gap}
+  svg.setAttribute('viewBox',`0 0 ${x-gap} ${7*s}`);svg.innerHTML=h}
+dotNumber($('#dotNum'),'7');
+
+/* ---------- soft grainy orb (canvas) ---------- */
+function orb(size,{c1,c2,glow=0,grain=.18,light=[.42,.36],dust=0,craters=0,shadow=false,seed=1}={}){
+  const pad=glow?size*.6:shadow?size*.25:4,W=size+pad*2,H=size+pad*2+(shadow?size*.12:0);
+  const cv=document.createElement('canvas'),dpr=Math.min(2,devicePixelRatio||1);cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
+  const x=cv.getContext('2d');x.scale(dpr,dpr);const cx=W/2,cy=pad+size/2,r=size/2;
+  let rnd=seed*9301;const R=()=>((rnd=(rnd*9301+49297)%233280)/233280);
+  if(glow){const g=x.createRadialGradient(cx,cy,r*.6,cx,cy,r+pad);g.addColorStop(0,`rgba(${c1},${.35*glow})`);g.addColorStop(1,`rgba(${c1},0)`);x.fillStyle=g;x.fillRect(0,0,W,H)}
+  if(shadow){x.save();x.translate(cx+r*.35,cy+r*.98);x.scale(1,.18);const sg=x.createRadialGradient(0,0,0,0,0,r*1.05);sg.addColorStop(0,'rgba(40,30,20,.32)');sg.addColorStop(1,'rgba(40,30,20,0)');x.fillStyle=sg;x.beginPath();x.arc(0,0,r*1.05,0,7);x.fill();x.restore()}
+  const g=x.createRadialGradient(cx-r*(.5-light[0])*2,cy-r*(.5-light[1])*2,r*.05,cx,cy,r*1.02);
+  g.addColorStop(0,`rgb(${c2})`);g.addColorStop(.55,`rgb(${c1})`);g.addColorStop(1,`rgba(${c1},.75)`);
+  x.save();x.beginPath();x.arc(cx,cy,r,0,7);x.clip();x.fillStyle=g;x.fillRect(0,0,W,H);
+  // terminator shade
+  const sh=x.createLinearGradient(cx-r,cy,cx+r,cy);sh.addColorStop(.55,'rgba(0,0,0,0)');sh.addColorStop(1,'rgba(0,0,0,.28)');x.fillStyle=sh;x.fillRect(0,0,W,H);
+  for(let i=0;i<craters;i++){const a=R()*6.28,d=R()*r*.55,cr=r*(.1+R()*.08),px=cx+Math.cos(a)*d,py=cy+Math.sin(a)*d;
+    const cg=x.createRadialGradient(px+cr*.3,py+cr*.3,cr*.1,px,py,cr);cg.addColorStop(0,'rgba(0,0,0,.30)');cg.addColorStop(.8,'rgba(0,0,0,.12)');cg.addColorStop(1,'rgba(255,255,255,.12)');x.fillStyle=cg;x.beginPath();x.arc(px,py,cr,0,7);x.fill()}
+  // grain
+  const n=Math.floor(size*size*grain*.35);for(let i=0;i<n;i++){const v=R()>.5?255:0;x.fillStyle=`rgba(${v},${v},${v},${R()*.12})`;x.fillRect(cx-r+R()*size,cy-r+R()*size,1,1)}
+  for(let i=0;i<dust*size*6;i++){x.fillStyle=`rgba(130,115,95,${.25+R()*.4})`;x.beginPath();x.arc(cx-r+R()*size,cy-r+R()*size,.4+R()*1.1,0,7);x.fill()}
+  x.restore();return cv}
+
+/* ---------- night: moon + sky orbs ---------- */
+$('#moonWrap').appendChild(orb(170,{c1:'110,160,225',c2:'225,238,250',glow:1.1,grain:.5,light:[.5,.8],seed:3}));
+const planets=[
+  {name:'TEPS',x:24,y:30,s:46,c1:'123,164,248',c2:'215,230,255',act:1,crat:1},
+  {name:'moons 설계',x:76,y:22,s:40,c1:'63,174,148',c2:'200,240,228',act:.9},
+  {name:'LEET',x:57,y:30,s:30,c1:'160,140,230',c2:'225,215,255',act:.35},
+  {name:'일기',x:13,y:47,s:20,c1:'240,180,120',c2:'255,232,205',act:.5},
+  {name:'언어',x:88,y:50,s:14,c1:'120,126,140',c2:'170,176,188',act:0,dust:1},
+  {name:'',x:12,y:58,s:6,c1:'140,146,160',c2:'180,186,198',act:0},{name:'',x:90,y:38,s:5,c1:'140,146,160',c2:'180,186,198',act:0},{name:'',x:50,y:12,s:4,c1:'140,146,160',c2:'180,186,198',act:0}
+];
+const sky=$('#sky');
+planets.forEach((p,i)=>{const d=document.createElement('button');d.className='orb'+(p.act>.6?' live':'');d.style.left=p.x+'%';d.style.top=p.y+'%';
+  d.appendChild(orb(p.s,{c1:p.c1,c2:p.c2,glow:p.act,grain:.4,craters:p.crat||0,dust:p.dust||0,seed:i+2}));
+  if(p.name){const t=document.createElement('span');t.textContent=p.name;d.appendChild(t)}
+  d.setAttribute('aria-label',p.name||'왜소행성');
+  d.onclick=()=>{const t=document.querySelector('.n-count .t');t.textContent=p.name?`${p.name} · ${p.act>.6?'요즘 자주 봄':p.act?'가끔 봄':'오래 안 봄'}`:'왜소행성 · 모행성 없음';clearTimeout(window._t);window._t=setTimeout(()=>t.textContent='오늘 털 것',2200)};
+  sky.appendChild(d)});
+$('#start').onclick=()=>{const b=$('#start');b.textContent='go by';b.style.transition='all .4s';setTimeout(()=>b.textContent='시작',1400)};
+
+/* ---------- museum ---------- */
+const cards=[
+  {no:'011',name:'go by',meta:'TEPS · LC, 오늘',html:'go by',tape:'#3FAE94'},
+  {no:'010',name:'did you move here yesterday',meta:'TEPS · 시제불일치, 2일 전',html:'<mark style="--c:var(--hl-red)">did</mark> you move here <mark style="--c:var(--hl-red)">yesterday</mark>'},
+  {no:'009',name:'spoil your appetite',meta:'TEPS · 관용, 47일 전',html:'spoil your <mark style="--c:var(--hl-blue)">appetite</mark>',dusty:true},
+  {no:'008',name:'be addressed',meta:'TEPS · 관용, 착각 2번',html:'be addressed',tape:'#e46a6a'},
+  {no:'007',name:'tide me over',meta:'설명 전',html:'tide me over',found:true},
+  {no:'006',name:'once I get there',meta:'TEPS · 시제불일치, 5일 전',html:'once I <mark style="--c:var(--hl-blue)">get</mark> there'},
+];
+const pls=[
+  {no:'P-01',name:'TEPS',meta:'카드 48, 크레이터 2',o:{c1:'123,164,248',c2:'222,234,255',craters:2,seed:4}},
+  {no:'P-02',name:'moons 설계',meta:'페이지 27, ✦ 1',o:{c1:'63,174,148',c2:'205,240,230',seed:5}},
+  {no:'P-03',name:'LEET',meta:'카드 35, 12일 전',o:{c1:'160,140,230',c2:'230,222,255',craters:1,seed:6}},
+  {no:'P-04',name:'언어',meta:'카드 9, 95일 전',o:{c1:'150,150,155',c2:'205,205,208',dust:3,seed:7}},
+];
+function renderGrid(t){const g=$('#grid');g.innerHTML='';
+  (t==='cards'?cards:pls).forEach(it=>{const p=document.createElement('div');p.className='piece'+(it.found?' found':'');
+    const ob=document.createElement('div');ob.className='object';
+    if(t==='cards'){ob.innerHTML=`<div class="pcard${it.dusty?' dusty':''}"><span>${it.html}</span>${it.tape?`<span class="tape" style="background:${it.tape}"></span>`:''}</div>`}
+    else ob.appendChild(orb(118,{...it.o,shadow:true,grain:.35,light:[.36,.3]}));
+    p.appendChild(ob);
+    p.insertAdjacentHTML('beforeend',`<div class="pno">No. ${it.no}</div><div class="pname">${it.name}</div><div class="pmeta">${it.meta}</div>`);
+    g.appendChild(p)})}
+document.querySelectorAll('.mtabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.mtabs button').forEach(x=>x.setAttribute('aria-pressed',x===b));renderGrid(b.dataset.t)});
+renderGrid('cards');
+</script>

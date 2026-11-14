@@ -198,6 +198,16 @@ test('projects: an idle worker issues no queries, and a save wakes it without po
     const state = async () => (await q<{state: string}>('select state from project_jobs where entry_id=$1', [woken]))[0]?.state;
     for (let i = 0; i < 100 && ['queued', 'running'].includes(await state() ?? 'queued'); i++) await new Promise(r => setTimeout(r, 50));
     assert.equal(await state(), 'complete', 'the committed save wakes the worker on its own');
+
+    // A second service sharing this database writes jobs but cannot reach this worker, so every
+    // save drains the queue, not only one that queued a job here.
+    const foreign = newId();
+    await q('insert into project_jobs(id,owner_id,entry_id,tag_key) values($1,$2,$3,$4)', [newId(), solo, foreign, '[]']);
+    const quiet = await loadWorkspace(solo);
+    await persistWorkspace(solo, quiet.revision, quiet.store);
+    const other = async () => (await q<{state: string}>('select state from project_jobs where entry_id=$1', [foreign]))[0]?.state;
+    for (let i = 0; i < 100 && ['queued', 'running'].includes(await other() ?? 'queued'); i++) await new Promise(r => setTimeout(r, 50));
+    assert.equal(await other(), 'no_proposal', 'a save with nothing of its own still drains another process\'s job');
     assert.deepEqual(errors, []);
   } finally {stop(); slot.__moonsDb = Promise.resolve(real);}
 });

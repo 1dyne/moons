@@ -1,0 +1,540 @@
+<title>moons next 와이어프레임</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* layout: app shell — top bar (brand · screen tabs · global eye), one screen at a time; map screens carry the Top/Bottom pill */
+:root{
+  --bg:#FFF8E7; --surface:#FFFFFF; --ink:#1E1E1E; --muted:#7d776c; --line:#1E1E1E;
+  --soft:#F1E8D6; --moon:#7BA4F8; --moon-deep:#3B66BE; --you:#FFE36B;
+  --hl-red:rgba(240,110,110,.45); --hl-orange:rgba(245,160,70,.45); --hl-yellow:rgba(250,220,60,.55);
+  --hl-green:rgba(60,190,120,.42); --hl-blue:rgba(90,150,240,.40); --hl-purple:rgba(170,120,230,.40);
+  --tape-green:#2fb67a; --tape-red:#e46a6a; --tape-blue:#5b8fe8; --tape-yellow:#e8c23a;
+  --dust:rgba(120,100,70,.38); --warn:#c2552d; --good:#2f8f5b;
+  --f-display:"Space Grotesk","Noto Sans KR",system-ui,sans-serif;
+  --f-body:"Noto Sans KR",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#17161a; --surface:#222127; --ink:#ECE7DC; --muted:#9a9488; --line:#ECE7DC;
+  --soft:#2c2a31; --moon:#7BA4F8; --moon-deep:#a9c3ff; --you:#b89b1e;
+  --dust:rgba(210,195,160,.30); --warn:#ff9a72; --good:#6fd39b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#17161a; --surface:#222127; --ink:#ECE7DC; --muted:#9a9488; --line:#ECE7DC;
+  --soft:#2c2a31; --moon:#7BA4F8; --moon-deep:#a9c3ff; --you:#b89b1e;
+  --dust:rgba(210,195,160,.30); --warn:#ff9a72; --good:#6fd39b; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 40px;max-width:1180px;margin:0 auto}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,select:focus-visible{outline:3px solid var(--moon);outline-offset:2px}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.brand{font-family:var(--f-display);font-weight:700;font-size:24px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.brand i{width:22px;height:22px;border-radius:50%;background:var(--moon);box-shadow:inset -7px 0 0 var(--moon-deep);display:inline-block}
+.tabs{display:flex;gap:4px;background:var(--soft);border-radius:999px;padding:4px}
+.tabs button{border:0;background:transparent;padding:6px 14px;border-radius:999px;font-weight:500}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.spacer{flex:1}
+.eye-all{display:flex;align-items:center;gap:6px;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:13px}
+.eye-all[aria-pressed="false"]{opacity:.55}
+.note{font-size:12px;color:var(--muted)}
+.screen[hidden]{display:none}
+h2{font-family:var(--f-display);font-size:15px;font-weight:700;margin:0 0 10px;letter-spacing:.01em}
+.pill-switch{display:inline-flex;border:2.5px solid var(--line);border-radius:999px;padding:4px;gap:4px;background:var(--surface)}
+.pill-switch button{border:2px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-family:var(--f-display);font-weight:700}
+.pill-switch button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.crumb{font-family:var(--f-display);font-weight:700;font-size:17px}
+.crumb span{color:var(--muted);font-weight:500;margin:0 6px}
+
+/* ---------- My Space ---------- */
+.ms{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px}
+.ms .full{grid-column:1/-1}
+.panel{background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:16px;min-width:0}
+.periods{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.periods button{border:1.5px solid var(--line);background:transparent;border-radius:999px;padding:4px 12px;font-size:13px}
+.periods button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.today{display:flex;gap:22px;align-items:center;flex-wrap:wrap}
+.deck{position:relative;width:132px;height:92px;flex:none}
+.deck div{position:absolute;inset:0;background:var(--surface);border:1.5px solid var(--line);border-radius:10px}
+.deck div:nth-child(1){transform:translate(10px,10px) rotate(4deg)}
+.deck div:nth-child(2){transform:translate(5px,5px) rotate(2deg)}
+.deck div:nth-child(3){display:flex;align-items:center;justify-content:center;font-family:var(--f-display);font-weight:700;font-size:30px}
+.today-copy{flex:1;min-width:200px}
+.today-copy b{font-family:var(--f-display);font-size:20px}
+.mix{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
+.chip{font-size:12px;border-radius:999px;padding:2px 9px;background:var(--soft);white-space:nowrap}
+.chip.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
+.btn{border:1.5px solid var(--line);background:var(--moon);color:#10203f;border-radius:999px;padding:8px 20px;font-weight:700}
+.btn.ghost{background:transparent;color:var(--ink)}
+.think{display:grid;gap:8px}
+.think-row{display:grid;grid-template-columns:minmax(0,9em) minmax(0,1fr) 3.5em;gap:10px;align-items:center;font-size:14px}
+.think-row .bar{height:10px;border-radius:5px;background:var(--soft);overflow:hidden}
+.think-row .bar i{display:block;height:100%;background:var(--moon)}
+.delta{font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+.delta.up{color:var(--good)} .delta.down{color:var(--muted)}
+.list{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.list li{display:flex;gap:10px;align-items:baseline;font-size:14px;border-bottom:1px dashed color-mix(in srgb,var(--line) 25%,transparent);padding-bottom:7px;min-width:0}
+.list li:last-child{border-bottom:0}
+.list .what{flex:1;min-width:0;overflow-wrap:anywhere}
+.list .meta{font-size:12px;color:var(--muted);white-space:nowrap}
+.change{display:grid;gap:4px;font-size:13px}
+.change del{color:var(--muted)}
+.change ins{text-decoration:none;background:var(--hl-yellow);border-radius:3px;padding:0 2px}
+.minimap-wrap{position:relative;height:220px;border-radius:10px;background:var(--bg);overflow:hidden;border:1px dashed color-mix(in srgb,var(--line) 35%,transparent)}
+.ms-grid2{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+
+/* ---------- canvas ---------- */
+.mapbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.canvas-scroller{overflow:auto;border:1.5px solid var(--line);border-radius:14px;background:
+  radial-gradient(circle,color-mix(in srgb,var(--line) 14%,transparent) 1px,transparent 1.2px) 0 0/22px 22px,var(--surface);height:560px;position:relative}
+.canvas{position:relative;width:1100px;height:640px;transform-origin:0 0}
+.canvas svg.links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.root-title{position:absolute;font-family:var(--f-display);font-weight:500;font-size:40px;letter-spacing:-.02em}
+.frame{position:absolute;border:1.5px dashed color-mix(in srgb,var(--line) 45%,transparent);border-radius:14px}
+.frame-title{position:absolute;top:-15px;left:14px;background:var(--surface);padding:0 8px;font-weight:700;font-size:16px;border-bottom:2.5px solid var(--line)}
+.frame-count{position:absolute;top:-12px;right:12px;background:var(--surface);padding:0 6px;font-size:12px;color:var(--muted)}
+.mini{position:absolute;background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.35;cursor:grab;user-select:none;touch-action:none}
+.mini.grey{background:var(--soft)}
+.mini.wide{border-radius:10px}
+.mini.dragging{cursor:grabbing;box-shadow:0 8px 20px rgba(0,0,0,.18)}
+.mini.current{box-shadow:0 0 0 5px var(--you)}
+.tape{position:absolute;top:-2px;width:9px;height:22px;border-radius:2px}
+.tape.r0{right:6px}.tape.r1{right:18px}
+.dust1::after,.dust2::after,.dust3::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(circle,var(--dust) 1px,transparent 1.4px) 0 0/7px 9px,radial-gradient(circle,var(--dust) .8px,transparent 1.2px) 3px 4px/11px 7px}
+.dust1::after{opacity:.35}.dust2::after{opacity:.8}.dust3::after{opacity:1}
+.dust2,.dust3{filter:saturate(.6);color:color-mix(in srgb,var(--ink) 70%,var(--bg))}
+.web{position:absolute;top:-1px;right:-1px;width:34px;height:34px;pointer-events:none}
+.web path{fill:none;stroke:var(--muted);stroke-width:.8}
+.pile{position:absolute;right:18px;bottom:18px;width:150px}
+.pile .mini{position:relative;margin-top:-28px;transform:rotate(-3deg)}
+.pile .mini:nth-child(2){transform:rotate(2deg)}
+.pile-label{font-size:12px;color:var(--muted);margin-bottom:34px}
+.zoom{display:flex;align-items:center;gap:8px;font-size:13px}
+.zoom input{width:120px}
+.z-far .mini .body{display:none}
+.z-far .mini{min-width:0;padding:4px 8px;font-size:11px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);align-items:center}
+.legend i{display:inline-block;width:18px;height:12px;border-radius:3px;border:1px solid color-mix(in srgb,var(--line) 40%,transparent);vertical-align:-2px;margin-right:4px;position:relative;overflow:hidden;background:var(--surface)}
+
+/* ---------- bottom-up ---------- */
+.bu{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
+.bu-main{display:grid;gap:14px;min-width:0}
+.bu-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.seg{display:inline-flex;border:1.5px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:5px 14px;font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+select{font:inherit;font-size:13px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:5px 10px}
+.stage{position:relative;background:var(--surface);border:2px solid var(--line);border-radius:6px;min-height:340px;display:flex;align-items:center;justify-content:center;padding:44px 28px;text-align:center}
+.stage .face-label{position:absolute;top:12px;left:16px;font-size:12px;color:var(--muted);letter-spacing:.06em}
+.stage .big{font-size:clamp(26px,5vw,44px);line-height:1.35;overflow-wrap:anywhere}
+.stage .sub{font-size:16px;color:var(--muted);margin-top:14px}
+.stage .eye{position:absolute;right:14px;bottom:12px;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:13px}
+.stage .eye[aria-pressed="false"]{opacity:.5}
+.stage .tape{top:-2px;width:14px;height:40px}
+.stage .tape.r0{right:22px}
+.tape-note{position:absolute;top:44px;right:10px;font-size:11px;background:var(--surface);border:1px solid color-mix(in srgb,var(--line) 30%,transparent);border-radius:6px;padding:2px 6px;color:var(--muted)}
+mark{background:none;color:inherit;border-radius:4px;padding:0 .08em}
+.show-marks mark[data-c="red"]{background:var(--hl-red)}
+.show-marks mark[data-c="green"]{background:var(--hl-green)}
+.show-marks mark[data-c="blue"]{background:var(--hl-blue)}
+.show-marks mark[data-c="yellow"]{background:var(--hl-yellow)}
+.show-marks mark[data-c="purple"]{background:var(--hl-purple)}
+.show-marks mark[data-c="orange"]{background:var(--hl-orange)}
+.actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.actions .q{font-size:13px;color:var(--muted);width:100%;text-align:center}
+.pred{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 18px;font-weight:500}
+.pred.ok{background:color-mix(in srgb,var(--good) 18%,var(--surface))}
+.pred.no{background:color-mix(in srgb,var(--warn) 16%,var(--surface))}
+.verdict{text-align:center;font-size:14px;padding:8px;border-radius:10px;background:var(--soft)}
+.verdict.illusion{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn);font-weight:700}
+.progress{display:flex;gap:4px}
+.progress i{flex:1;height:5px;border-radius:3px;background:var(--soft)}
+.progress i.done{background:var(--ink)}
+.progress i.now{background:var(--moon)}
+.side{border-left:2.5px solid var(--line);padding-left:16px;display:grid;gap:12px;min-width:0}
+.side-map{position:relative;height:260px;background:var(--surface);border:1.5px solid var(--line);border-radius:12px;overflow:hidden}
+.side-map .canvas{transform:scale(.27)}
+.tape-legend{display:grid;gap:6px;font-size:13px}
+.tape-legend div{display:flex;gap:8px;align-items:center}
+.tape-legend i{width:8px;height:16px;border-radius:2px;flex:none}
+.palette{display:flex;gap:6px;flex-wrap:wrap}
+.palette button{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--line)}
+
+/* ---------- card editor ---------- */
+.ed{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.ed-face{background:var(--surface);border:1.5px solid var(--line);border-radius:10px;min-height:190px;padding:14px;position:relative}
+.ed-face .lbl{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;margin-bottom:8px}
+.ed-face .txt{font-size:24px;line-height:1.5}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1.5px solid var(--line);border-radius:999px;padding:6px 12px;width:fit-content;max-width:100%}
+.toolbar .sep{width:1px;height:20px;background:color-mix(in srgb,var(--line) 30%,transparent)}
+.toolbar .tool{border:0;background:transparent;padding:4px 8px;border-radius:999px;font-size:13px}
+.toolbar .tool[aria-pressed="true"]{background:var(--soft)}
+.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;counter-reset:s}
+.flow div{background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:12px;font-size:13px;position:relative}
+.flow b{display:block;font-family:var(--f-display);margin-bottom:4px}
+.ink-demo{width:100%;height:120px;border-radius:8px;background:var(--bg);border:1px dashed color-mix(in srgb,var(--line) 35%,transparent);touch-action:none;display:block}
+
+@media (max-width:860px){
+  .ms,.ms-grid2,.bu,.ed,.flow{grid-template-columns:minmax(0,1fr)}
+  .side{border-left:0;border-top:2.5px solid var(--line);padding-left:0;padding-top:14px}
+  .canvas-scroller{height:440px}
+}
+@media (prefers-reduced-motion:no-preference){.stage .big{transition:opacity .18s}}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><i aria-hidden="true"></i>moons</div>
+    <nav class="tabs" aria-label="화면">
+      <button data-go="space" aria-pressed="true">My Space</button>
+      <button data-go="map" aria-pressed="false">지도</button>
+      <button data-go="edit" aria-pressed="false">카드 만들기</button>
+    </nav>
+    <div class="spacer"></div>
+    <button class="eye-all" id="eyeAll" aria-pressed="true" title="전체 형광펜">👁 전체 형광펜</button>
+  </div>
+
+  <!-- ================= MY SPACE ================= -->
+  <section class="screen" id="s-space">
+    <div class="periods" role="group" aria-label="기간">
+      <button aria-pressed="false" data-p="1">1일</button>
+      <button aria-pressed="true" data-p="7">7일</button>
+      <button aria-pressed="false" data-p="30">30일</button>
+      <button aria-pressed="false" data-p="all">전체</button>
+    </div>
+    <div class="ms">
+      <div class="panel full">
+        <div class="today">
+          <div class="deck" aria-hidden="true"><div></div><div></div><div id="deckN">7</div></div>
+          <div class="today-copy">
+            <b>오늘 털 것 <span id="todayN">7</span>장</b>
+            <div class="mix">
+              <span class="chip warn">착각한 앎 2</span>
+              <span class="chip">복습할 때 3</span>
+              <span class="chip">먼지 많음 2</span>
+            </div>
+            <button class="btn" id="startTest">시작</button>
+            <span class="note" style="margin-left:8px">약 3분</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>요즘 생각</h2>
+        <div class="think" id="think"></div>
+      </div>
+
+      <div class="panel">
+        <h2>착각한 앎 <span class="note">안다고 했는데 틀린 것</span></h2>
+        <ul class="list">
+          <li><span class="what">be addressed</span><span class="meta">확신 → 틀림 ×2</span></li>
+          <li><span class="what">once I get there</span><span class="meta">확신 → 틀림 ×1</span></li>
+          <li><span class="what">tide me over</span><span class="meta">확신 → 틀림 ×1</span></li>
+        </ul>
+      </div>
+
+      <div class="full ms-grid2">
+        <div class="panel">
+          <h2>새로 알게 된 것</h2>
+          <ul class="list">
+            <li><span class="what">go by</span><span class="meta">틀림 → 맞음</span></li>
+            <li><span class="what">spoil your appetite</span><span class="meta">새 문장</span></li>
+            <li><span class="what">시제불일치</span><span class="meta">내 말 정의 생김</span></li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h2>생각이 바뀐 곳</h2>
+          <div class="change">
+            <div><b>looking forward to</b> 뒷면</div>
+            <del>to 뒤에 동사원형</del>
+            <ins>to는 전치사 → 뒤에 -ing</ins>
+            <div class="note">11월 10일 → 11월 13일</div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>채울 것</h2>
+          <ul class="list">
+            <li><span class="what">tide over</span><span class="meta">뒷면 비어 있음</span></li>
+            <li><span class="what">관용 (용어)</span><span class="meta">내 말 정의 없음</span></li>
+            <li><span class="what">LC 파트 4는 왜 시간이 부족할까?</span><span class="meta">열린 질문</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="panel full">
+        <h2>먼지 지도 <span class="note">눌러서 그 자리로</span></h2>
+        <div class="minimap-wrap" id="msMap"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= MAP ================= -->
+  <section class="screen" id="s-map" hidden>
+    <div class="mapbar">
+      <div class="crumb" id="crumb">TEPS<span>/</span>LC</div>
+      <div class="spacer"></div>
+      <div class="pill-switch" role="group" aria-label="보기 방향">
+        <button data-dir="top" aria-pressed="true">Top</button>
+        <button data-dir="bottom" aria-pressed="false">Bottom</button>
+      </div>
+    </div>
+
+    <!-- top-down -->
+    <div id="topdown">
+      <div class="mapbar">
+        <div class="zoom"><label for="zoom">확대</label><input id="zoom" type="range" min="45" max="100" value="100"></div>
+        <div class="legend">
+          <span><i></i>깨끗</span>
+          <span><i class="dust1"></i>먼지 조금</span>
+          <span><i class="dust3"></i>먼지 많음</span>
+          <span>🕸 오래 안 봄</span>
+          <span>카드는 끌어서 옮길 수 있어요</span>
+        </div>
+      </div>
+      <div class="canvas-scroller"><div class="canvas" id="bigCanvas"></div></div>
+    </div>
+
+    <!-- bottom-up -->
+    <div id="bottomup" hidden>
+      <div class="bu">
+        <div class="bu-main">
+          <div class="bu-controls">
+            <div class="seg" role="group" aria-label="모드">
+              <button data-mode="browse" aria-pressed="true">보기</button>
+              <button data-mode="test" aria-pressed="false">테스트</button>
+            </div>
+            <label class="note" for="order">순서</label>
+            <select id="order">
+              <option value="canvas">캔버스 배치 순서</option>
+              <option value="created">만든 순서</option>
+              <option value="random">무작위</option>
+              <option value="due" hidden>보완 우선</option>
+            </select>
+            <label class="note" for="tapeFilter">테이프</label>
+            <select id="tapeFilter">
+              <option value="">전체</option>
+              <option value="green">초록만</option>
+            </select>
+          </div>
+          <div class="progress" id="progress"></div>
+          <div class="stage" id="stage"></div>
+          <div class="actions" id="actions"></div>
+        </div>
+        <aside class="side">
+          <div class="crumb" style="font-size:14px">지금 위치</div>
+          <div class="side-map" id="sideMap"></div>
+          <div>
+            <h2>테이프 범례</h2>
+            <div class="tape-legend">
+              <div><i style="background:var(--tape-green)"></i>몰랐던 카드</div>
+              <div><i style="background:var(--tape-red)"></i>시험 직전 다시</div>
+              <div><i style="background:var(--tape-blue)"></i><span class="note">이름 없음</span></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= EDITOR ================= -->
+  <section class="screen" id="s-edit" hidden>
+    <div class="flow" style="margin-bottom:16px">
+      <div><b>+ 입력</b>어디서나. 지금 보는 폴더로 들어감</div>
+      <div><b>글자 또는 펜</b>아이패드 펜은 글자칸에서 바로 글자로(Scribble). 손글씨 면은 그대로 저장</div>
+      <div><b>칠하기</b>글자를 고르고 색. 색의 뜻은 내가 정함</div>
+      <div><b>테이프</b>가장자리에 붙이고, 원하면 메모</div>
+    </div>
+    <div class="toolbar" role="toolbar" aria-label="카드 도구" style="margin-bottom:14px">
+      <button class="tool" aria-pressed="true">글자</button>
+      <button class="tool" aria-pressed="false">손글씨</button>
+      <span class="sep"></span>
+      <span class="note">형광펜</span>
+      <div class="palette" id="pal"></div>
+      <span class="sep"></span>
+      <button class="tool" aria-pressed="false">▮ 테이프</button>
+      <button class="tool" aria-pressed="false">👁</button>
+    </div>
+    <div class="ed show-marks" id="edFaces">
+      <div class="ed-face">
+        <div class="lbl"><span>앞면</span><span>폴더: TEPS / LC / 시제불일치</span></div>
+        <div class="txt" id="edFront"></div>
+        <div class="note" style="margin-top:12px">글자를 드래그로 고른 뒤 위 색을 누르면 칠해져요</div>
+      </div>
+      <div class="ed-face">
+        <div class="lbl"><span>뒷면</span><span>손글씨 영역 (마우스·펜으로 써 보기)</span></div>
+        <div class="txt" id="edBack"></div>
+        <canvas class="ink-demo" id="ink" width="600" height="120" aria-label="손글씨 영역"></canvas>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const state={eyeAll:true, dir:'top', mode:'browse', idx:0, phase:'front', pred:null, order:'canvas', tape:''};
+
+/* ---------- data ---------- */
+const folders=[
+  {id:'tense',name:'시제불일치',x:520,y:40,w:540,h:200,dust:0},
+  {id:'idiom',name:'관용',x:520,y:300,w:540,h:300,dust:1},
+];
+const items=[
+  {id:'c1',folder:'tense',x:540,y:80,w:200,front:[['did','red'],' you move here ',['yesterday','red']],back:[['과거','red'],' — yesterday가 있으면 현재완료 X'],sub:'',dust:0,created:3},
+  {id:'c2',folder:'tense',x:780,y:80,w:250,front:['once I ',['get','blue'],' there'],back:['시간 부사절 → ',['현재형','blue'],'으로 미래'],dust:1,created:5},
+  {id:'c3',folder:'tense',x:780,y:160,w:250,front:['looking forward ',['to','purple']],back:[['to는 전치사','purple'],' → 뒤에 -ing'],dust:0,created:6},
+  {id:'c4',folder:'idiom',x:540,y:340,w:150,front:['go by'],back:['(시간이) ',['지나다','green'],' / ~에 들르다'],tapes:['green'],tapeNote:'몰랐던 카드',dust:0,created:1},
+  {id:'c5',folder:'idiom',x:720,y:340,w:220,grey:true,front:['be addressed'],back:[['다뤄지다','yellow'],', 처리되다'],dust:2,created:2,tapes:['red']},
+  {id:'s1',folder:'idiom',x:540,y:430,w:220,front:['spoil your ',['appetite','orange']],back:['입맛을 떨어뜨리다 (식사 전 군것질)'],kind:'문장',dust:3,created:4},
+  {id:'s2',folder:'idiom',x:540,y:500,w:440,front:["I'll just have enough to ",['tide me over','green']],back:['(다음 식사까지) ',['버틸','green'],' 만큼만 먹을게'],kind:'문장',dust:2,created:7,tapes:['green'],tapeNote:'몰랐던 카드'},
+];
+const unplaced=[{t:'affluent'},{t:'run late'}];
+const tapeColor={green:'var(--tape-green)',red:'var(--tape-red)',blue:'var(--tape-blue)'};
+
+/* ---------- helpers ---------- */
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const rich=parts=>parts.map(p=>Array.isArray(p)?`<mark data-c="${p[1]}">${esc(p[0])}</mark>`:esc(p)).join('');
+const plain=parts=>parts.map(p=>Array.isArray(p)?p[0]:p).join('');
+const web='<svg class="web" viewBox="0 0 34 34" aria-hidden="true"><path d="M34 0 L8 26 M34 0 L18 30 M34 0 L4 14 M34 0 L26 33 M10 3 Q22 10 31 24 M18 2 Q26 9 32 16 M5 9 Q20 14 28 29"/></svg>';
+
+function drawCanvas(el,{scale=1,current=null,interactive=false}={}){
+  el.innerHTML='';
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('class','links');svg.setAttribute('viewBox','0 0 1100 640');
+  const path=(d)=>{const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',d);p.setAttribute('fill','none');p.setAttribute('stroke','currentColor');p.setAttribute('stroke-width','2.5');p.setAttribute('stroke-dasharray','1 7');p.setAttribute('stroke-linecap','round');svg.appendChild(p)};
+  path('M300 330 C 360 200, 420 60, 525 40');
+  path('M300 330 C 380 300, 440 300, 525 300');
+  el.appendChild(svg);
+  const t=document.createElement('div');t.className='root-title';t.style.left='90px';t.style.top='300px';t.textContent='TEPS LC';el.appendChild(t);
+  folders.forEach(f=>{
+    const d=document.createElement('div');d.className='frame'+(f.dust?' dust'+f.dust:'');
+    Object.assign(d.style,{left:f.x+'px',top:f.y+'px',width:f.w+'px',height:f.h+'px'});
+    const n=items.filter(i=>i.folder===f.id).length;
+    d.innerHTML=`<div class="frame-title">${f.name}</div><div class="frame-count">${n}</div>`;el.appendChild(d);
+  });
+  items.forEach((it,k)=>{
+    const d=document.createElement('div');
+    d.className='mini'+(it.grey?' grey':'')+(it.w>300?' wide':'')+(it.dust?' dust'+it.dust:'')+(current===it.id?' current':'');
+    Object.assign(d.style,{left:it.x+'px',top:it.y+'px',width:it.w+'px'});
+    d.innerHTML=`${it.kind?'<span class="note">'+it.kind+'</span> ':''}${esc(plain(it.front))}${(it.tapes||[]).map((c,j)=>`<span class="tape r${j}" style="background:${tapeColor[c]}"></span>`).join('')}${it.dust===3?web:''}`;
+    d.dataset.id=it.id;
+    if(interactive) makeDraggable(d,it);
+    el.appendChild(d);
+  });
+  if(interactive){
+    const p=document.createElement('div');p.className='pile';
+    p.innerHTML='<div class="pile-label">아직 안 놓은 것 2</div>'+unplaced.map(u=>`<div class="mini">${u.t}</div>`).join('');
+    el.appendChild(p);
+  }
+  el.style.transform=`scale(${scale})`;
+}
+function makeDraggable(d,it){
+  let sx,sy,ox,oy;
+  d.addEventListener('pointerdown',e=>{d.setPointerCapture(e.pointerId);sx=e.clientX;sy=e.clientY;ox=it.x;oy=it.y;d.classList.add('dragging')});
+  d.addEventListener('pointermove',e=>{if(!d.classList.contains('dragging'))return;const s=+$('#zoom').value/100;it.x=ox+(e.clientX-sx)/s;it.y=oy+(e.clientY-sy)/s;d.style.left=it.x+'px';d.style.top=it.y+'px'});
+  const end=()=>{d.classList.remove('dragging')};
+  d.addEventListener('pointerup',end);d.addEventListener('pointercancel',end);
+}
+
+/* ---------- my space ---------- */
+const thinkData={
+  '1':[['시제불일치',90,'+3'],['관용',40,'+1'],['LC 파트 4',20,'±0']],
+  '7':[['시제불일치',100,'+12'],['관용',70,'+5'],['LC 파트 4',45,'+2'],['moons 설계',30,'−4'],['일기',22,'−1']],
+  '30':[['moons 설계',100,'+20'],['시제불일치',80,'+30'],['관용',60,'+18'],['LEET 추리',40,'−6'],['일기',35,'±0']],
+  'all':[['moons 설계',100,''],['LEET 추리',75,''],['시제불일치',55,''],['관용',40,''],['일기',38,'']]
+};
+function renderThink(p){
+  $('#think').innerHTML=thinkData[p].map(([n,v,d])=>`<div class="think-row"><span>${n}</span><span class="bar"><i style="width:${v}%"></i></span><span class="delta ${d.startsWith('+')?'up':'down'}">${d}</span></div>`).join('');
+}
+$$('.periods button').forEach(b=>b.onclick=()=>{$$('.periods button').forEach(x=>x.setAttribute('aria-pressed',x===b));renderThink(b.dataset.p)});
+renderThink('7');
+function fitMini(wrap){const c=document.createElement('div');c.className='canvas';wrap.innerHTML='';wrap.appendChild(c);drawCanvas(c,{scale:Math.min(wrap.clientWidth/1100,wrap.clientHeight/640)||.3});c.style.cursor='pointer';c.onclick=()=>go('map')}
+$('#startTest').onclick=()=>{go('map');setDir('bottom');setMode('test')};
+
+/* ---------- navigation ---------- */
+function go(s){$$('.tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.go===s));$$('.screen').forEach(x=>x.hidden=x.id!=='s-'+s);
+  if(s==='space')fitMini($('#msMap'));if(s==='map')renderMap();}
+$$('.tabs button').forEach(b=>b.onclick=()=>go(b.dataset.go));
+function setDir(d){state.dir=d;$$('.pill-switch button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.dir===d));$('#topdown').hidden=d!=='top';$('#bottomup').hidden=d!=='bottom';renderMap()}
+$$('.pill-switch button').forEach(b=>b.onclick=()=>setDir(b.dataset.dir));
+function renderMap(){
+  if(state.dir==='top'){const s=+$('#zoom').value/100;const c=$('#bigCanvas');drawCanvas(c,{scale:s,interactive:true});c.classList.toggle('z-far',s<.6);c.parentElement.style.setProperty('--s',s);$('#crumb').innerHTML='TEPS<span>/</span>LC'}
+  else renderBU();
+}
+$('#zoom').oninput=renderMap;
+
+/* ---------- bottom-up ---------- */
+function deck(){
+  let d=items.slice();
+  if(state.tape)d=d.filter(i=>(i.tapes||[]).includes(state.tape));
+  if(state.order==='created')d.sort((a,b)=>a.created-b.created);
+  else if(state.order==='random')d.sort((a,b)=>((a.created*7919)%13)-((b.created*7919)%13));
+  else if(state.order==='due')d.sort((a,b)=>b.dust-a.dust);
+  else d.sort((a,b)=>(a.folder===b.folder?0:a.folder==='tense'?-1:1)||a.y-b.y||a.x-b.x);
+  return d;
+}
+function setMode(m){state.mode=m;state.idx=0;state.phase='front';state.pred=null;
+  $$('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.mode===m));
+  $('#order option[value=due]').hidden=m!=='test';
+  if(m==='test'){state.order='due';$('#order').value='due'}else if(state.order==='due'){state.order='canvas';$('#order').value='canvas'}
+  renderBU()}
+$$('.seg button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+$('#order').onchange=e=>{state.order=e.target.value;state.idx=0;state.phase='front';renderBU()};
+$('#tapeFilter').onchange=e=>{state.tape=e.target.value;state.idx=0;state.phase='front';renderBU()};
+
+function renderBU(){
+  const d=deck();if(!d.length){$('#stage').innerHTML='<div class="note">해당하는 카드가 없어요</div>';$('#actions').innerHTML='';return}
+  state.idx=Math.min(state.idx,d.length-1);
+  const it=d[state.idx], f=folders.find(x=>x.id===it.folder);
+  $('#crumb').innerHTML=`TEPS<span>/</span>LC<span>/</span>${f.name}`;
+  $('#progress').innerHTML=d.map((_,k)=>`<i class="${k<state.idx?'done':k===state.idx?'now':''}"></i>`).join('');
+  const back=state.phase!=='front';
+  const cardEye=it.eye!==false;
+  const show=state.eyeAll&&cardEye&&!(state.mode==='test'&&!back&&false);
+  const st=$('#stage');
+  st.className='stage'+(show?' show-marks':'');
+  st.innerHTML=`<span class="face-label">${it.kind||'카드'} · ${back?'뒷면':'앞면'}</span>
+    ${(it.tapes||[]).map((c,j)=>`<span class="tape r${j}" style="background:${tapeColor[c]}"></span>`).join('')}
+    ${it.tapeNote?`<span class="tape-note">▮ ${it.tapeNote}</span>`:''}
+    <div><div class="big">${rich(back?it.back:it.front)}</div>${back?`<div class="sub">${esc(plain(it.front))}</div>`:''}</div>
+    <button class="eye" aria-pressed="${cardEye}" title="이 카드 형광펜">👁 ${cardEye?'켜짐':'꺼짐'}</button>`;
+  st.querySelector('.eye').onclick=e=>{e.stopPropagation();it.eye=!cardEye;renderBU()};
+  if(state.mode==='browse'){st.style.cursor='pointer';st.onclick=()=>{state.phase=back?'front':'back';renderBU()}}
+  else{st.style.cursor='default';st.onclick=null}
+  const a=$('#actions');
+  const nav=`<button class="btn ghost" id="prev">이전</button><button class="btn ghost" id="flip">${back?'앞면':'뒤집기'}</button><button class="btn" id="next">다음</button>`;
+  if(state.mode==='browse'){a.innerHTML=nav}
+  else if(state.phase==='front'){a.innerHTML=`<div class="q">뒤집기 전에</div><button class="pred ok" data-p="know">알 것 같아</button><button class="pred no" data-p="unsure">모르겠어</button>`;
+    a.querySelectorAll('.pred').forEach(b=>b.onclick=()=>{state.pred=b.dataset.p;state.phase='back';renderBU()})}
+  else if(state.phase==='back'){a.innerHTML=`<div class="q">맞았어?</div><button class="pred ok" data-r="right">맞았어</button><button class="pred no" data-r="wrong">틀렸어</button>`;
+    a.querySelectorAll('.pred').forEach(b=>b.onclick=()=>{state.result=b.dataset.r;state.phase='done';if(b.dataset.r==='right')it.dust=0;renderBU()})}
+  else{
+    const ill=state.pred==='know'&&state.result==='wrong', hidden=state.pred==='unsure'&&state.result==='right';
+    a.innerHTML=`<div class="verdict ${ill?'illusion':''}" style="width:100%">${ill?'착각한 앎 — 내일 다시 나와요':hidden?'숨은 앎 — 생각보다 알고 있어요':state.result==='right'?'다음 복습: 7일 뒤':'다음 복습: 내일'}</div><button class="btn" id="next">다음</button>`;
+  }
+  const n=$('#next'),p=$('#prev'),fl=$('#flip');
+  if(n)n.onclick=()=>{state.idx=(state.idx+1)%d.length;state.phase='front';state.pred=null;renderBU()};
+  if(p)p.onclick=()=>{state.idx=(state.idx-1+d.length)%d.length;state.phase='front';renderBU()};
+  if(fl)fl.onclick=()=>{state.phase=back?'front':'back';renderBU()};
+  const sm=$('#sideMap');const c=document.createElement('div');c.className='canvas';sm.innerHTML='';sm.appendChild(c);
+  drawCanvas(c,{scale:Math.min(sm.clientWidth/1100,sm.clientHeight/640)||.27,current:it.id});
+}
+
+/* ---------- global eye ---------- */
+$('#eyeAll').onclick=()=>{state.eyeAll=!state.eyeAll;$('#eyeAll').setAttribute('aria-pressed',state.eyeAll);
+  $('#edFaces').classList.toggle('show-marks',state.eyeAll);renderMap()};
+
+/* ---------- editor ---------- */
+const palColors=['red','orange','yellow','green','blue','purple'];
+const palVar={red:'--hl-red',orange:'--hl-orange',yellow:'--hl-yellow',green:'--hl-green',blue:'--hl-blue',purple:'--hl-purple'};
+$('#pal').innerHTML=palColors.map(c=>`<button data-c="${c}" title="${c}" style="background:var(${palVar[c]})"></button>`).join('');
+$('#edFront').innerHTML=rich(items[0].front);$('#edBack').innerHTML=rich(items[0].back);
+$('#pal').addEventListener('click',e=>{const c=e.target.dataset.c;if(!c)return;const sel=getSelection();if(!sel.rangeCount||sel.isCollapsed)return;
+  const r=sel.getRangeAt(0);if(!$('#edFaces').contains(r.commonAncestorContainer))return;const m=document.createElement('mark');m.dataset.c=c;try{r.surroundContents(m)}catch(_){}sel.removeAllRanges()});
+(()=>{const cv=$('#ink'),x=cv.getContext('2d');let on=false;
+  const pos=e=>{const b=cv.getBoundingClientRect();return[(e.clientX-b.left)*cv.width/b.width,(e.clientY-b.top)*cv.height/b.height]};
+  cv.addEventListener('pointerdown',e=>{on=true;cv.setPointerCapture(e.pointerId);x.beginPath();x.moveTo(...pos(e))});
+  cv.addEventListener('pointermove',e=>{if(!on)return;x.lineWidth=1.5+(e.pressure||.5)*3;x.lineCap='round';x.strokeStyle=getComputedStyle(document.body).color;x.lineTo(...pos(e));x.stroke()});
+  cv.addEventListener('pointerup',()=>on=false);})();
+
+fitMini($('#msMap'));
+addEventListener('resize',()=>{if(!$('#s-space').hidden)fitMini($('#msMap'));if(!$('#s-map').hidden)renderMap()});
+</script>

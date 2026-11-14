@@ -9,7 +9,7 @@ import {TEAM_TABLES} from './teams.ts';
 import {PROJECT_TABLES} from '../projects/schema.ts';
 import {SATELLITE_TABLES} from '../satellites/store.ts';
 import {OAUTH_TABLES} from '../mcp/oauth.ts';
-import {enqueueProjectSparks} from '../projects/queue.ts';
+import {enqueueProjectSparks,kickProjectWorker} from '../projects/queue.ts';
 import {validateNotation} from './notation.ts';
 import type {Op} from '@workspace/moons-sync';
 import {verifyEntryQuotes,migrateVerdict} from './analysis.ts';
@@ -124,7 +124,7 @@ export function validateStore(input:unknown,previous?:Store,planted?:Set<string>
  return {...s,planets:s.planets.map(p=>({...p,entryCount:s.entries.filter(e=>e.planetIds.includes(p.id)).reduce((sum,e)=>sum+(e.analysis?.nodes.filter(n=>!n.empty).length??1),0)}))};
 }
 export async function persistWorkspace(owner:string,revision:number,store:Store,opts:{device?:string|null;conflicts?:Op[]}={}) {
- return transaction(async tx=>{
+ const saved=await transaction(async tx=>{
   const current=(await tx.query('select store,revision from personal_workspaces where owner_id=$1 for update',[owner])).rows[0] as {store:Store;revision:number}|undefined;
   if(!current||current.revision!==revision)throw new WorkspaceError(409,'This space changed in another tab. Your unsaved changes are protected; reload before retrying.');
   const rows=(await tx.query(`with saved as (
@@ -139,6 +139,11 @@ export async function persistWorkspace(owner:string,revision:number,store:Store,
   await enqueueProjectSparks(tx,owner,current.store,store);
   return {guestId:owner,revision:rows[0]!.revision,store};
  });
+ // After the commit, so the worker sees what was written. Every save wakes it, not just one that
+ // queued a job here: a second process on the same database cannot reach this worker, and a drain
+ // on an already-awake connection costs two statements, while idle polling costs a suspend.
+ kickProjectWorker();
+ return saved;
 }
 const locks=new Map<string,Promise<unknown>>();
 export async function locked<T>(owner:string,work:()=>Promise<T>):Promise<T> {

@@ -5,6 +5,7 @@ import {WorkspaceError, type Store} from '../v5/types.ts';
 import {listProjects} from './service.ts';
 import {generateReviews} from './review.ts';
 import {deviceEnabled,type DeviceSettings} from '@workspace/moons-sync/satellites';
+import {onProjectWork} from './queue.ts';
 
 type Job = {id: string; owner_id: string; entry_id: string; lease: string; attempts: number; tag_key: string};
 export async function runProjectJob() {
@@ -49,9 +50,42 @@ export async function runProjectJob() {
   } finally {clearInterval(heartbeat);}
   return true;
 }
+// A failed job is requeued for now()+2 minutes, and a lease lost with its process is
+// reclaimed 10 minutes after it was taken. Nothing else puts work in the queue on a timer.
+const RETRY_MS = 150_000;
+const LEASE_MS = 11 * 60_000;
+// How long until the queue is worth another look, or 0 when no job is left to run.
+async function nextCheck() {
+  const row = (await q<{queued: string; running: string}>(`select
+    count(*) filter (where state='queued') queued, count(*) filter (where state='running') running
+    from project_jobs where attempts<3`))[0];
+  return Number(row?.queued ?? 0) ? RETRY_MS : Number(row?.running ?? 0) ? LEASE_MS : 0;
+}
+// Jobs arrive through enqueueProjectSparks in this same process, so the worker is woken by
+// that write and otherwise holds no timer: polling an empty queue costs a query every few
+// seconds, and a managed Postgres that is never idle never suspends its compute.
+// MOONS_PROJECT_POLL_MS is an escape hatch for a deployment whose jobs are written by a
+// second process that cannot wake this one; it caps how long the worker stays asleep.
 export function startProjectWorker(onError: (error: unknown) => void) {
-  let active = false;
-  const tick = async () => {if (active) return; active = true; try {await runProjectJob();} catch (e) {onError(e);} finally {active = false;}};
-  const timer = setInterval(() => {void tick();}, 5000); timer.unref(); void tick();
-  return () => clearInterval(timer);
+  const floor = Number(process.env.MOONS_PROJECT_POLL_MS) || 0;
+  let draining = false, again = false, stopped = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const later = (ms: number) => {
+    const wait = floor && ms ? Math.min(ms, floor) : ms || floor;
+    if (stopped || timer || !wait) return;
+    timer = setTimeout(() => {timer = undefined; void drain();}, wait);
+    timer.unref();
+  };
+  const drain = async () => {
+    if (draining) {again = true; return;}
+    draining = true;
+    try {
+      do {again = false; while (!stopped && await runProjectJob());} while (again && !stopped);
+      later(await nextCheck());
+    } catch (error) {onError(error); later(RETRY_MS);}
+    finally {draining = false;}
+  };
+  onProjectWork(() => {if (!stopped) void drain();});
+  void drain(); // Picks up jobs a previous process left behind.
+  return () => {stopped = true; onProjectWork(undefined); if (timer) clearTimeout(timer);};
 }

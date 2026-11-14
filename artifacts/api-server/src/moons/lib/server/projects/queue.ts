@@ -13,6 +13,12 @@ export function changedProjectSparks(previous: Store, next: Store) {
   });
 }
 
+// The worker registers here, so a queued job starts as soon as it is written rather than
+// being discovered by a poll. Unset while no worker runs in this process.
+let wake: (() => void) | undefined;
+export function onProjectWork(handler: (() => void) | undefined) {wake = handler;}
+export function kickProjectWorker() {wake?.();}
+
 // Written in the same transaction as the original: a browser closing cannot lose the trigger.
 export async function enqueueProjectSparks(tx: Driver, owner: string, previous: Store, next: Store) {
   for (const spark of changedProjectSparks(previous, next)) {

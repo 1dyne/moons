@@ -4,22 +4,22 @@
 <style>
 /* layout: app shell — top bar (brand · screen tabs · global eye), one screen at a time; map screens carry the Top/Bottom pill */
 :root{
-  --bg:#FFF8E7; --surface:#FFFFFF; --ink:#1E1E1E; --muted:#7d776c; --line:#1E1E1E;
-  --soft:#F1E8D6; --moon:#7BA4F8; --moon-deep:#3B66BE; --you:#FFE36B;
+  --bg:#F7F8FA; --surface:#FFFFFF; --ink:#1E1E1E; --muted:#6f7480; --line:#1E1E1E;
+  --soft:#ECEEF2; --moon:#7BA4F8; --moon-deep:#3B66BE; --you:#FFE36B;
   --hl-red:rgba(240,110,110,.45); --hl-orange:rgba(245,160,70,.45); --hl-yellow:rgba(250,220,60,.55);
   --hl-green:rgba(60,190,120,.42); --hl-blue:rgba(90,150,240,.40); --hl-purple:rgba(170,120,230,.40);
   --tape-green:#2fb67a; --tape-red:#e46a6a; --tape-blue:#5b8fe8; --tape-yellow:#e8c23a;
-  --dust:rgba(120,100,70,.38); --warn:#c2552d; --good:#2f8f5b;
+  --dust:rgba(110,100,85,.42); --warn:#c2552d; --good:#2f8f5b;
   --f-display:"Space Grotesk","Noto Sans KR",system-ui,sans-serif;
   --f-body:"Noto Sans KR",system-ui,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#17161a; --surface:#222127; --ink:#ECE7DC; --muted:#9a9488; --line:#ECE7DC;
-  --soft:#2c2a31; --moon:#7BA4F8; --moon-deep:#a9c3ff; --you:#b89b1e;
+  --bg:#121317; --surface:#1d1f25; --ink:#E9EAEE; --muted:#9a9ea8; --line:#E9EAEE;
+  --soft:#2a2d35; --moon:#7BA4F8; --moon-deep:#a9c3ff; --you:#b89b1e;
   --dust:rgba(210,195,160,.30); --warn:#ff9a72; --good:#6fd39b; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#17161a; --surface:#222127; --ink:#ECE7DC; --muted:#9a9488; --line:#ECE7DC;
-  --soft:#2c2a31; --moon:#7BA4F8; --moon-deep:#a9c3ff; --you:#b89b1e;
+  --bg:#121317; --surface:#1d1f25; --ink:#E9EAEE; --muted:#9a9ea8; --line:#E9EAEE;
+  --soft:#2a2d35; --moon:#7BA4F8; --moon-deep:#a9c3ff; --you:#b89b1e;
   --dust:rgba(210,195,160,.30); --warn:#ff9a72; --good:#6fd39b; color-scheme:dark}
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -174,6 +174,30 @@ mark{background:none;color:inherit;border-radius:4px;padding:0 .08em}
 .flow b{display:block;font-family:var(--f-display);margin-bottom:4px}
 .ink-demo{width:100%;height:120px;border-radius:8px;background:var(--bg);border:1px dashed color-mix(in srgb,var(--line) 35%,transparent);touch-action:none;display:block}
 
+/* ---------- My Space sky ---------- */
+:root{--p-blue:#6f9cf2;--p-blue2:#a9c4f7;--p-purple:#a585e6;--p-purple2:#cdb9f2;--p-teal:#3fb8a2;--p-orange:#f0a35a;--p-dim:#c9ccd3;--crater:rgba(20,30,60,.38);--star:#e5b416;--halo:.28}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--p-dim:#4a4e58;--crater:rgba(0,0,0,.5);--halo:.4}}
+:root[data-theme="dark"]{--p-dim:#4a4e58;--crater:rgba(0,0,0,.5);--halo:.4}
+.sky-bar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sky-bar .periods{margin:0}
+.legend-btn{margin-left:auto;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);font-weight:700}
+.sky{position:relative;background:var(--surface);border:1.5px solid var(--line);border-radius:18px;overflow:hidden}
+.sky-scroll{overflow-x:auto}
+.sky svg#skySvg{display:block;width:100%;min-width:720px;height:auto}
+.sky-legend[hidden],.tip[hidden]{display:none}
+.planet{cursor:pointer}
+.planet:hover .body,.planet:focus .body{stroke:var(--ink);stroke-width:2}
+.planet text{font-family:var(--f-body);fill:var(--ink);pointer-events:none}
+.planet .pname{font-weight:700}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--surface);font-size:12px;border-radius:8px;padding:6px 9px;white-space:nowrap;transform:translate(-50%,-115%)}
+.sky-legend{position:absolute;top:12px;right:12px;background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:4px;font-size:13px}
+.sky-legend div{display:flex;align-items:center;gap:8px}
+.moon-btn{position:absolute;right:18px;bottom:18px;width:72px;height:72px;border-radius:50%;border:2px solid var(--line);background:var(--moon);box-shadow:inset -18px 0 0 var(--moon-deep);padding:0}
+.moon-face{position:absolute;left:18px;top:26px;display:flex;gap:9px}
+.moon-face i{width:7px;height:10px;border-radius:50%;background:#10203f;display:block}
+.moon-badge{position:absolute;top:-6px;left:-6px;min-width:28px;height:28px;border-radius:14px;background:var(--ink);color:var(--surface);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;padding:0 6px;border:2px solid var(--surface)}
+@media (prefers-reduced-motion:no-preference){.moon-btn{animation:bob 3.2s ease-in-out infinite}@keyframes bob{50%{transform:translateY(-4px)}}}
+
 @media (max-width:860px){
   .ms,.ms-grid2,.bu,.ed,.flow{grid-template-columns:minmax(0,1fr)}
   .side{border-left:0;border-top:2.5px solid var(--line);padding-left:0;padding-top:14px}
@@ -196,75 +220,29 @@ mark{background:none;color:inherit;border-radius:4px;padding:0 .08em}
 
   <!-- ================= MY SPACE ================= -->
   <section class="screen" id="s-space">
-    <div class="periods" role="group" aria-label="기간">
-      <button aria-pressed="false" data-p="1">1일</button>
-      <button aria-pressed="true" data-p="7">7일</button>
-      <button aria-pressed="false" data-p="30">30일</button>
-      <button aria-pressed="false" data-p="all">전체</button>
+    <div class="sky-bar">
+      <div class="periods" role="group" aria-label="기간">
+        <button aria-pressed="false" data-p="1">1일</button>
+        <button aria-pressed="true" data-p="7">7일</button>
+        <button aria-pressed="false" data-p="30">30일</button>
+      </div>
+      <button class="legend-btn" id="legendBtn" aria-expanded="false" aria-label="읽는 법">?</button>
     </div>
-    <div class="ms">
-      <div class="panel full">
-        <div class="today">
-          <div class="deck" aria-hidden="true"><div></div><div></div><div id="deckN">7</div></div>
-          <div class="today-copy">
-            <b>오늘 털 것 <span id="todayN">7</span>장</b>
-            <div class="mix">
-              <span class="chip warn">착각한 앎 2</span>
-              <span class="chip">복습할 때 3</span>
-              <span class="chip">먼지 많음 2</span>
-            </div>
-            <button class="btn" id="startTest">시작</button>
-            <span class="note" style="margin-left:8px">약 3분</span>
-          </div>
-        </div>
+    <div class="sky" id="sky">
+      <div class="sky-scroll" id="skyScroll"><svg id="skySvg" viewBox="0 0 1100 620" role="img" aria-label="내 생각 지도"></svg></div>
+      <div class="tip" id="tip" hidden></div>
+      <div class="sky-legend" id="skyLegend" hidden>
+        <div><svg width="26" height="26"><circle cx="13" cy="13" r="11" fill="var(--p-blue)"/></svg>크기 = 쌓인 기록</div>
+        <div><svg width="26" height="26"><circle cx="13" cy="13" r="12" fill="none" stroke="var(--p-blue)" stroke-opacity=".35" stroke-width="4"/><circle cx="13" cy="13" r="8" fill="var(--p-blue)"/></svg>빛 = 요즘 자주 다룸</div>
+        <div><svg width="26" height="26"><circle cx="13" cy="13" r="11" fill="var(--p-dim)"/><circle cx="13" cy="13" r="11" fill="url(#dustP)"/></svg>먼지 · 거미줄 = 오래 안 봄</div>
+        <div><svg width="26" height="26"><circle cx="13" cy="13" r="11" fill="var(--p-blue)"/><circle cx="10" cy="11" r="3.2" fill="var(--crater)"/></svg>구멍 = 안다고 했는데 틀림</div>
+        <div><svg width="26" height="26"><circle cx="13" cy="13" r="11" fill="var(--p-blue)"/><text x="17" y="10" font-size="11" fill="var(--star)">✦</text></svg>✦ = 생각보다 앎</div>
+        <div><svg width="26" height="26"><circle cx="9" cy="14" r="2.5" fill="var(--muted)"/><circle cx="17" cy="9" r="2" fill="var(--muted)"/><circle cx="18" cy="18" r="1.6" fill="var(--muted)"/></svg>바깥 점 = 왜소행성 (모행성 없음)</div>
       </div>
-
-      <div class="panel">
-        <h2>요즘 생각</h2>
-        <div class="think" id="think"></div>
-      </div>
-
-      <div class="panel">
-        <h2>착각한 앎 <span class="note">안다고 했는데 틀린 것</span></h2>
-        <ul class="list">
-          <li><span class="what">be addressed</span><span class="meta">확신 → 틀림 ×2</span></li>
-          <li><span class="what">once I get there</span><span class="meta">확신 → 틀림 ×1</span></li>
-          <li><span class="what">tide me over</span><span class="meta">확신 → 틀림 ×1</span></li>
-        </ul>
-      </div>
-
-      <div class="full ms-grid2">
-        <div class="panel">
-          <h2>새로 알게 된 것</h2>
-          <ul class="list">
-            <li><span class="what">go by</span><span class="meta">틀림 → 맞음</span></li>
-            <li><span class="what">spoil your appetite</span><span class="meta">새 문장</span></li>
-            <li><span class="what">시제불일치</span><span class="meta">내 말 정의 생김</span></li>
-          </ul>
-        </div>
-        <div class="panel">
-          <h2>생각이 바뀐 곳</h2>
-          <div class="change">
-            <div><b>looking forward to</b> 뒷면</div>
-            <del>to 뒤에 동사원형</del>
-            <ins>to는 전치사 → 뒤에 -ing</ins>
-            <div class="note">11월 10일 → 11월 13일</div>
-          </div>
-        </div>
-        <div class="panel">
-          <h2>채울 것</h2>
-          <ul class="list">
-            <li><span class="what">tide over</span><span class="meta">뒷면 비어 있음</span></li>
-            <li><span class="what">관용 (용어)</span><span class="meta">내 말 정의 없음</span></li>
-            <li><span class="what">LC 파트 4는 왜 시간이 부족할까?</span><span class="meta">열린 질문</span></li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="panel full">
-        <h2>먼지 지도 <span class="note">눌러서 그 자리로</span></h2>
-        <div class="minimap-wrap" id="msMap"></div>
-      </div>
+      <button class="moon-btn" id="startTest" aria-label="오늘 털 것 7장 시작">
+        <span class="moon-face" aria-hidden="true"><i></i><i></i></span>
+        <span class="moon-badge" id="todayN">7</span>
+      </button>
     </div>
   </section>
 
@@ -435,23 +413,77 @@ function makeDraggable(d,it){
 }
 
 /* ---------- my space ---------- */
-const thinkData={
-  '1':[['시제불일치',90,'+3'],['관용',40,'+1'],['LC 파트 4',20,'±0']],
-  '7':[['시제불일치',100,'+12'],['관용',70,'+5'],['LC 파트 4',45,'+2'],['moons 설계',30,'−4'],['일기',22,'−1']],
-  '30':[['moons 설계',100,'+20'],['시제불일치',80,'+30'],['관용',60,'+18'],['LEET 추리',40,'−6'],['일기',35,'±0']],
-  'all':[['moons 설계',100,''],['LEET 추리',75,''],['시제불일치',55,''],['관용',40,''],['일기',38,'']]
+const sky={
+  planets:[
+    {id:'teps',name:'TEPS',x:330,y:300,r:104,c:'--p-blue',n:48,
+      kids:[{id:'lc',name:'LC',a:-40,r:38,c:'--p-blue2',n:21,craters:2,go:true},{id:'rc',name:'RC',a:200,r:26,c:'--p-blue2',n:12},{id:'voca',name:'어휘',a:110,r:30,c:'--p-blue2',n:15,stars:1}]},
+    {id:'leet',name:'LEET',x:740,y:200,r:84,c:'--p-purple',n:35,
+      kids:[{id:'logic',name:'추리',a:150,r:30,c:'--p-purple2',n:20,craters:1},{id:'verbal',name:'언어',a:30,r:22,c:'--p-purple2',n:9}]},
+    {id:'moons',name:'moons 설계',x:770,y:470,r:66,c:'--p-teal',n:27,stars:1},
+    {id:'diary',name:'일기',x:520,y:520,r:40,c:'--p-orange',n:14},
+  ],
+  // days since last touched, by period view doesn't change; activity share in period does
+  activity:{
+    '1':{teps:.2,lc:1,rc:0,voca:.1,leet:0,logic:0,verbal:0,moons:.6,diary:.4},
+    '7':{teps:.5,lc:1,rc:.1,voca:.5,leet:.2,logic:.3,verbal:0,moons:.9,diary:.3},
+    '30':{teps:.6,lc:.9,rc:.3,voca:.6,leet:.6,logic:.8,verbal:.1,moons:1,diary:.5}
+  },
+  idle:{teps:2,lc:0,rc:26,voca:4,leet:12,logic:9,verbal:95,moons:1,diary:3},
+  dwarfs:6
 };
-function renderThink(p){
-  $('#think').innerHTML=thinkData[p].map(([n,v,d])=>`<div class="think-row"><span>${n}</span><span class="bar"><i style="width:${v}%"></i></span><span class="delta ${d.startsWith('+')?'up':'down'}">${d}</span></div>`).join('');
+const dustOf=d=>d>=60?3:d>=21?2:d>=7?1:0;
+const svgNS='http://www.w3.org/2000/svg';
+function el(tag,attrs,parent){const e=document.createElementNS(svgNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
+function hash(str){let h=7;for(const ch of str)h=(h*31+ch.charCodeAt(0))>>>0;return h}
+function drawPlanet(g,p,act,idle){
+  const dust=dustOf(idle), color=dust>=2?'var(--p-dim)':`var(${p.c})`;
+  const grp=el('g',{class:'planet',tabindex:'0',role:'button','aria-label':p.name},g);
+  if(act>.15) el('circle',{cx:p.x,cy:p.y,r:p.r+6+act*14,fill:`var(${p.c})`,'fill-opacity':`calc(var(--halo) * ${act.toFixed(2)})`,style:`fill-opacity:calc(var(--halo) * ${act.toFixed(2)})`},grp);
+  el('circle',{class:'body',cx:p.x,cy:p.y,r:p.r,fill:color,'fill-opacity':dust===1?.75:1},grp);
+  for(let i=0;i<(p.craters||0);i++){const h=hash(p.id+i),ang=(h%360)*Math.PI/180,d=p.r*(.25+((h>>8)%40)/100);
+    el('circle',{cx:p.x+Math.cos(ang)*d,cy:p.y+Math.sin(ang)*d,r:Math.max(4,p.r*.16),fill:'var(--crater)'},grp)}
+  for(let i=0;i<(p.stars||0);i++){const t=el('text',{x:p.x+p.r*.62,y:p.y-p.r*.62,'font-size':Math.max(14,p.r*.32),fill:'var(--star)'},grp);t.textContent='✦'}
+  if(dust) el('circle',{cx:p.x,cy:p.y,r:p.r,fill:'url(#dustP)',opacity:[0,.45,.85,1][dust]},grp);
+  if(dust===3){const x=p.x+p.r*.55,y=p.y-p.r*.85,s=p.r*.7;
+    el('path',{d:`M${x+s} ${y} L${x} ${y+s*.9} M${x+s} ${y} L${x+s*.25} ${y+s*1.1} M${x+s} ${y} L${x-s*.15} ${y+s*.45} M${x+s*.2} ${y+s*.25} Q${x+s*.55} ${y+s*.5} ${x+s*.85} ${y+s*.95} M${x+s*.45} ${y+s*.1} Q${x+s*.7} ${y+s*.35} ${x+s*.95} ${y+s*.6}`,fill:'none',stroke:'var(--muted)','stroke-width':1.1},grp)}
+  const big=p.r>=50;
+  const t=el('text',{x:p.x,y:big?p.y+5:p.y+p.r+15,'text-anchor':'middle','font-size':big?Math.min(22,p.r*.3):13,class:'pname'},grp);t.textContent=p.name;
+  grp.addEventListener('mouseenter',e=>showTip(p,idle,e));grp.addEventListener('mouseleave',()=>$('#tip').hidden=true);
+  grp.addEventListener('click',()=>{go('map');setDir('top')});
+  grp.addEventListener('keydown',e=>{if(e.key==='Enter'){go('map');setDir('top')}});
 }
-$$('.periods button').forEach(b=>b.onclick=()=>{$$('.periods button').forEach(x=>x.setAttribute('aria-pressed',x===b));renderThink(b.dataset.p)});
-renderThink('7');
-function fitMini(wrap){const c=document.createElement('div');c.className='canvas';wrap.innerHTML='';wrap.appendChild(c);drawCanvas(c,{scale:Math.min(wrap.clientWidth/1100,wrap.clientHeight/640)||.3});c.style.cursor='pointer';c.onclick=()=>go('map')}
+function showTip(p,idle,e){const tip=$('#tip'),box=$('#sky').getBoundingClientRect(),svg=$('#skySvg').getBoundingClientRect(),k=svg.width/1100;
+  tip.textContent=`${p.name} · 기록 ${p.n}${p.craters?` · 틀린 확신 ${p.craters}`:''} · ${idle===0?'오늘 봄':idle+'일 전'}`;
+  const sc=$('#skyScroll').scrollLeft;tip.style.left=(p.x*k-sc)+'px';tip.style.top=((p.y-p.r)*k)+'px';tip.hidden=false}
+function renderSky(period){
+  const svg=$('#skySvg');svg.innerHTML='';
+  const defs=el('defs',{},svg);const pat=el('pattern',{id:'dustP',width:7,height:9,patternUnits:'userSpaceOnUse'},defs);
+  el('circle',{cx:1.5,cy:1.5,r:1,fill:'var(--dust)'},pat);el('circle',{cx:5,cy:6,r:.8,fill:'var(--dust)'},pat);
+  const act=sky.activity[period];
+  // links between top planets (shared pages)
+  el('line',{x1:330,y1:300,x2:740,y2:200,stroke:'var(--muted)','stroke-opacity':.35,'stroke-width':2},svg);
+  el('line',{x1:740,y1:200,x2:770,y2:470,stroke:'var(--muted)','stroke-opacity':.35,'stroke-width':4},svg);
+  el('line',{x1:520,y1:520,x2:770,y2:470,stroke:'var(--muted)','stroke-opacity':.35,'stroke-width':1.5},svg);
+  const g=el('g',{},svg);
+  sky.planets.forEach(p=>{
+    (p.kids||[]).forEach(k=>{const orbit=p.r+k.r+26,ang=k.a*Math.PI/180;k.x=p.x+Math.cos(ang)*orbit;k.y=p.y+Math.sin(ang)*orbit;
+      el('line',{x1:p.x,y1:p.y,x2:k.x,y2:k.y,stroke:'var(--muted)','stroke-opacity':.5,'stroke-dasharray':'1 6','stroke-linecap':'round','stroke-width':2},g)});
+  });
+  sky.planets.forEach(p=>{drawPlanet(g,p,act[p.id],sky.idle[p.id]);(p.kids||[]).forEach(k=>drawPlanet(g,k,act[k.id],sky.idle[k.id]))});
+  // dwarf belt
+  const belt=el('g',{class:'planet',tabindex:'0',role:'button','aria-label':'왜소행성 '+sky.dwarfs},svg);
+  for(let i=0;i<sky.dwarfs;i++){const h=hash('d'+i);el('circle',{cx:1010+(h%60)-30,cy:90+i*80+((h>>4)%30),r:4+(h%4),fill:'var(--muted)','fill-opacity':.7},belt)}
+  const bt=el('text',{x:1010,y:60,'text-anchor':'middle','font-size':12,fill:'var(--muted)'},belt);bt.textContent='왜소행성 '+sky.dwarfs;
+  belt.addEventListener('click',()=>{go('map');setDir('top')});
+}
+$$('.periods button').forEach(b=>b.onclick=()=>{$$('.periods button').forEach(x=>x.setAttribute('aria-pressed',x===b));renderSky(b.dataset.p)});
+$('#legendBtn').onclick=()=>{const L=$('#skyLegend');L.hidden=!L.hidden;$('#legendBtn').setAttribute('aria-expanded',!L.hidden)};
+renderSky('7');
 $('#startTest').onclick=()=>{go('map');setDir('bottom');setMode('test')};
 
 /* ---------- navigation ---------- */
 function go(s){$$('.tabs button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.go===s));$$('.screen').forEach(x=>x.hidden=x.id!=='s-'+s);
-  if(s==='space')fitMini($('#msMap'));if(s==='map')renderMap();}
+  if(s==='map')renderMap();}
 $$('.tabs button').forEach(b=>b.onclick=()=>go(b.dataset.go));
 function setDir(d){state.dir=d;$$('.pill-switch button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.dir===d));$('#topdown').hidden=d!=='top';$('#bottomup').hidden=d!=='bottom';renderMap()}
 $$('.pill-switch button').forEach(b=>b.onclick=()=>setDir(b.dataset.dir));
@@ -535,6 +567,5 @@ $('#pal').addEventListener('click',e=>{const c=e.target.dataset.c;if(!c)return;c
   cv.addEventListener('pointermove',e=>{if(!on)return;x.lineWidth=1.5+(e.pressure||.5)*3;x.lineCap='round';x.strokeStyle=getComputedStyle(document.body).color;x.lineTo(...pos(e));x.stroke()});
   cv.addEventListener('pointerup',()=>on=false);})();
 
-fitMini($('#msMap'));
-addEventListener('resize',()=>{if(!$('#s-space').hidden)fitMini($('#msMap'));if(!$('#s-map').hidden)renderMap()});
+addEventListener('resize',()=>{if(!$('#s-map').hidden)renderMap()});
 </script>

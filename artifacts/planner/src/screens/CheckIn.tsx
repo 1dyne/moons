@@ -4,7 +4,6 @@ import type {ModuleSpec} from '@workspace/planner-spec';
 import {ofKind, type Planner} from '../data.ts';
 import {hm} from './Focus.tsx';
 import {Scale} from './Scale.tsx';
-import {Tip} from '../Tip.tsx';
 import {InlineEdit} from '../InlineEdit.tsx';
 import {lowEnergyAlert} from './Focus.tsx';
 import {FACTORS} from '../lifeLogic.ts';
@@ -41,24 +40,30 @@ export function CheckIn({m, p, day, now}: {m: ModuleSpec; p: Planner; day: strin
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="고정 일정" aria-label="고정 일정" /><button className="small">추가</button>
       </form>
     </div>
-    <div className="capacity" aria-label="오늘 가용 시간">
-      <div className="cap-bar">
-        <i className="cap-fixed" style={{width: pct(cap.fixedMin)}} title={`고정 일정 ${hm(cap.fixedMin)}`} />
-        <i className="cap-real" style={{width: pct(cap.realistic)}} title={`현실적인 집중 ${hm(cap.realistic)}`} />
-        <i className="cap-plan" style={{left: `calc(${pct(cap.fixedMin)})`, width: pct(cap.planned)}} title={`계획 ${hm(cap.planned)}`} />
-      </div>
-      <p className="cap-text">
-        <span className="k">가용</span> <strong>{hm(cap.free)}</strong>
-        {w && <> · <span className="k">현실 집중</span> <strong>{hm(cap.realistic)}</strong></>}
-        <Tip id="checkin-math"> 깨어 있는 {hm(cap.awake)} − 고정 {hm(cap.fixedMin)}. 에너지를 고르면 현실적인 집중량을 계산해요.</Tip>
-      </p>
-      {w && <p className={`cap-verdict ${cap.over ? 'over' : 'ok'}`}>
-        {cap.over ? <>계획 {hm(cap.planned)} · <strong>{hm(cap.over)}</strong> 초과</>
-          : <>계획 {hm(cap.planned)} · 여유 {hm(cap.realistic - cap.planned)}</>}
-        {cap.unestimated > 0 && <Tip id="checkin-unestimated"> 예상 시간이 없는 할 일 {cap.unestimated}개는 빠졌어요</Tip>}
-      </p>}
-    </div>
+    <TimeLeft cap={cap} hasEnergy={!!w} energy={w?.body.energy ?? null} wake={wake} sleep={sleep} />
   </div>;
+}
+
+/** 오늘 할 일에 쓸 수 있는 시간: one big number first, then how it was worked out, then whether today's plan fits. */
+function TimeLeft({cap, hasEnergy, energy, wake, sleep}: {cap: ReturnType<typeof capacity>; hasEnergy: boolean; energy: number | null; wake: string; sleep: string}) {
+  const left = cap.realistic - cap.planned, fill = cap.realistic ? Math.min(100, Math.round(cap.planned / cap.realistic * 100)) : 0;
+  return <section className="tl" aria-label="오늘 할 일에 쓸 수 있는 시간">
+    <p className="tl-head"><span className="tl-k">오늘 할 일에 쓸 수 있는 시간</span><strong className="tl-big mono">{hm(cap.realistic)}</strong>
+      {!hasEnergy && <span className="tl-note">위에서 일어났을 때 에너지를 고르면 더 정확해져요</span>}</p>
+    <ol className="tl-steps">
+      <li><span>깨어 있는 시간 <em>{wake}–{sleep}</em></span><b className="mono">{hm(cap.awake)}</b></li>
+      <li><span>고정 일정</span><b className="mono">− {hm(cap.fixedMin)}</b></li>
+      <li><span>그 밖의 시간</span><b className="mono">{hm(cap.free)}</b></li>
+      <li><span>그중 집중할 수 있는 몫 <em>{energy !== null ? `에너지 ${energy} → ${Math.round(cap.factor * 100)}%` : `에너지 모름 → ${Math.round(cap.factor * 100)}%`}</em></span><b className="mono">= {hm(cap.realistic)}</b></li>
+    </ol>
+    <div className="tl-plan">
+      <div className="tl-bar" role="img" aria-label={`계획 ${hm(cap.planned)} / 쓸 수 있는 시간 ${hm(cap.realistic)}`}><i className={cap.over ? 'over' : ''} style={{width: `${fill}%`}} /></div>
+      <p className={`tl-verdict ${cap.over ? 'over' : 'ok'}`}>{cap.over
+        ? <>오늘 계획 <b className="mono">{hm(cap.planned)}</b> · <strong>{hm(cap.over)} 넘쳐요</strong> — 몇 개는 희망사항이나 내일로</>
+        : <>오늘 계획 <b className="mono">{hm(cap.planned)}</b> · <strong>{hm(left)} 더 넣을 수 있어요</strong></>}</p>
+      {cap.unestimated > 0 && <p className="tl-note">예상 시간을 안 적은 할 일 {cap.unestimated}개는 계획에 안 들어갔어요</p>}
+    </div>
+  </section>;
 }
 
 export function ConditionDay({p, day, now}: {p: Planner; day: string; now: () => string}) {

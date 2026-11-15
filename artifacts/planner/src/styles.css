@@ -1743,3 +1743,18 @@ lit-block{display:block;min-width:0;max-width:100%}
 div.mb-row,div.mb-card{cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .mb-list li,.mb-cards li,.mb-table tr{touch-action:manipulation}
 .cl-wrap{z-index:340}
+
+/* 오늘 할 일에 쓸 수 있는 시간 (아침 점검) */
+.tl{display:grid;gap:10px;padding:12px;border:1px solid var(--line);background:var(--surface,#f5f5f1)}
+.tl-head{display:grid;gap:2px}
+.tl-k{font-size:13px;color:var(--muted)}
+.tl-big{font-size:34px;line-height:1.1;font-weight:700}
+.tl-note{font-size:12px;color:var(--muted);margin:0}
+.tl-steps{list-style:none;margin:0;padding:0;display:grid;gap:2px;font-size:13px}
+.tl-steps li{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed var(--line)}
+.tl-steps li:last-child{border-bottom:0;font-weight:600}
+.tl-steps em{font-style:normal;color:var(--muted);margin-left:4px}
+.tl-plan{display:grid;gap:4px}
+.tl-bar{height:10px;background:color-mix(in srgb,var(--green) 22%,#fff);border:1px solid var(--line)}
+.tl-bar i{display:block;height:100%;background:var(--ink)}.tl-bar i.over{background:var(--red)}
+.tl-verdict{margin:0;font-size:14px}.tl-verdict.over strong{color:var(--red)}.tl-verdict.ok strong{color:var(--green)}

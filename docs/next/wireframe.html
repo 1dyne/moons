@@ -191,7 +191,16 @@ mark{background:none;color:inherit;border-radius:4px;padding:0 .08em}
 .planet .pname{font-weight:700}
 .tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--surface);font-size:12px;border-radius:8px;padding:6px 9px;white-space:nowrap;transform:translate(-50%,-115%)}
 .sky-legend{position:absolute;top:12px;right:12px;background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:4px;font-size:13px}
-.sky-legend div{display:flex;align-items:center;gap:8px}
+.sky-legend div{display:grid;grid-template-columns:4.5em 1fr;gap:8px}
+.sky-legend b{font-weight:700}
+.sky-bar{flex-wrap:wrap}
+#scope{margin-left:4px}
+.pop{position:absolute;background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:12px;font-size:13px;display:grid;gap:8px;width:220px;z-index:4}
+.pop[hidden]{display:none}
+.pop .row{display:flex;gap:6px;flex-wrap:wrap}
+.pop .sw{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line);padding:0}
+.pop .sw[aria-pressed=true]{outline:2px solid var(--ink);outline-offset:2px}
+.planet.dim{opacity:.15}
 .moon-btn{position:absolute;right:18px;bottom:18px;width:72px;height:72px;border-radius:50%;border:2px solid var(--line);background:var(--moon);box-shadow:inset -18px 0 0 var(--moon-deep);padding:0}
 .moon-face{position:absolute;left:18px;top:26px;display:flex;gap:9px}
 .moon-face i{width:7px;height:10px;border-radius:50%;background:#10203f;display:block}
@@ -226,19 +235,32 @@ mark{background:none;color:inherit;border-radius:4px;padding:0 .08em}
         <button aria-pressed="true" data-p="7">7일</button>
         <button aria-pressed="false" data-p="30">30일</button>
       </div>
+      <div class="periods" role="group" aria-label="보기 필터" id="lens">
+        <button aria-pressed="true" data-l="all">전체</button>
+        <button aria-pressed="false" data-l="recent">요즘</button>
+        <button aria-pressed="false" data-l="crater">착각</button>
+        <button aria-pressed="false" data-l="dust">먼지</button>
+        <button aria-pressed="false" data-l="explain">설명 전</button>
+      </div>
+      <select id="scope" aria-label="모행성 범위"><option value="">모든 모행성</option></select>
       <button class="legend-btn" id="legendBtn" aria-expanded="false" aria-label="읽는 법">?</button>
     </div>
     <div class="sky" id="sky">
       <div class="sky-scroll" id="skyScroll"><svg id="skySvg" viewBox="0 0 1100 620" role="img" aria-label="내 생각 지도"></svg></div>
       <div class="tip" id="tip" hidden></div>
       <div class="sky-legend" id="skyLegend" hidden>
-        <div><svg width="26" height="26"><circle cx="13" cy="13" r="11" fill="var(--p-blue)"/></svg>크기 = 쌓인 기록</div>
-        <div><svg width="26" height="26"><circle cx="13" cy="13" r="12" fill="none" stroke="var(--p-blue)" stroke-opacity=".35" stroke-width="4"/><circle cx="13" cy="13" r="8" fill="var(--p-blue)"/></svg>빛 = 요즘 자주 다룸</div>
-        <div><svg width="26" height="26"><circle cx="13" cy="13" r="11" fill="var(--p-dim)"/><circle cx="13" cy="13" r="11" fill="url(#dustP)"/></svg>먼지 · 거미줄 = 오래 안 봄</div>
-        <div><svg width="26" height="26"><circle cx="13" cy="13" r="11" fill="var(--p-blue)"/><circle cx="10" cy="11" r="3.2" fill="var(--crater)"/></svg>구멍 = 안다고 했는데 틀림</div>
-        <div><svg width="26" height="26"><circle cx="13" cy="13" r="11" fill="var(--p-blue)"/><text x="17" y="10" font-size="11" fill="var(--star)">✦</text></svg>✦ = 생각보다 앎</div>
-        <div><svg width="26" height="26"><circle cx="9" cy="14" r="2.5" fill="var(--muted)"/><circle cx="17" cy="9" r="2" fill="var(--muted)"/><circle cx="18" cy="18" r="1.6" fill="var(--muted)"/></svg>바깥 점 = 왜소행성 (모행성 없음)</div>
+        <div><b>거리</b>함께 묶인 기록이 많을수록 가까이</div>
+        <div><b>선 굵기</b>함께 묶인 기록 수</div>
+        <div><b>크기</b>쌓인 기록 수</div>
+        <div><b>색</b>내가 고른 색 · 안 고르면 회색 · 하위는 같은 색 밝게</div>
+        <div><b>둘레 빛</b>고른 기간에 다룬 양</div>
+        <div><b>먼지</b>마지막으로 본 뒤 지난 날</div>
+        <div><b>구멍</b>안다고 했는데 틀린 카드 수</div>
+        <div><b>✦</b>생각보다 아는 카드</div>
+        <div><b>숫자 배지</b>설명 전 개념 수</div>
+        <div><b>바깥 점</b>왜소행성 (모행성 없음)</div>
       </div>
+      <div class="pop" id="pop" hidden></div>
       <button class="moon-btn" id="startTest" aria-label="오늘 털 것 7장 시작">
         <span class="moon-face" aria-hidden="true"><i></i><i></i></span>
         <span class="moon-badge" id="todayN">7</span>
@@ -413,72 +435,112 @@ function makeDraggable(d,it){
 }
 
 /* ---------- my space ---------- */
+/* data — 색은 사용자가 모행성에서 고른 값(null = 아직 안 고름). 위치는 저장하지 않고 관련도로 계산 */
+/* data — 색은 사용자가 모행성에서 고른 값(null = 아직 안 고름). 위치는 저장하지 않고 관련도로 계산 */
 const sky={
   planets:[
-    {id:'teps',name:'TEPS',x:330,y:300,r:104,c:'--p-blue',n:48,
-      kids:[{id:'lc',name:'LC',a:-40,r:38,c:'--p-blue2',n:21,craters:2,go:true},{id:'rc',name:'RC',a:200,r:26,c:'--p-blue2',n:12},{id:'voca',name:'어휘',a:110,r:30,c:'--p-blue2',n:15,stars:1}]},
-    {id:'leet',name:'LEET',x:740,y:200,r:84,c:'--p-purple',n:35,
-      kids:[{id:'logic',name:'추리',a:150,r:30,c:'--p-purple2',n:20,craters:1},{id:'verbal',name:'언어',a:30,r:22,c:'--p-purple2',n:9}]},
-    {id:'moons',name:'moons 설계',x:770,y:470,r:66,c:'--p-teal',n:27,stars:1},
-    {id:'diary',name:'일기',x:520,y:520,r:40,c:'--p-orange',n:14},
+    {id:'teps',name:'TEPS',n:48,color:'#6f9cf2'},
+    {id:'lc',name:'LC',parent:'teps',n:21,craters:2,explain:3},
+    {id:'rc',name:'RC',parent:'teps',n:12,explain:1},
+    {id:'voca',name:'어휘',parent:'teps',n:15,stars:1,explain:5},
+    {id:'leet',name:'LEET',n:35,color:'#a585e6'},
+    {id:'logic',name:'추리',parent:'leet',n:20,craters:1,explain:2},
+    {id:'verbal',name:'언어',parent:'leet',n:9},
+    {id:'moons',name:'moons 설계',n:27,color:'#3fb8a2',stars:1},
+    {id:'diary',name:'일기',n:14,color:null},
+    {id:'cog',name:'인지심리',n:8,color:null,explain:4},
   ],
-  // days since last touched, by period view doesn't change; activity share in period does
+  // 함께 묶인 기록 수(한 기록이 두 모행성에 같이 속한 수). 부모-자식은 계층이라 따로 강하게 묶음
+  shared:[['lc','voca',5],['verbal','rc',4],['logic','moons',4],['moons','cog',6],['moons','diary',5],['cog','diary',3],['voca','verbal',2],['logic','cog',2]],
   activity:{
-    '1':{teps:.2,lc:1,rc:0,voca:.1,leet:0,logic:0,verbal:0,moons:.6,diary:.4},
-    '7':{teps:.5,lc:1,rc:.1,voca:.5,leet:.2,logic:.3,verbal:0,moons:.9,diary:.3},
-    '30':{teps:.6,lc:.9,rc:.3,voca:.6,leet:.6,logic:.8,verbal:.1,moons:1,diary:.5}
+    '1':{teps:.2,lc:1,rc:0,voca:.1,leet:0,logic:0,verbal:0,moons:.6,diary:.4,cog:0},
+    '7':{teps:.5,lc:1,rc:.1,voca:.5,leet:.2,logic:.3,verbal:0,moons:.9,diary:.3,cog:.4},
+    '30':{teps:.6,lc:.9,rc:.3,voca:.6,leet:.6,logic:.8,verbal:.1,moons:1,diary:.5,cog:.7}
   },
-  idle:{teps:2,lc:0,rc:26,voca:4,leet:12,logic:9,verbal:95,moons:1,diary:3},
+  idle:{teps:2,lc:0,rc:26,voca:4,leet:12,logic:9,verbal:95,moons:1,diary:3,cog:5},
   dwarfs:6
 };
+const state2={period:'7',lens:'all',scope:''};
 const dustOf=d=>d>=60?3:d>=21?2:d>=7?1:0;
 const svgNS='http://www.w3.org/2000/svg';
 function el(tag,attrs,parent){const e=document.createElementNS(svgNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
 function hash(str){let h=7;for(const ch of str)h=(h*31+ch.charCodeAt(0))>>>0;return h}
-function drawPlanet(g,p,act,idle){
-  const dust=dustOf(idle), color=dust>=2?'var(--p-dim)':`var(${p.c})`;
-  const grp=el('g',{class:'planet',tabindex:'0',role:'button','aria-label':p.name},g);
-  if(act>.15) el('circle',{cx:p.x,cy:p.y,r:p.r+6+act*14,fill:`var(${p.c})`,'fill-opacity':`calc(var(--halo) * ${act.toFixed(2)})`,style:`fill-opacity:calc(var(--halo) * ${act.toFixed(2)})`},grp);
-  el('circle',{class:'body',cx:p.x,cy:p.y,r:p.r,fill:color,'fill-opacity':dust===1?.75:1},grp);
-  for(let i=0;i<(p.craters||0);i++){const h=hash(p.id+i),ang=(h%360)*Math.PI/180,d=p.r*(.25+((h>>8)%40)/100);
-    el('circle',{cx:p.x+Math.cos(ang)*d,cy:p.y+Math.sin(ang)*d,r:Math.max(4,p.r*.16),fill:'var(--crater)'},grp)}
-  for(let i=0;i<(p.stars||0);i++){const t=el('text',{x:p.x+p.r*.62,y:p.y-p.r*.62,'font-size':Math.max(14,p.r*.32),fill:'var(--star)'},grp);t.textContent='✦'}
-  if(dust) el('circle',{cx:p.x,cy:p.y,r:p.r,fill:'url(#dustP)',opacity:[0,.45,.85,1][dust]},grp);
-  if(dust===3){const x=p.x+p.r*.55,y=p.y-p.r*.85,s=p.r*.7;
-    el('path',{d:`M${x+s} ${y} L${x} ${y+s*.9} M${x+s} ${y} L${x+s*.25} ${y+s*1.1} M${x+s} ${y} L${x-s*.15} ${y+s*.45} M${x+s*.2} ${y+s*.25} Q${x+s*.55} ${y+s*.5} ${x+s*.85} ${y+s*.95} M${x+s*.45} ${y+s*.1} Q${x+s*.7} ${y+s*.35} ${x+s*.95} ${y+s*.6}`,fill:'none',stroke:'var(--muted)','stroke-width':1.1},grp)}
-  const big=p.r>=50;
-  const t=el('text',{x:p.x,y:big?p.y+5:p.y+p.r+15,'text-anchor':'middle','font-size':big?Math.min(22,p.r*.3):13,class:'pname'},grp);t.textContent=p.name;
-  grp.addEventListener('mouseenter',e=>showTip(p,idle,e));grp.addEventListener('mouseleave',()=>$('#tip').hidden=true);
-  grp.addEventListener('click',()=>{go('map');setDir('top')});
-  grp.addEventListener('keydown',e=>{if(e.key==='Enter'){go('map');setDir('top')}});
+const byId=id=>sky.planets.find(p=>p.id===id);
+const rootOf=p=>p.parent?rootOf(byId(p.parent)):p;
+function shade(hex,t){const n=parseInt(hex.slice(1),16),r=n>>16,g=n>>8&255,b=n&255,m=c=>Math.round(c+(255-c)*t);return `rgb(${m(r)},${m(g)},${m(b)})`}
+const colorOf=p=>{const c=rootOf(p).color;return c?(p.parent?shade(c,.35):c):'var(--p-dim)'};
+const radius=p=>10+Math.sqrt(p.n)*(p.parent?5:9);
+
+/* 관련도 배치: 같은 데이터면 항상 같은 자리(시드 고정, 반복 횟수 고정) */
+function layout(nodes){
+  const W=1000,H=560,P=nodes.map(p=>{const h=hash(p.id);return {p,x:W/2+(h%400)-200,y:H/2+((h>>9)%300)-150,vx:0,vy:0}});
+  const ix=new Map(P.map((q,i)=>[q.p.id,i]));
+  const springs=[];
+  nodes.forEach(p=>{if(p.parent&&ix.has(p.parent))springs.push([ix.get(p.id),ix.get(p.parent),14])});
+  sky.shared.forEach(([a,b,w])=>{if(ix.has(a)&&ix.has(b))springs.push([ix.get(a),ix.get(b),w])});
+  for(let it=0;it<500;it++){
+    for(let i=0;i<P.length;i++)for(let j=i+1;j<P.length;j++){const A=P[i],B=P[j];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||1;
+      const min=radius(A.p)+radius(B.p)+24,f=d<min?(min-d)*.5:1800/(d*d);dx/=d;dy/=d;A.vx-=dx*f;A.vy-=dy*f;B.vx+=dx*f;B.vy+=dy*f}
+    springs.forEach(([i,j,w])=>{const A=P[i],B=P[j],dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||1;
+      const rest=radius(A.p)+radius(B.p)+260/Math.sqrt(w),f=(d-rest)*.02*Math.sqrt(w);A.vx+=dx/d*f;A.vy+=dy/d*f;B.vx-=dx/d*f;B.vy-=dy/d*f});
+    P.forEach(q=>{q.vx+=(W/2-q.x)*.002;q.vy+=(H/2-q.y)*.002;q.x+=q.vx*.5;q.y+=q.vy*.5;q.vx*=.6;q.vy*=.6});
+  }
+  // 화면에 맞추기
+  const xs=P.map(q=>q.x),ys=P.map(q=>q.y),pad=90,minx=Math.min(...xs),maxx=Math.max(...xs),miny=Math.min(...ys),maxy=Math.max(...ys);
+  const k=Math.min((W-pad*2)/(maxx-minx||1),(H-pad*2)/(maxy-miny||1),1.4);
+  P.forEach(q=>{q.p.x=pad+(q.x-minx)*k+((W-pad*2)-(maxx-minx)*k)/2;q.p.y=pad+(q.y-miny)*k+((H-pad*2)-(maxy-miny)*k)/2+20});
+  return springs.map(([i,j,w])=>[P[i].p,P[j].p,w]);
 }
-function showTip(p,idle,e){const tip=$('#tip'),box=$('#sky').getBoundingClientRect(),svg=$('#skySvg').getBoundingClientRect(),k=svg.width/1100;
-  tip.textContent=`${p.name} · 기록 ${p.n}${p.craters?` · 틀린 확신 ${p.craters}`:''} · ${idle===0?'오늘 봄':idle+'일 전'}`;
-  const sc=$('#skyScroll').scrollLeft;tip.style.left=(p.x*k-sc)+'px';tip.style.top=((p.y-p.r)*k)+'px';tip.hidden=false}
-function renderSky(period){
+function matches(p){const a=sky.activity[state2.period][p.id]||0;
+  return state2.lens==='all'||(state2.lens==='recent'&&a>=.4)||(state2.lens==='crater'&&p.craters)||(state2.lens==='dust'&&dustOf(sky.idle[p.id])>=1)||(state2.lens==='explain'&&p.explain)}
+function drawPlanet(g,p){
+  const act=sky.activity[state2.period][p.id]||0,idle=sky.idle[p.id],dust=dustOf(idle),r=radius(p);
+  const grp=el('g',{class:'planet'+(matches(p)?'':' dim'),tabindex:'0',role:'button','aria-label':p.name},g);
+  if(act>.15) el('circle',{cx:p.x,cy:p.y,r:r+5+act*12,fill:colorOf(p),style:`fill-opacity:calc(var(--halo) * ${act.toFixed(2)})`},grp);
+  el('circle',{class:'body',cx:p.x,cy:p.y,r,fill:colorOf(p),'fill-opacity':dust>=2?.45:dust===1?.75:1},grp);
+  for(let i=0;i<(p.craters||0);i++){const h=hash(p.id+i),ang=(h%360)*Math.PI/180,d=r*(.25+((h>>8)%40)/100);el('circle',{cx:p.x+Math.cos(ang)*d,cy:p.y+Math.sin(ang)*d,r:Math.max(3.5,r*.16),fill:'var(--crater)'},grp)}
+  for(let i=0;i<(p.stars||0);i++){const t=el('text',{x:p.x+r*.6,y:p.y-r*.6,'font-size':Math.max(13,r*.32),fill:'var(--star)'},grp);t.textContent='✦'}
+  if(dust) el('circle',{cx:p.x,cy:p.y,r,fill:'url(#dustP)',opacity:[0,.45,.85,1][dust]},grp);
+  if(dust===3){const x=p.x+r*.55,y=p.y-r*.85,s2=r*.7;el('path',{d:`M${x+s2} ${y} L${x} ${y+s2*.9} M${x+s2} ${y} L${x+s2*.25} ${y+s2*1.1} M${x+s2} ${y} L${x-s2*.15} ${y+s2*.45} M${x+s2*.2} ${y+s2*.25} Q${x+s2*.55} ${y+s2*.5} ${x+s2*.85} ${y+s2*.95}`,fill:'none',stroke:'var(--muted)','stroke-width':1.1},grp)}
+  if(p.explain){el('circle',{cx:p.x-r*.72,cy:p.y-r*.72,r:9,fill:'var(--surface)',stroke:'var(--ink)','stroke-width':1.2},grp);const t=el('text',{x:p.x-r*.72,y:p.y-r*.72+4,'text-anchor':'middle','font-size':11,'font-weight':700},grp);t.textContent=p.explain}
+  const big=r>=46,t=el('text',{x:p.x,y:big?p.y+5:p.y+r+15,'text-anchor':'middle','font-size':big?Math.min(20,r*.3):13,class:'pname'},grp);t.textContent=p.name;
+  grp.addEventListener('mouseenter',()=>showTip(p,idle));grp.addEventListener('mouseleave',()=>$('#tip').hidden=true);
+  const open=()=>openPop(p);grp.addEventListener('click',open);grp.addEventListener('keydown',e=>{if(e.key==='Enter')open()});
+}
+function svgToBox(x,y){const svg=$('#skySvg').getBoundingClientRect(),k=svg.width/1100;return [x*k-$('#skyScroll').scrollLeft,y*k]}
+function showTip(p,idle){const tip=$('#tip'),[x,y]=svgToBox(p.x,p.y-radius(p));
+  tip.textContent=`${p.name} · 기록 ${p.n}${p.craters?` · 착각 ${p.craters}`:''}${p.explain?` · 설명 전 ${p.explain}`:''} · ${idle===0?'오늘 봄':idle+'일 전'}`;
+  tip.style.left=x+'px';tip.style.top=y+'px';tip.hidden=false}
+const PALETTE=['#6f9cf2','#a585e6','#3fb8a2','#f0a35a','#e46a6a','#e5b416','#5aa6c9','#8d8f97'];
+function openPop(p){const root=rootOf(p),pop=$('#pop'),[x,y]=svgToBox(p.x,p.y);
+  const rel=sky.shared.filter(s=>s[0]===p.id||s[1]===p.id).map(s=>`${byId(s[0]===p.id?s[1]:s[0]).name} ${s[2]}`).join(' · ')||'없음';
+  pop.innerHTML=`<b>${p.name}</b><div class="note">함께 묶인 기록: ${rel}</div>
+    <div class="note">${root===p?'색':'색 ('+root.name+'에서 고름)'}</div>
+    <div class="row">${PALETTE.map(c=>`<button class="sw" style="background:${c}" data-c="${c}" aria-pressed="${root.color===c}" aria-label="색 ${c}"></button>`).join('')}</div>
+    <div class="row"><button class="btn" id="enter">들어가기</button><button class="btn ghost" id="popClose">닫기</button></div>`;
+  pop.style.left=Math.min(x+10,$('#sky').clientWidth-230)+'px';const ph=pop.offsetHeight||210;pop.style.top=Math.max(8,Math.min(y-40,$('#sky').clientHeight-ph-8))+'px';pop.hidden=false;
+  pop.querySelectorAll('.sw').forEach(b=>b.onclick=()=>{root.color=b.dataset.c;renderSky();openPop(p)});
+  $('#enter').onclick=()=>{pop.hidden=true;go('map');setDir('top')};$('#popClose').onclick=()=>pop.hidden=true}
+function renderSky(){
   const svg=$('#skySvg');svg.innerHTML='';
   const defs=el('defs',{},svg);const pat=el('pattern',{id:'dustP',width:7,height:9,patternUnits:'userSpaceOnUse'},defs);
   el('circle',{cx:1.5,cy:1.5,r:1,fill:'var(--dust)'},pat);el('circle',{cx:5,cy:6,r:.8,fill:'var(--dust)'},pat);
-  const act=sky.activity[period];
-  // links between top planets (shared pages)
-  el('line',{x1:330,y1:300,x2:740,y2:200,stroke:'var(--muted)','stroke-opacity':.35,'stroke-width':2},svg);
-  el('line',{x1:740,y1:200,x2:770,y2:470,stroke:'var(--muted)','stroke-opacity':.35,'stroke-width':4},svg);
-  el('line',{x1:520,y1:520,x2:770,y2:470,stroke:'var(--muted)','stroke-opacity':.35,'stroke-width':1.5},svg);
-  const g=el('g',{},svg);
-  sky.planets.forEach(p=>{
-    (p.kids||[]).forEach(k=>{const orbit=p.r+k.r+26,ang=k.a*Math.PI/180;k.x=p.x+Math.cos(ang)*orbit;k.y=p.y+Math.sin(ang)*orbit;
-      el('line',{x1:p.x,y1:p.y,x2:k.x,y2:k.y,stroke:'var(--muted)','stroke-opacity':.5,'stroke-dasharray':'1 6','stroke-linecap':'round','stroke-width':2},g)});
-  });
-  sky.planets.forEach(p=>{drawPlanet(g,p,act[p.id],sky.idle[p.id]);(p.kids||[]).forEach(k=>drawPlanet(g,k,act[k.id],sky.idle[k.id]))});
-  // dwarf belt
-  const belt=el('g',{class:'planet',tabindex:'0',role:'button','aria-label':'왜소행성 '+sky.dwarfs},svg);
-  for(let i=0;i<sky.dwarfs;i++){const h=hash('d'+i);el('circle',{cx:1010+(h%60)-30,cy:90+i*80+((h>>4)%30),r:4+(h%4),fill:'var(--muted)','fill-opacity':.7},belt)}
-  const bt=el('text',{x:1010,y:60,'text-anchor':'middle','font-size':12,fill:'var(--muted)'},belt);bt.textContent='왜소행성 '+sky.dwarfs;
-  belt.addEventListener('click',()=>{go('map');setDir('top')});
+  const nodes=sky.planets.filter(p=>!state2.scope||rootOf(p).id===state2.scope||sky.shared.some(s=>(s[0]===p.id||s[1]===p.id)&&[s[0],s[1]].some(id=>rootOf(byId(id)).id===state2.scope)));
+  const links=layout(nodes);
+  links.forEach(([a,b,w])=>{const hier=b.id===a.parent||a.id===b.parent;
+    const on=matches(a)||matches(b);
+    el('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:'var(--muted)','stroke-opacity':(hier?.5:.35)*(on?1:.25),'stroke-width':hier?1.5:Math.min(6,w*.7),...(hier?{'stroke-dasharray':'1 6','stroke-linecap':'round'}:{})},svg)});
+  const g=el('g',{},svg);nodes.forEach(p=>drawPlanet(g,p));
+  if(!state2.scope){const belt=el('g',{class:'planet',tabindex:'0',role:'button','aria-label':'왜소행성 '+sky.dwarfs},svg);
+    for(let i=0;i<sky.dwarfs;i++){const h=hash('d'+i);el('circle',{cx:1050+(h%30)-15,cy:110+i*75+((h>>4)%30),r:4+(h%4),fill:'var(--muted)','fill-opacity':.7},belt)}
+    const bt=el('text',{x:1050,y:80,'text-anchor':'middle','font-size':12,fill:'var(--muted)'},belt);bt.textContent='왜소행성 '+sky.dwarfs}
 }
-$$('.periods button').forEach(b=>b.onclick=()=>{$$('.periods button').forEach(x=>x.setAttribute('aria-pressed',x===b));renderSky(b.dataset.p)});
+$$('.sky-bar .periods:first-child button').forEach(b=>b.onclick=()=>{$$('.sky-bar .periods:first-child button').forEach(x=>x.setAttribute('aria-pressed',x===b));state2.period=b.dataset.p;renderSky()});
+$$('#lens button').forEach(b=>b.onclick=()=>{$$('#lens button').forEach(x=>x.setAttribute('aria-pressed',x===b));state2.lens=b.dataset.l;renderSky()});
+sky.planets.filter(p=>!p.parent).forEach(p=>$('#scope').insertAdjacentHTML('beforeend',`<option value="${p.id}">${p.name}</option>`));
+$('#scope').onchange=e=>{state2.scope=e.target.value;$('#pop').hidden=true;renderSky()};
 $('#legendBtn').onclick=()=>{const L=$('#skyLegend');L.hidden=!L.hidden;$('#legendBtn').setAttribute('aria-expanded',!L.hidden)};
-renderSky('7');
+renderSky();
 $('#startTest').onclick=()=>{go('map');setDir('bottom');setMode('test')};
 
 /* ---------- navigation ---------- */

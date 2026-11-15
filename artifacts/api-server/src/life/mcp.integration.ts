@@ -206,6 +206,25 @@ test('packages: a made widget is shared with its DB and rules, installed again w
   await assert.rejects(call('install_widget', {pack: {...pack, contract: 99}}), /새로운 lit/);
 });
 
+test('기본 DB: a 할 일 widget with my own property, and a rule that unlocks a 희망사항 on the server', async () => {
+  const {writeRecord} = await import('./store.ts');
+  const made = await call('make_widget', {type: {id: 'task', name: '할 일', fields: [{id: 'unlock', name: '여는 조건', kind: 'signal'}]},
+    blocks: [{kind: 'checklist', stateField: 'state', fields: ['unlock'], detail: ['unlock', 'cat'], conds: [{field: 'cat', op: 'eq', value: '희망사항'}]}],
+    flows: [{name: '희망사항 해금', on: {kind: 'item', type: 'task', field: 'unlock'}, if: [{field: 'cat', op: 'eq', value: '희망사항'}], do: [{do: 'update', fields: {cat: {set: '필수'}}}]}]});
+  assert.ok((made.flows as string[]).some(x => x.startsWith('할 일의 항목마다')), 'the rule reads in plain words');
+  const spec = (await getSpec(owner))!.spec;
+  assert.ok(!spec.logic!.types.some(t => t.id === 'task'), '할 일 is not stored as a DB of its own');
+  assert.equal(spec.props!.task!.find(p => p.id === 'unlock')?.type, 'signal', 'my property became a task property');
+  const logic = await call('get_logic', {}) as {types: {id: string}[]};
+  assert.deepEqual(logic.types.slice(0, 2).map(t => t.id), ['task', 'goal']);
+  const day = '2026-11-15';
+  const wish = await writeRecord(owner, null, {kind: 'task', logicalDay: day, body: {title: '운동 30분', category: 'want', props: {unlock: JSON.stringify({kind: 'tasksDone', n: 1})}, plan: {state: 'committed'}}});
+  const cat = async () => ((await allRecords(owner)).find(r => r.id === wish.id)!.body as {category: string}).category;
+  assert.equal(await cat(), 'want');
+  await writeRecord(owner, null, {kind: 'task', logicalDay: day, body: {title: '빨래', category: 'must', plan: {state: 'committed'}, outcome: {result: 'done'}}});
+  assert.equal(await cat(), 'must', 'the 희망사항 opened when a task was done');
+});
+
 test('modes: an energy-driven mode can be set from chat and is listed back', async () => {
   const r = await call('set_modes', {modes: [{name: '에너지 긴축모드', energyAtOrBelow: 4, taskStyle: 'did'}]});
   assert.deepEqual((r.modes as {name: string; energyAtOrBelow: number}[]).map(m => [m.name, m.energyAtOrBelow]), [['에너지 긴축모드', 4]]);

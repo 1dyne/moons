@@ -40,7 +40,7 @@ export function RuleCards({flow, types, goals, onChange, onDelete}: {flow: Flow;
           {on.kind === 'record' && <>{dbSel(on.type, id => set({on: {...on, type: id}, if: []}))}에 항목이
             <select className="chip-sel" value={on.event} onChange={e => set({on: {...on, event: e.target.value as Flow['on']['event']}})} aria-label="언제"><option value="created">추가되면</option><option value="changed">수정되면</option><option value="any">추가·수정되면</option></select></>}
           {on.kind === 'item' && <>{dbSel(on.type, id => set({on: {...on, type: id, field: fieldsOf(types.find(x => x.id === id)).find(f => f.kind === 'signal')?.id ?? ''}, if: []}))}의 항목마다, 그 항목의
-            <select className="chip-sel" value={on.field} onChange={e => set({on: {...on, field: e.target.value}})} aria-label="상황 속성"><option value="">상황 속성</option>{fieldsOf(t).filter(f => f.kind === 'signal').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select>이 되면</>}
+            <select className="chip-sel" value={on.field} onChange={e => set({on: {...on, field: e.target.value}})} aria-label="상황 속성"><option value="">아래 만약 조건에 맞게</option>{fieldsOf(t).filter(f => f.kind === 'signal').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select>{on.field ? '이 되면' : ' 되면'}</>}
           {on.kind === 'signal' && <><SignalChip value={on.signal} goals={goals} types={types} onChange={sg => set({on: {...on, signal: sg}})} />이 되면</>}
           {on.kind === 'time' && <>매일 <input type="time" className="chip-sel time-in" value={on.at} onChange={e => e.target.value && set({on: {...on, at: e.target.value}})} aria-label="시각" />에</>}
           {on.kind === 'dayStart' && <span className="muted small">그날 플래너를 처음 열 때</span>}

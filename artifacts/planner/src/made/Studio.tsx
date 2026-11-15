@@ -1,7 +1,7 @@
 import {useBack} from '../back.ts';
 import {useEffect, useMemo, useState} from 'react';
 import {createPortal} from 'react-dom';
-import {LOGIC_CONTRACT, packOf, type MadePack, FIELD_KINDS, LOGIC_BLOCKS, AGGS, BLOCK_GROUPS, EFFECTS, Flow as FlowSchema, Logic, MadeOptions, PERIODS, TypeDef, blockInfo, checkTemplate, flowSentence, newBlock, newLogicId, tabsOf,
+import {BUILTIN_FIELD_IDS, isSystemType, logicOfSpec, propOfField, LOGIC_CONTRACT, packOf, type MadePack, FIELD_KINDS, LOGIC_BLOCKS, AGGS, BLOCK_GROUPS, EFFECTS, Flow as FlowSchema, Logic, MadeOptions, PERIODS, TypeDef, blockInfo, checkTemplate, flowSentence, newBlock, newLogicId, tabsOf,
   type Flow, type FieldDef, type LogicBlock, type PlannerSpec, type SavedFilter, type TabSpec, type Widget} from '@workspace/planner-spec';
 import type {Settings} from '@workspace/life-contract';
 import {ofKind} from '../data.ts';
@@ -25,10 +25,18 @@ export const openStudio = (detail: StudioOpen) => dispatchEvent(new CustomEvent(
 type Draft = {widgetId: string | null; title: string; options: MadeOptions; types: TypeDef[]; flows: Flow[]};
 const allWidgets = (spec: PlannerSpec) => [...(spec.canvas.day ?? []).map(w => ({w, page: '오늘'})), ...tabsOf(spec).flatMap(t => (t.widgets ?? []).map(w => ({w, page: t.name}))), ...(spec.modes ?? []).flatMap(m => (m.widgets ?? []).map(w => ({w, page: m.name})))];
 
+/** What is saved: the user's own DBs and rules. A 기본 DB (할 일, 목표) is not stored; properties added to 할 일
+ *  become task properties (spec.props.task), so the old 할 일 widget and the connector see them too. */
+export function storeLogic(s: PlannerSpec, l: {types: TypeDef[]; flows: Flow[]}): PlannerSpec {
+  const task = l.types.find(t => t.id === 'task'), old = s.props?.task ?? [];
+  const props = task ? task.fields.filter(f => !BUILTIN_FIELD_IDS.task!.includes(f.id)).map(f => { const o = old.find(p => p.id === f.id); return o && o.type === 'role' ? {...o, name: f.name} : propOfField(f); }) : old;
+  return {...s, props: {...s.props, task: props}, logic: {types: l.types.filter(t => !isSystemType(t.id)), flows: l.flows}};
+}
+
 export function StudioHost({spec, settings, p, nav, today, tab, saveSpec}: {spec: PlannerSpec; settings: Settings; p: Planner; nav: Nav; today: string; tab: TabSpec; saveSpec?: (change: (s: PlannerSpec) => PlannerSpec) => Promise<void>}) {
   const [open, setOpen] = useState<StudioOpen | null>(null), [draft, setDraft] = useState<Draft | null>(null);
   useEffect(() => { const f = (e: Event) => setOpen((e as CustomEvent<StudioOpen>).detail); addEventListener('lit:studio', f); return () => removeEventListener('lit:studio', f); }, []);
-  const logic = useMemo(() => Logic.parse(spec.logic ?? {}), [spec.logic]);
+  const logic = useMemo(() => logicOfSpec(spec), [spec.logic, spec.props]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!open || !('widgetId' in open) || !open.widgetId) return;
     const found = allWidgets(spec).find(x => x.w.id === open.widgetId)?.w;
@@ -42,10 +50,10 @@ export function StudioHost({spec, settings, p, nav, today, tab, saveSpec}: {spec
   // The user's own subjects (from timer widgets) and routines, so block versions start with them.
   const seed: Seed = {subjects: [...new Set(allWidgets(spec).filter(x => x.w.type === 'focus').flatMap(x => ((x.w.options.subjects as {name: string}[] | undefined) ?? []).map(sj => sj.name)))].slice(0, 60),
     routines: [...new Set(p.records.filter(r => r.kind === 'routine' && !r.deletedAt && (r.body as {active: boolean}).active).map(r => (r.body as {title: string}).title.slice(0, 30)))].slice(0, 60)};
-  if (!draft) return createPortal(<Picker logic={logic} pick={pr => { const made = pr.make(logic, seed); setDraft({widgetId: null, title: made.title, options: made.options, types: [...logic.types, ...made.types.filter(t => !logic.types.some(x => x.id === t.id))], flows: [...logic.flows, ...made.flows]}); }} close={close} />, document.body);
+  if (!draft) return createPortal(<Picker logic={logic} pick={pr => { const made = pr.make(logic, seed); setDraft({widgetId: null, title: made.title, options: made.options, types: [...logic.types.map(t => isSystemType(t.id) ? made.types.find(x => x.id === t.id) ?? t : t), ...made.types.filter(t => !logic.types.some(x => x.id === t.id))], flows: [...logic.flows, ...made.flows]}); }} close={close} />, document.body);
   const save = async (d: Draft) => {
     await saveSpec(s => {
-      const next: PlannerSpec = {...s, logic: {types: d.types, flows: d.flows}};
+      const next: PlannerSpec = storeLogic(s, {types: d.types, flows: d.flows});
       // Changing an installed widget's console code makes it the user's own (no approval of someone else's code left).
       const own = (w: Widget) => JSON.stringify((w.options as {design?: unknown}).design ?? null) === JSON.stringify(d.options.design) ? d.options : {...d.options, from: ''};
       const patch = (ws: Widget[]) => ws.map(w => w.id === d.widgetId ? {...w, title: d.title || undefined, options: own(w) as unknown as Record<string, unknown>} : w);
@@ -115,22 +123,26 @@ function DataPanel({draft, put, type, setType, spec}: {draft: Draft; put: (p: Pa
   const sharing = type ? allWidgets(spec).filter(x => x.w.type === 'made' && x.w.options.type === type.id && x.w.id !== draft.widgetId) : [];
   const newType = () => { let id = 'mine', n = 2; while (draft.types.some(t => t.id === id)) id = `mine${n++}`; const t = TypeDef.parse({id, name: '새 DB'}); put({types: [...draft.types, t], options: {...draft.options, type: id}}); };
   const field = (i: number, p: Partial<FieldDef>) => type && setType({...type, fields: type.fields.map((f, j) => j === i ? {...f, ...p} : f)});
+  // 기본 DB (할 일, 목표): lit's own records. Their built-in properties stay; 할 일 takes properties of your own.
+  const sys = !!type && isSystemType(type.id), builtin = (f: FieldDef) => sys && (BUILTIN_FIELD_IDS[type!.id] ?? []).includes(f.id);
+  const kinds = sys ? FIELD_KINDS.filter(k => ['text', 'number', 'choice', 'check', 'date', 'signal'].includes(k.id)) : FIELD_KINDS;
   return <div className="sp">
     <label className="sp-row"><span className="k">이 위젯의 DB</span>
       <span className="inline"><select value={draft.options.type} onChange={e => put({options: {...draft.options, type: e.target.value}})}><option value="" disabled>고르기</option>{draft.types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
         <button className="ghost small" onClick={newType}>+ 새 DB</button></span></label>
     {sharing.length > 0 && <p className="sp-share"><Icon name="people" size={14} /> 같은 DB를 쓰는 위젯: {sharing.map(x => `${x.w.title || '만든 위젯'}(${x.page})`).join(', ')}</p>}
     {type && <>
-      <div className="sp-grid">
+      {sys && <p className="sp-share"><Icon name="lock" size={14} /> lit 기본 DB예요. 기본 속성은 그대로 두고, 내 속성을 더할 수 있어요{type.id === 'goal' ? ' (목표는 지금은 기본 속성만)' : ''}.</p>}
+      {!sys && <div className="sp-grid">
         <label><span className="k">이름</span><input value={type.name} maxLength={30} onChange={e => setType({...type, name: e.target.value || ' '})} /></label>
         <label><span className="k">단위</span><input value={type.unit} maxLength={12} onChange={e => setType({...type, unit: e.target.value})} placeholder="잔 · 쪽 · 분" /></label>
         <label className="wide"><span className="k">설명 (사람과 AI가 읽어요)</span><input value={type.desc} maxLength={300} onChange={e => setType({...type, desc: e.target.value})} /></label>
         <label><span className="k">아이콘</span><IconPick value={type.icon} onChange={icon => setType({...type, icon})} /></label>
-      </div>
+      </div>}
       <h4 className="sp-h">속성</h4>
-      <ul className="sp-fields">{type.fields.map((f, i) => <li key={f.id} className="sp-field">
+      <ul className="sp-fields">{type.fields.map((f, i) => builtin(f) ? <li key={f.id} className="sp-field builtin"><span>{f.name}</span><span className="muted small">{FIELD_KINDS.find(k => k.id === f.kind)?.name} · 기본</span></li> : <li key={f.id} className="sp-field">
         <div className="inline"><input value={f.name} maxLength={30} onChange={e => field(i, {name: e.target.value || ' '})} aria-label="속성 이름" />
-          <select value={f.kind} onChange={e => field(i, {kind: e.target.value as FieldDef['kind']})} aria-label="종류">{FIELD_KINDS.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}</select>
+          <select value={f.kind} onChange={e => field(i, {kind: e.target.value as FieldDef['kind']})} aria-label="종류">{kinds.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}</select>
           <button className="ghost small" onClick={() => setType({...type, fields: type.fields.filter((_, j) => j !== i)})} aria-label={`${f.name} 지우기`}>×</button></div>
         <div className="inline">
           {(f.kind === 'number' || f.kind === 'duration') && <input className="num" value={f.unit} maxLength={12} onChange={e => field(i, {unit: e.target.value})} placeholder="단위" aria-label="단위" />}
@@ -139,7 +151,7 @@ function DataPanel({draft, put, type, setType, spec}: {draft: Draft; put: (p: Pa
           {f.kind === 'link' && <select value={f.to} onChange={e => field(i, {to: e.target.value})} aria-label="무엇과 연결"><option value="goal">목표</option><option value="task">할 일</option><option value="persona">페르소나</option>{draft.types.filter(t => t.id !== type.id).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>}
           <input className="wide" value={f.desc} maxLength={200} onChange={e => field(i, {desc: e.target.value})} placeholder="설명" aria-label="속성 설명" />
         </div></li>)}</ul>
-      <button className="small" disabled={type.fields.length >= 30} onClick={() => setType({...type, fields: [...type.fields, {id: newLogicId(), name: '새 속성', kind: 'text', desc: '', unit: '', options: [], max: 10, to: 'goal'}]})}>+ 속성</button>
+      <button className="small" disabled={type.fields.length >= 30 || type.id === 'goal'} onClick={() => setType({...type, fields: [...type.fields, {id: newLogicId(), name: '새 속성', kind: 'text', desc: '', unit: '', options: [], max: 10, to: 'goal'}]})}>+ 속성</button>
     </>}
   </div>;
 }
@@ -174,6 +186,25 @@ function BlocksPanel({blocks, type, setType, onChange}: {blocks: LogicBlock[]; t
   </div>;
 }
 
+/** 체크 목록: which property is the check, what each row shows, what ⋯ lets you change (in this order), and the taps. */
+function ChecklistConfig({b, type, set, addField}: {b: LogicBlock; type: TypeDef; set: (p: Partial<LogicBlock>) => void; addField: (kind: FieldDef['kind'], name: string, options?: string[]) => string}) {
+  const fs = type.fields, choice = fs.filter(f => f.kind === 'choice');
+  const toggle = (key: 'fields' | 'detail', id: string, on: boolean) => set({[key]: on ? [...b[key], id] : b[key].filter(x => x !== id)});
+  const move = (id: string, d: -1 | 1) => { const a = [...b.detail], i = a.indexOf(id), j = i + d; if (i < 0 || j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j]!, a[i]!]; set({detail: a}); };
+  return <div className="cl-conf">
+    <label className="inline"><span className="k">체크 칸</span><select value={b.stateField} onChange={e => set({stateField: e.target.value === '+' ? addField('choice', '상태', ['할 일', '한 일']) : e.target.value})}>
+      <option value="">없음</option>{choice.map(f => <option key={f.id} value={f.id}>{f.name} ({f.options.join('·')})</option>)}<option value="+">+ 새 상태 속성</option></select>
+      {b.stateField && <select value={b.tap} onChange={e => set({tap: e.target.value as LogicBlock['tap']})} aria-label="누를 때"><option value="cycle">누를 때마다 다음 상태로 (처음 네 개)</option><option value="done">했다 / 안 했다만</option></select>}</label>
+    <div className="checks"><span className="k">줄에 보일 속성</span>{fs.filter(f => f.id !== 'title' && f.id !== b.stateField).map(f => <label key={f.id} className="row-check"><input type="checkbox" checked={b.fields.includes(f.id)} onChange={e => toggle('fields', f.id, e.target.checked)} /> {f.name}</label>)}</div>
+    <div className="checks"><span className="k">⋯에서 고칠 속성</span>{fs.filter(f => f.id !== 'title').map(f => <label key={f.id} className="row-check"><input type="checkbox" checked={b.detail.includes(f.id)} onChange={e => toggle('detail', f.id, e.target.checked)} /> {f.name}</label>)}</div>
+    {b.detail.length > 1 && <ol className="cl-order">{b.detail.map(id => <li key={id}><span>{fs.find(f => f.id === id)?.name ?? id}</span><button className="ghost small" onClick={() => move(id, -1)} aria-label="위로">↑</button><button className="ghost small" onClick={() => move(id, 1)} aria-label="아래로">↓</button></li>)}</ol>}
+    <label className="inline"><span className="k">묶어 보기</span><select value={b.field} onChange={e => set({field: e.target.value})}><option value="">묶지 않기</option>{choice.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select></label>
+    <label className="inline"><span className="k">두 번 누르면</span><select value={b.dbl} onChange={e => set({dbl: e.target.value as LogicBlock['dbl']})}><option value="delete">지우기 (되돌리기 가능)</option><option value="open">⋯ 열기</option><option value="none">아무것도 안 함</option></select></label>
+    <label className="row-check"><input type="checkbox" checked={b.add} onChange={e => set({add: e.target.checked})} /> 아래에 추가 줄</label>
+    {type.id === 'task' && <label className="row-check"><input type="checkbox" checked={b.play} onChange={e => set({play: e.target.checked})} /> ▶ 집중 타이머</label>}
+  </div>;
+}
+
 function BlockConfig({b, type, setType, set}: {b: LogicBlock; type: TypeDef; setType: (t: TypeDef) => void; set: (p: Partial<LogicBlock>) => void}) {
   const fs = type.fields, nums = fs.filter(f => ['number', 'score', 'duration'].includes(f.kind));
   const view = ['list', 'table', 'gallery', 'timeline'].includes(b.kind), calc = ['stat', 'calendar', 'chart'].includes(b.kind);
@@ -182,6 +213,8 @@ function BlockConfig({b, type, setType, set}: {b: LogicBlock; type: TypeDef; set
   return <div className="sp-bconf">
     {b.kind !== 'note' && b.kind !== 'heading' && <div className="inline"><label><span className="k">이름</span><input value={b.label} maxLength={40} onChange={e => set({label: e.target.value})} /></label><label><span className="k">아이콘</span><IconPick value={b.icon} onChange={icon => set({icon})} /></label></div>}
     {b.kind === 'heading' && <div className="inline"><input className="wide" value={b.text} maxLength={500} onChange={e => set({text: e.target.value})} aria-label="문구" /><select value={b.style || 'm'} onChange={e => set({style: e.target.value})} aria-label="크기"><option value="s">작게</option><option value="m">보통</option><option value="l">크게</option></select></div>}
+    {b.kind === 'checklist' && <ChecklistConfig b={b} type={type} set={set} addField={addField} />}
+    {['list', 'table', 'gallery', 'cards'].includes(b.kind) && <label className="inline"><span className="k">두 번 누르면</span><select value={b.dbl} onChange={e => set({dbl: e.target.value as LogicBlock['dbl']})}><option value="delete">지우기 (되돌리기 가능)</option><option value="open">고치기 열기</option><option value="none">아무것도 안 함</option></select></label>}
     {b.kind === 'cards' && <div className="inline wrap">
       <label className="inline"><span className="k">조건(상황) 속성</span><select value={b.field} onChange={e => set({field: e.target.value === '+' ? addField('signal', '조건') : e.target.value})}><option value="">없음</option>{fs.filter(f => f.kind === 'signal').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}<option value="+">+ 새 상황 속성</option></select></label>
       <label className="inline"><span className="k">상태 속성</span><select value={b.stateField} onChange={e => set({stateField: e.target.value === '+' ? addField('choice', '상태', ['잠김', '열림', '사용함']) : e.target.value})}><option value="">없음</option>{fs.filter(f => f.kind === 'choice').map(f => <option key={f.id} value={f.id}>{f.name} ({f.options.join('·')})</option>)}<option value="+">+ 새 상태 속성</option></select></label></div>}
@@ -375,7 +408,7 @@ const CONSOLE_JS = "async function draw(d){\n  d = d || await lit.made.data();\n
 // ── 로직: every type (the data dictionary people and AI read) and every automation, in one place ────────
 export function LogicPage({spec, p, saveSpec, close}: {spec: PlannerSpec; p: Planner; saveSpec: (change: (s: PlannerSpec) => PlannerSpec) => Promise<void>; close: () => void}) {
   const [tab, setTab] = useState<'types' | 'flows'>('types'), [edit, setEdit] = useState<string | null>(null);
-  const [logic, setLogic] = useState(() => Logic.parse(spec.logic ?? {})), [dirty, setDirty] = useState(false);
+  const [logic, setLogic] = useState(() => logicOfSpec(spec)), [dirty, setDirty] = useState(false);
   const put = (l: Logic) => { setLogic(l); setDirty(true); };
   const goals = ofKind(p.records, 'goal').map(g => ({id: g.id, title: g.body.title}));
   const count = (id: string) => p.records.filter(r => r.kind === 'entry' && !r.deletedAt && (r.body as {type: string}).type === id).length;
@@ -388,7 +421,7 @@ export function LogicPage({spec, p, saveSpec, close}: {spec: PlannerSpec; p: Pla
   return <div className="studio-wrap"><div className="studio logic-page" role="dialog" aria-label="로직">
     <header className="studio-bar"><button className="ghost" onClick={close} aria-label="닫기">←</button><h2>로직</h2>
       <button className="ghost small" onClick={exportAll}>내보내기</button>
-      <button className="primary" disabled={!dirty} onClick={async () => { await saveSpec(s => ({...s, logic})); setDirty(false); close(); }}>저장</button></header>
+      <button className="primary" disabled={!dirty} onClick={async () => { await saveSpec(s => storeLogic(s, logic)); setDirty(false); close(); }}>저장</button></header>
     <nav className="studio-steps" role="tablist">{([['types', 'DB'], ['flows', '규칙']] as const).map(([k, n]) => <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{n}</button>)}</nav>
     <div className="studio-body single">
       {tab === 'types' && <ul className="dict">{logic.types.map(t => <li key={t.id}>

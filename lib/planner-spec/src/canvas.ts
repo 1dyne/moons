@@ -56,7 +56,7 @@ export const WIDGETS: WidgetInfo[] = [
 ];
 export const widgetInfo = (t: WidgetType) => WIDGETS.find(w => w.type === t)!;
 /** A user-made property (Notion-style): a column in a table widget or an extra field on tasks. */
-export const PROP_TYPES = [{id: 'text', name: '글'}, {id: 'number', name: '숫자'}, {id: 'select', name: '선택'}, {id: 'check', name: '체크'}, {id: 'date', name: '날짜'}, {id: 'role', name: '역할 (페르소나별)'}] as const;
+export const PROP_TYPES = [{id: 'text', name: '글'}, {id: 'number', name: '숫자'}, {id: 'select', name: '선택'}, {id: 'check', name: '체크'}, {id: 'date', name: '날짜'}, {id: 'role', name: '역할 (페르소나별)'}, {id: 'signal', name: '상황 (조건)'}] as const;
 export type PropType = typeof PROP_TYPES[number]['id'];
 export const PropDef = z.object({
   id: z.string().regex(/^[a-z0-9]{1,24}$/),

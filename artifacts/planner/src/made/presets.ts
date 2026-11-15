@@ -1,4 +1,4 @@
-import {Flow, LogicBlock, MadeOptions, Signal, TypeDef, newLogicId, type Logic} from '@workspace/planner-spec';
+import {BUILTIN_FIELD_IDS, Flow, LogicBlock, MadeOptions, Signal, TypeDef, newLogicId, type Logic} from '@workspace/planner-spec';
 
 // Starting points in the studio. Each is only blocks + a type (+ automations) — the same pieces the user can change,
 // so a preset is a filled-in example, never a separate feature.
@@ -76,6 +76,26 @@ const OLD: Preset[] = [
   }},
 ];
 
+// 기본 DB (할 일, 목표) templates: the planner's own records, shown and changed by parts the user can reshape.
+const taskOf = (logic: Logic) => logic.types.find(t => t.id === 'task')!;
+const SYS: Preset[] = [
+  {id: 'today-tasks', group: 'new', name: '오늘 일정 (할 일 목록)', icon: 'check', desc: '할 일 DB의 체크 목록. 줄에 보일 속성과 ⋯에서 고칠 속성을 내가 골라요. 두 번 누르면 지워져요', make: logic => {
+    const t = taskOf(logic), mine = t.fields.filter(f => !BUILTIN_FIELD_IDS.task!.includes(f.id)).map(f => f.id);
+    return {title: '오늘 일정', types: [], flows: [], options: opts('task', [B('checklist', {stateField: 'state', field: 'cat', fields: ['start', 'goal', ...mine.slice(0, 2)], detail: ['state', 'start', 'end', 'day', 'cat', 'goal', 'est', ...mine, 'reason'], period: 'day', anim: '', tap: 'cycle', dbl: 'delete'})])};
+  }},
+  {id: 'wish-tasks', group: 'new', name: '희망사항 해금', icon: 'lock', desc: '오늘은 어려운 할 일을 희망사항으로 두고, 여는 조건(상황)이 되면 필수로 바뀌며 반짝여요. 규칙은 편집에서 바꿀 수 있어요', make: logic => {
+    const t = taskOf(logic), has = t.fields.some(f => f.id === 'unlock');
+    const task = has ? t : {...t, fields: [...t.fields, {id: 'unlock', name: '여는 조건', kind: 'signal' as const, desc: '이 상황이 되면 희망사항이 열려요', unit: '', options: [], max: 10, to: 'goal'}]};
+    return {title: '희망사항', types: [task], options: opts('task', [B('checklist', {label: '조건이 되면 열려요', stateField: 'state', fields: ['unlock'], detail: ['unlock', 'cat', 'start', 'est'], conds: [{field: 'cat', op: 'eq', value: '희망사항'}], period: 'day', add: false, dbl: 'delete', anim: ''})]),
+      flows: [F({name: '희망사항 해금', on: {kind: 'item', type: 'task', field: 'unlock'}, if: [{field: 'cat', op: 'eq', value: '희망사항'}],
+        do: [{do: 'update', fields: {cat: {set: '필수'}}}, {do: 'effect', name: 'sparkle', target: 'item'}, {do: 'notify', text: '{이름} 열렸어요. 지금 해 볼까요?'}]})]};
+  }},
+  {id: 'goal-party', group: 'new', name: '목표 달성 축하', icon: 'trophy', desc: '목표 DB에서 진행률이 100%가 되면 이룸으로 바꾸고 축하 화면을 띄워요. 어떤 기간의 목표를 축하할지 바꿀 수 있어요', make: () => ({title: '목표', types: [],
+    options: opts('goal', [B('list', {fields: ['horizon', 'progress', 'status'], conds: [{field: 'status', op: 'eq', value: '진행 중'}], period: 'all', sort: 'new', dbl: 'none'})]),
+    flows: [F({name: '목표 달성 축하', on: {kind: 'item', type: 'goal'}, if: [{field: 'progress', op: 'gte', value: 100}, {field: 'status', op: 'eq', value: '진행 중'}, {field: 'horizon', op: 'ne', value: '주간'}],
+      do: [{do: 'update', fields: {status: {set: '이룸'}}}, {do: 'effect', name: 'celebrate', target: 'item'}, {do: 'notify', text: '{이름} 이뤘어요!'}]})]})},
+];
+
 const NEW: Preset[] = [
   {id: 'blank', group: 'new', name: '빈 위젯', icon: 'plus', desc: 'DB와 부품을 처음부터', make: logic => { const id = freeId(logic, 'mine'); return {title: '새 위젯', types: [T({id, name: '새 DB'})], options: opts(id, []), flows: []}; }},
   {id: 'sleep', group: 'old', name: '수면 (기상·취침)', icon: 'moon', desc: '시작·끝 버튼 + 평균 + 7일 막대', make: logic => {
@@ -123,4 +143,4 @@ const NEW: Preset[] = [
   }},
 ];
 // The sleep preset is one of the earlier widgets too.
-export const PRESETS: Preset[] = [...NEW.filter(p => p.id === 'blank'), ...OLD, ...NEW.filter(p => p.group === 'old'), ...NEW.filter(p => p.group === 'new' && p.id !== 'blank')];
+export const PRESETS: Preset[] = [...NEW.filter(p => p.id === 'blank'), ...SYS, ...OLD, ...NEW.filter(p => p.group === 'old'), ...NEW.filter(p => p.group === 'new' && p.id !== 'blank')];

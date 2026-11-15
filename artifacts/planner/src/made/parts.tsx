@@ -29,6 +29,16 @@ export function SignalPicker({value, onChange, m}: {value: string; onChange: (v:
 }
 export const signalOf = (v: unknown) => { if (typeof v !== 'string') return null; try { const p = Signal.safeParse(JSON.parse(v)); return p.success ? p.data : null; } catch { return null; } };
 
+/** Tapping the same item twice within a moment (touch or mouse). Taps on controls inside the item don't count. */
+export function useDoubleTap(on: (id: string) => void) {
+  const last = useRef<{id: string; t: number} | null>(null);
+  return (id: string) => (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button,input,select,textarea,a,label')) return;
+    const now = Date.now();
+    if (last.current?.id === id && now - last.current.t < 380) { last.current = null; on(id); } else last.current = {id, t: now};
+  };
+}
+
 /** 열림 카드: each item with its 상황 and how far along it is; opened ones can be used. */
 export function CardsBlock({b, m, entries, write, remove}: {b: LogicBlock; m: M; entries: import('@workspace/planner-spec').E[]; write: (id: string, fields: Record<string, unknown>) => void; remove: (id: string) => void}) {
   const t = m.type, stateF = t?.fields.find(f => f.id === b.stateField), sigF = t?.fields.find(f => f.id === b.field);
@@ -37,12 +47,13 @@ export function CardsBlock({b, m, entries, write, remove}: {b: LogicBlock; m: M;
   const title = (e: (typeof entries)[number]) => String(t?.fields.filter(f => f.kind === 'text').map(f => e.body.fields[f.id]).find(Boolean) ?? '');
   const order = (e: (typeof entries)[number]) => { const s = stateF ? e.body.fields[stateF.id] : null; return s === open ? 0 : s === used ? 2 : 1; };
   const list = [...entries].sort((a, c) => order(a) - order(c) || c.body.at.localeCompare(a.body.at));
+  const dbl = useDoubleTap(id => { if (b.dbl === 'delete') remove(id); });
   if (!list.length) return <p className="muted small mb-none">–</p>;
   return <ul className="mb-wcards">{list.map(e => {
     const state = stateF ? String(e.body.fields[stateF.id] ?? locked) : '', sg = sigF ? signalOf(e.body.fields[sigF.id]) : null;
     const ev = sg ? evalSignal(sg, m.ctx.p.records, m.logic, m.ctx.day) : null, pct = ev?.target ? Math.min(100, Math.round((ev.value ?? 0) / ev.target * 100)) : ev?.met ? 100 : 0;
     const st = state === open ? 'open' : state === used ? 'used' : 'locked';
-    return <li key={e.id} data-entry={e.id} className={`wcard st-${st}`}>
+    return <li key={e.id} data-entry={e.id} className={`wcard st-${st}`} onPointerUp={dbl(e.id)}>
       <div className="wc-head"><span className="wc-ico" aria-hidden="true">{st === 'open' ? <Icon name="sparkles" size={18} /> : st === 'used' ? <Icon name="check" size={18} /> : <Icon name="lock" size={18} />}</span>
         <b>{title(e) || t?.name}</b>{stateF && <span className="wc-state">{state}</span>}</div>
       {sg && <span className="wc-cond">{signalText(sg, m.logic, goals)}{ev?.met && st === 'locked' ? ' · 달성' : ''}</span>}

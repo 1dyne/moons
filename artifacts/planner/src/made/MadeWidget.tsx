@@ -2,19 +2,20 @@ import {createElement, useEffect, useLayoutEffect, useMemo, useRef, useState} fr
 import {createRoot, type Root} from 'react-dom/client';
 import {logicalDay, type AnyRecord, type Entry} from '@workspace/life-contract';
 import {Logic, MadeOptions, aggregate, timeStretches, type Stretch, checkTemplate, cleanCss, durationMin, entriesOf, inRange, matches, periodRange, read, renderTemplate, runFlows, suggestLinks,
-  codeHash, type E, type FieldDef, type LogicBlock, type TypeDef} from '@workspace/planner-spec';
+  codeHash, evalSignal, signalText, isSystemType, logicOfSpec, recordWrite, type E, type FieldDef, type LogicBlock, type TypeDef} from '@workspace/planner-spec';
 import {ofKind} from '../data.ts';
 import type {Ctx} from '../screens/day.ts';
 import {Icon, iconSvg} from './icons.tsx';
 import {useLibrary} from '../library.tsx';
+import {ChecklistBlock, useDoubleTap} from './checklist.tsx';
 import {setGoalFocus, useGoalFocus} from '../goalFocus.ts';
-import {Animated, CardsBlock, CodeDesign, SignalPicker, Sticker, playEffect, useEffectsOn} from './parts.tsx';
+import {Animated, CardsBlock, CodeDesign, SignalPicker, Sticker, playEffect, signalOf, useEffectsOn} from './parts.tsx';
 
 // A made widget: blocks over one type of entries (docs/lit/BLOCKS.md §3). The same component draws the live widget,
 // the preview in the studio, and the blocks inside an HTML design.
 export type M = {ctx: Ctx; logic: Logic; type: TypeDef | undefined; wid: string; opts: MadeOptions; today: string; notify: (s: string) => void; goal?: {id: string; field: string} | null};
 
-export const logicOf = (ctx: Ctx, override?: Logic) => override ?? Logic.parse(ctx.spec?.logic ?? {});
+export const logicOf = (ctx: Ctx, override?: Logic) => override ?? logicOfSpec(ctx.spec);
 const hm = (min: number) => `${Math.floor(min / 60)}:${String(Math.round(min % 60)).padStart(2, '0')}`;
 const clock = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 const isOpen = (e: E) => !e.body.end && (e.ext as {open?: boolean} | undefined)?.open === true;
@@ -71,13 +72,16 @@ function CodeConsole({m}: {m: M}) {
 }
 
 // ── Writing entries (and the automations that follow) ────────────────────────────────────────────
-async function write(m: M, id: string | null, body: Partial<Entry>, ext?: Record<string, unknown>, base?: E) {
+export async function write(m: M, id: string | null, body: Partial<Entry>, ext?: Record<string, unknown>, base?: E) {
   const at = body.at ?? base?.body.at ?? new Date().toISOString();
   const settings = m.ctx.settings;
   const full = {type: m.opts.type, verb: 'did', end: null, value: null, fields: {}, links: [], ...base?.body, ...body, at} as Entry;
   // A new item written while a goal is picked belongs to that goal.
   if (!id && m.goal && !full.fields[m.goal.field]) full.fields = {...full.fields, [m.goal.field]: m.goal.id};
-  const rec = await m.ctx.p.write(id, {kind: 'entry', logicalDay: base?.logicalDay ?? (settings ? logicalDay(at, settings) : m.ctx.day), body: full, ...(ext ? {ext} : base?.ext ? {ext: base.ext} : {}), ...(base ? {baseRevision: base.revision} : {})});
+  // A 할 일/목표 item is written to its own task or goal record (a new 할 일 belongs to the day on screen).
+  const ld = base?.logicalDay ?? (isSystemType(m.opts.type) ? m.ctx.day : settings ? logicalDay(at, settings) : m.ctx.day);
+  const rw = recordWrite({id, logicalDay: ld, body: full, ...(base ? {baseRevision: base.revision} : {})}, m.ctx.p.live?.() ?? m.ctx.p.records, Number(settings?.dayBoundary.slice(0, 2)) || 4);
+  const rec = await m.ctx.p.write(id, {...rw, ...(rw.kind === 'entry' ? (ext ? {ext} : base?.ext ? {ext: base.ext} : {}) : {})} as never);
   if (rec) {
     // The newest records (taps in quick succession write before the screen re-renders).
     const now = m.ctx.p.live?.() ?? m.ctx.p.records;
@@ -90,10 +94,10 @@ async function write(m: M, id: string | null, body: Partial<Entry>, ext?: Record
   return rec as E | null;
 }
 /** When the visible day is not today, inputs without a clock (check, score, form) are written to the visible day. */
-const atFor = (m: M) => m.ctx.day === m.today ? new Date().toISOString() : noon(m.ctx.day);
+export const atFor = (m: M) => m.ctx.day === m.today ? new Date().toISOString() : noon(m.ctx.day);
 const entries = (m: M) => entriesOf(m.ctx.p.records, m.opts.type);
 const ofGoal = (m: M, e: E) => !m.goal || e.body.fields[m.goal.field] === m.goal.id || (Array.isArray(e.body.fields[m.goal.field]) && (e.body.fields[m.goal.field] as unknown[]).includes(m.goal.id)) || e.body.links.some(l => l.to === m.goal!.id);
-const ofPeriod = (m: M, b: LogicBlock) => entries(m).filter(e => inRange(e, periodRange(b.period, m.ctx.day, m.today)) && matches(e.body, b.conds) && ofGoal(m, e));
+export const ofPeriod = (m: M, b: LogicBlock) => entries(m).filter(e => inRange(e, periodRange(b.period, m.ctx.day, m.today)) && matches(e.body, b.conds) && ofGoal(m, e));
 const fieldOf = (m: M, id: string) => m.type?.fields.find(f => f.id === id);
 
 /** What a block's main button does — shared by the drawn block and data-lit-press in HTML designs. */
@@ -138,6 +142,7 @@ function BlockView({b, m}: {b: LogicBlock; m: M}) {
     case 'calendar': return <div className="mb mb-calendar">{head}<CalendarBlock b={b} m={m} /></div>;
     case 'chart': return <div className="mb mb-chart">{head}<ChartBlock b={b} m={m} /></div>;
     case 'grid10': return <Grid10Block b={b} m={m} />;
+    case 'checklist': return <div className="mb mb-checklist">{head}<ChecklistBlock b={b} m={m} /></div>;
     case 'cards': return <div className="mb mb-cards">{head}<CardsBlock b={b} m={m} entries={ofPeriod(m, b)}
       write={(id, fields) => { const e = entries(m).find(x => x.id === id); if (e) void write(m, id, {fields: {...e.body.fields, ...fields} as Entry['fields']}, undefined, e); }} remove={id => void m.ctx.p.remove(id)} /></div>;
     case 'breakdown': return <BreakdownBlock b={b} m={m} />;
@@ -241,7 +246,7 @@ export function linkCandidates(records: AnyRecord[], to: string, logic: Logic) {
   return entriesOf(records, to).slice(-200).map(e => ({id: e.id, title: titleOf(e.body, t)}));
 }
 export const titleOf = (e: Entry, t?: TypeDef) => String(t?.fields.filter(f => f.kind === 'text').map(f => e.fields[f.id]).find(Boolean) ?? `${t?.name ?? ''} ${clock(e.at)}`);
-function FieldInput({f, m, value, onChange, title}: {f: FieldDef; m: M; value: unknown; onChange: (v: unknown) => void; title: string}) {
+export function FieldInput({f, m, value, onChange, title}: {f: FieldDef; m: M; value: unknown; onChange: (v: unknown) => void; title: string}) {
   const s = value === undefined || value === null ? '' : String(value);
   switch (f.kind) {
     case 'number': case 'duration': return <span className="inline"><input inputMode="decimal" className="num" value={s} onChange={e => onChange(e.target.value === '' ? '' : Number(e.target.value))} aria-label={f.name} />{f.unit || (f.kind === 'duration' ? '분' : '')}</span>;
@@ -400,11 +405,16 @@ export function showValue(m: M, f: FieldDef | undefined, v: unknown) {
   if (v === null || v === undefined || v === '') return '';
   if (f?.kind === 'link') return linkCandidates(m.ctx.p.records, f.to, m.logic).find(c => c.id === v)?.title ?? '';
   if (f?.kind === 'check') return v ? '✓' : '';
+  // A 상황 shows what it asks and how far along it is (오늘 끝낸 할 일 2 / 3개).
+  if (f?.kind === 'signal') { const sg = signalOf(v); if (!sg) return ''; const goals = ofKind(m.ctx.p.records, 'goal').map(g => ({id: g.id, title: g.body.title})), ev = evalSignal(sg, m.ctx.p.records, m.logic, m.ctx.day);
+    return `${signalText(sg, m.logic, goals)}${ev.met ? ' · 달성' : ev.text ? ` · ${ev.text}` : ''}`; }
   if (Array.isArray(v)) return v.join(', ');
   return `${v}${f?.unit ?? ''}`;
 }
 function ListBlock({b, m}: {b: LogicBlock; m: M}) {
   const fl = useFilter(m, b), [edit, setEdit] = useState<string | null>(null);
+  // Tapping an item twice: delete (with 되돌리기) or open, as the part is set.
+  const dbl = useDoubleTap(id => { if (b.dbl === 'delete') { setEdit(null); void m.ctx.p.remove(id); } else if (b.dbl === 'open') setEdit(id); });
   const list = ofPeriod(m, b).filter(e => matches(e.body, fl.conds)).sort((a, c) => b.sort === 'old' ? a.body.at.localeCompare(c.body.at) : b.sort === 'value' ? (c.body.value?.amount ?? 0) - (a.body.value?.amount ?? 0) : c.body.at.localeCompare(a.body.at)).slice(0, b.limit);
   const cols = (b.fields.length ? b.fields : m.type?.fields.map(f => f.id) ?? []).map(id => fieldOf(m, id)).filter((f): f is FieldDef => !!f);
   const chips = b.filters.length > 0 && <div className="chips mb-chips" role="radiogroup" aria-label="필터">
@@ -413,14 +423,14 @@ function ListBlock({b, m}: {b: LogicBlock; m: M}) {
   const when = (e: E) => `${b.period === 'day' || b.period === 'today' ? '' : `${e.logicalDay?.slice(5).replace('-', '/')} `}${clock(e.body.at)}${e.body.end ? `–${clock(e.body.end)}` : ''}`;
   const editor = (e: E) => edit === e.id && <EntryEditor e={e} m={m} close={() => setEdit(null)} />;
   if (b.kind === 'table') return <>{chips}<div className="mb-tablewrap"><table className="mb-table"><thead><tr><th>시각</th>{cols.map(f => <th key={f.id}>{f.name}</th>)}{m.type?.unit ? <th>{m.type.unit}</th> : null}</tr></thead>
-    <tbody>{list.map(e => <tr key={e.id} onClick={() => setEdit(edit === e.id ? null : e.id)}><td className="mono">{when(e)}</td>{cols.map(f => <td key={f.id}>{showValue(m, f, e.body.fields[f.id])}</td>)}{m.type?.unit ? <td className="mono">{e.body.value?.amount ?? ''}</td> : null}</tr>)}</tbody></table></div>
+    <tbody>{list.map(e => <tr key={e.id} onClick={() => setEdit(edit === e.id ? null : e.id)} onPointerUp={dbl(e.id)}><td className="mono">{when(e)}</td>{cols.map(f => <td key={f.id}>{showValue(m, f, e.body.fields[f.id])}</td>)}{m.type?.unit ? <td className="mono">{e.body.value?.amount ?? ''}</td> : null}</tr>)}</tbody></table></div>
     {list.filter(e => e.id === edit).map(e => <EntryEditor key={e.id} e={e} m={m} close={() => setEdit(null)} />)}</>;
-  if (b.kind === 'gallery') return <>{chips}<ul className="mb-cards">{list.map(e => <li key={e.id}><button className="mb-card" onClick={() => setEdit(edit === e.id ? null : e.id)}>
-    <b>{titleOf(e.body, m.type)}</b><span className="mono small">{when(e)}</span>{cols.filter(f => f.kind !== 'text').slice(0, 3).map(f => { const v = showValue(m, f, e.body.fields[f.id]); return v && <span key={f.id} className="small">{f.name} {v}</span>; })}</button>{editor(e)}</li>)}</ul></>;
-  return <>{chips}<ul className="mb-list">{list.map(e => <li key={e.id}><button className="mb-row" onClick={() => setEdit(edit === e.id ? null : e.id)}>
+  if (b.kind === 'gallery') return <>{chips}<ul className="mb-cards">{list.map(e => <li key={e.id} onPointerUp={dbl(e.id)}><div role="button" tabIndex={0} className="mb-card" onClick={() => setEdit(edit === e.id ? null : e.id)} onKeyDown={k => { if (k.key === 'Enter') setEdit(edit === e.id ? null : e.id); }}>
+    <b>{titleOf(e.body, m.type)}</b><span className="mono small">{when(e)}</span>{cols.filter(f => f.kind !== 'text').slice(0, 3).map(f => { const v = showValue(m, f, e.body.fields[f.id]); return v && <span key={f.id} className="small">{f.name} {v}</span>; })}</div>{editor(e)}</li>)}</ul></>;
+  return <>{chips}<ul className="mb-list">{list.map(e => <li key={e.id} onPointerUp={dbl(e.id)}><div role="button" tabIndex={0} className="mb-row" onClick={() => setEdit(edit === e.id ? null : e.id)} onKeyDown={k => { if (k.key === 'Enter') setEdit(edit === e.id ? null : e.id); }}>
     <span className="mono mb-when">{when(e)}</span>
     <span className="mb-vals">{e.body.value ? <b className="mono">{e.body.value.amount}{e.body.value.unit}</b> : e.body.end ? <b className="mono">{hm(durationMin(e.body))}</b> : null}
-      {cols.map(f => { const v = showValue(m, f, e.body.fields[f.id]); return v && <span key={f.id}><em>{f.name}</em> {v}</span>; })}</span></button>{editor(e)}</li>)}
+      {cols.map(f => { const v = showValue(m, f, e.body.fields[f.id]); return v && <span key={f.id}><em>{f.name}</em> {v}</span>; })}</span></div>{editor(e)}</li>)}
     {!list.length && <li className="muted small mb-none">–</li>}</ul></>;
 }
 function EntryEditor({e, m, close}: {e: E; m: M; close: () => void}) {

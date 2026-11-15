@@ -121,3 +121,38 @@ test('packages: install shares a same-shaped DB, renames a clashing one, skips r
   assert.equal(moved.options.type, 'wish2'); assert.equal(moved.logic.flows[0]!.on.type, 'wish2');
   assert.throws(() => installPack(mine, {...pack, contract: LOGIC_CONTRACT + 1}), /새로운 lit/);
 });
+
+test('기본 DB: tasks read as 할 일 items, and an item change writes back only what changed', async () => {
+  const {entriesOf, recordWrite, systemTypes, setSystemZone, runItems, runFlows} = await import('./index.ts');
+  setSystemZone('Asia/Seoul');
+  const day = '2026-11-15';
+  const task = (id: string, body: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({id, kind: 'task', revision: 3, logicalDay: day, deletedAt: null, createdAt: '2026-11-15T00:00:00.000Z', updatedAt: '2026-11-15T01:00:00.000Z',
+    body: {title: 't', category: null, goalIds: [], highlight: null, props: {}, plan: {state: 'committed', start: null, end: null, estimateMin: null, fixed: false, due: null, target: null}, outcome: {result: 'unknown', amount: null, reason: null, completedAt: null}, ...body}, ...extra}) as unknown as AnyRecord;
+  const t1 = task('T1', {title: 'TEPS', category: 'must', goalIds: ['G1', 'G2'], props: {per: 'Polyglot'}, plan: {state: 'committed', start: {value: '2026-11-15T05:20:00.000Z', precision: 'minute'}, end: {value: '2026-11-15T07:05:00.000Z', precision: 'minute'}, estimateMin: 105, fixed: true, due: null, target: null}});
+  const [it] = entriesOf([t1], 'task');
+  assert.deepEqual(it!.body.fields, {per: 'Polyglot', title: 'TEPS', day, state: '할 일', cat: '필수', start: '14:20', end: '16:05', est: 105, goal: 'G1', fixed: true});
+  const types = systemTypes([{id: 'per', name: '페르소나', type: 'select', options: ['Polyglot']}]);
+  assert.equal(types[0]!.fields.at(-1)!.kind, 'choice');
+  // Marking it done changes the outcome only; the second goal and the times stay.
+  const w = recordWrite({id: 'T1', logicalDay: day, body: {...it!.body, fields: {...it!.body.fields, state: '한 일'}}}, [t1]);
+  const b = w.body as {outcome: {result: string}; goalIds: string[]; plan: {start: {value: string}}};
+  assert.equal(w.kind, 'task'); assert.equal(b.outcome.result, 'done'); assert.deepEqual(b.goalIds, ['G1', 'G2']); assert.equal(b.plan.start.value, '2026-11-15T05:20:00.000Z'); assert.equal(w.baseRevision, 3);
+  // A moved start time is written in the user's zone.
+  const moved = recordWrite({id: 'T1', logicalDay: day, body: {...it!.body, fields: {...it!.body.fields, start: '09:00'}}}, [t1]).body as {plan: {start: {value: string}}};
+  assert.equal(moved.plan.start.value, '2026-11-15T00:00:00.000Z');
+  // 날짜 moves it to another day, and its times go with it.
+  const mv = recordWrite({id: 'T1', logicalDay: day, body: {...it!.body, fields: {...it!.body.fields, day: '2026-11-16'}}}, [t1]);
+  assert.equal(mv.logicalDay, '2026-11-16'); assert.equal((mv.body as {plan: {start: {value: string}}}).plan.start.value, '2026-11-16T05:20:00.000Z');
+  // 희망사항 해금 as a rule the user makes: each 희망사항 whose own 조건 is met becomes 필수.
+  const logic = Logic.parse({types: []});
+  const wish = task('T2', {title: '운동', category: 'want', props: {unlock: JSON.stringify({kind: 'tasksDone', n: 1})}});
+  const done = task('T3', {title: '빨래', category: 'must', outcome: {result: 'done', amount: null, reason: null, completedAt: null}});
+  const rule = Flow.parse({id: 'unl', on: {kind: 'item', type: 'task', field: 'unlock'}, if: [{field: 'cat', op: 'eq', value: '희망사항'}], do: [{do: 'update', fields: {cat: {set: '필수'}}}, {do: 'effect', name: 'sparkle'}]});
+  const out = runItems(rule, logic, [wish, done], day);
+  assert.equal(out.writes.length, 1);
+  const unlocked = recordWrite(out.writes[0]!, [wish, done]);
+  assert.equal((unlocked.body as {category: string}).category, 'must'); assert.equal(unlocked.kind, 'task');
+  // A record rule starts from a task too.
+  const onDone = Flow.parse({id: 'cel', on: {type: 'task', event: 'changed'}, if: [{field: 'state', op: 'eq', value: '한 일'}], do: [{do: 'notify', text: '잘했어요'}]});
+  assert.deepEqual(runFlows(Logic.parse({flows: [onDone]}), [done], done, {day}).notices, ['잘했어요']);
+});

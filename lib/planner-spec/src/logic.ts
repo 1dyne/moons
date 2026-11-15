@@ -60,7 +60,7 @@ export type SavedFilter = z.infer<typeof SavedFilter>;
 // ── Blocks: the pieces a widget is made of ───────────────────────────────────────────────────────
 export const BLOCK_GROUPS = {input: '입력', time: '시간', compute: '계산', view: '보기', deco: '꾸미기'} as const;
 export type BlockGroup = keyof typeof BLOCK_GROUPS;
-export const BLOCK_KINDS = ['button', 'toggle', 'counter', 'check', 'score', 'form', 'stopwatch', 'timer', 'stat', 'list', 'timeline', 'calendar', 'chart', 'gallery', 'table', 'grid10', 'breakdown', 'cards', 'heading', 'note'] as const;
+export const BLOCK_KINDS = ['button', 'toggle', 'counter', 'check', 'score', 'form', 'stopwatch', 'timer', 'stat', 'list', 'timeline', 'calendar', 'chart', 'gallery', 'table', 'grid10', 'breakdown', 'cards', 'checklist', 'heading', 'note'] as const;
 export type BlockKind = (typeof BLOCK_KINDS)[number];
 export const LOGIC_BLOCKS: {kind: BlockKind; group: BlockGroup; name: string; desc: string}[] = [
   {kind: 'button', group: 'input', name: '버튼', desc: '누르면 그 시각이 한 줄 기록돼요 (기상, 약 먹음, 출근…)'},
@@ -80,6 +80,7 @@ export const LOGIC_BLOCKS: {kind: BlockKind; group: BlockGroup; name: string; de
   {kind: 'table', group: 'view', name: '표', desc: '속성을 열로'},
   {kind: 'grid10', group: 'view', name: '10분 타임테이블', desc: '하루를 10분 칸으로. 잰 시간이 저절로 칠해지고, 빈 칸을 눌러 직접 칠해요'},
   {kind: 'breakdown', group: 'compute', name: '나눠 보기', desc: '선택 속성별 합계 (과목별 시간, 분류별 지출) — 목록 또는 원형'},
+  {kind: 'checklist', group: 'input', name: '체크 목록', desc: '항목마다 체크 칸. 줄에 보일 속성과 ⋯에서 고칠 속성을 골라요 (할 일, 숙제, 장보기)'},
   {kind: 'cards', group: 'view', name: '열림 카드', desc: '항목마다 상황(조건)과 진행 막대. 조건이 되면 열리고, 열린 것은 사용하기 (소원, 보상)'},
   {kind: 'heading', group: 'deco', name: '제목·문구', desc: '블록 사이의 글'},
   {kind: 'note', group: 'deco', name: '안내 없는 빈 줄', desc: '간격'},
@@ -89,6 +90,8 @@ import {AGGS, type Agg} from './agg.ts';
 import {Signal} from './signal-schema.ts';
 import {evalSignal, signalText} from './signals.ts';
 import {EFFECT_IDS, EFFECT_NAME} from './effects.ts';
+import {asItem, isSystemType, systemItems, systemTypes} from './systemdb.ts';
+import type {PropDef} from './canvas.ts';
 export {EFFECTS, EFFECT_IDS, type EffectId} from './effects.ts';
 export {AGGS, type Agg} from './agg.ts';
 export const Step = z.object({name: z.string().trim().min(1).max(20), min: z.number().min(0.1).max(600)});
@@ -135,6 +138,13 @@ export const LogicBlock = z.object({
   // A ready-made movement and when it plays.
   anim: z.enum(['', ...EFFECT_IDS]).default(''),
   animWhen: z.enum(['always', 'tap', 'appear']).default('tap'),
+  // 체크 목록: the properties ⋯ opens to change (fields = what each row shows), what the check does, an add line, ▶.
+  detail: z.array(z.string().max(24)).max(30).default([]),
+  tap: z.enum(['cycle', 'done']).default('cycle'),
+  // Every list part: tapping an item twice. Deleting shows 되돌리기.
+  dbl: z.enum(['delete', 'open', 'none']).default('delete'),
+  add: z.boolean().default(true),
+  play: z.boolean().default(true),
 });
 export type LogicBlock = z.infer<typeof LogicBlock>;
 export const newBlock = (kind: BlockKind, extra: Partial<LogicBlock> = {}): LogicBlock => LogicBlock.parse({id: newLogicId(), kind, ...extra});
@@ -204,7 +214,7 @@ export const Action = z.discriminatedUnion('do', [
 export const OPEN_WHAT = {'receipt-today': '오늘 영수증', 'receipt-yesterday': '어제 영수증', checkin: '아침 상태 묻기'} as const;
 // What starts a flow: a record written (any device, any widget; run on the server), or a moment on the screen —
 // a time of day, the first opening of a new day, or 일어났어요 (run by the planner that is open).
-export const TRIGGERS = {record: 'DB에 항목이 추가·수정되면', item: '항목마다, 그 항목의 상황이 되면', signal: '상황이 되면', time: '매일 정한 시각에', dayStart: '하루를 시작하면 (그날 처음 열 때)', wake: '일어났어요를 누르면'} as const;
+export const TRIGGERS = {record: 'DB에 항목이 추가·수정되면', item: '항목마다, 그 항목의 상황(또는 조건)이 되면', signal: '상황이 되면', time: '매일 정한 시각에', dayStart: '하루를 시작하면 (그날 처음 열 때)', wake: '일어났어요를 누르면'} as const;
 export type Action = z.infer<typeof Action>;
 export const Flow = z.object({
   id: z.string().regex(/^[a-z0-9]{1,12}$/),
@@ -224,9 +234,15 @@ export type Flow = z.infer<typeof Flow>;
 export const Logic = z.object({types: z.array(TypeDef).max(60).default([]), flows: z.array(Flow).max(100).default([])});
 export type Logic = z.infer<typeof Logic>;
 
+/** The user's logic with the 기본 DB (할 일, 목표) in front: what parts, rules and the editor see. */
+export function logicOfSpec(spec: {logic?: unknown; props?: {task?: PropDef[]}} | undefined): Logic {
+  const l = Logic.safeParse(spec?.logic ?? {}).data ?? Logic.parse({});
+  return {...l, types: [...systemTypes(spec?.props?.task ?? []), ...l.types.filter(t => !isSystemType(t.id))]};
+}
+
 // ── Evaluation (pure; used by the screen, the server and tests) ──────────────────────────────────
 export type E = LifeRecord<'entry'>;
-export const entriesOf = (records: AnyRecord[], type: string) => records.filter((r): r is E => r.kind === 'entry' && !r.deletedAt && (r.body as Entry).type === type);
+export const entriesOf = (records: AnyRecord[], type: string): E[] => systemItems(records, type) ?? records.filter((r): r is E => r.kind === 'entry' && !r.deletedAt && (r.body as Entry).type === type);
 export const durationMin = (e: Entry, now = Date.now()) => Math.max(0, ((e.end ? Date.parse(e.end) : now) - Date.parse(e.at)) / 60000);
 /** A value a condition or aggregate reads from an entry. */
 export function read(e: Entry, field: string, now = Date.now()): unknown {
@@ -299,8 +315,10 @@ function value(x: z.infer<typeof ValueExpr>, src: Entry, nowIso: string) {
  *  Entries written by an automation carry its id in the chain, and a flow never runs twice in one chain (no loops). */
 export function runFlows(logic: Logic, records: AnyRecord[], changed: AnyRecord, opts: {day: string; now?: Date; chain?: string[]} = {day: ''}): FlowOut {
   const out = emptyOut();
-  if (changed.kind !== 'entry' || changed.deletedAt) return out;
-  const e = changed as E, now = opts.now ?? new Date(), nowIso = now.toISOString(), chain = opts.chain ?? [];
+  // A task or goal starts rules through its 기본 DB, like any item.
+  const e0 = changed.deletedAt ? null : asItem(changed);
+  if (!e0) return out;
+  const e = e0, now = opts.now ?? new Date(), nowIso = now.toISOString(), chain = opts.chain ?? [];
   // Revisions count the whole account, so a new record is the one whose first write is its last.
   const created = e.createdAt === e.updatedAt;
   for (const f of logic.flows) {
@@ -363,14 +381,17 @@ export function runMoment(f: Flow, logic: Logic, records: AnyRecord[], day: stri
  *  "상태 = 잠김" and does not run twice. */
 export function runItems(f: Flow, logic: Logic, records: AnyRecord[], day: string, now = new Date()): FlowOut {
   const out = emptyOut();
-  if (!f.enabled || f.on.kind !== 'item' || !f.on.field) return out;
+  // With a 상황 property: each item whose own 상황 is met. Without one: each item that meets the 만약 conditions.
+  if (!f.enabled || f.on.kind !== 'item') return out;
   if (!f.when.every(sg => evalSignal(sg, records, logic, day, now).met)) return out;
   const nowIso = now.toISOString();
   for (const e of entriesOf(records, f.on.type)) {
     if (!matches(e.body, f.if, now.getTime())) continue;
-    const raw = e.body.fields[f.on.field];
-    const sg = typeof raw === 'string' ? Signal.safeParse(safeJson(raw)) : null;
-    if (!sg?.success || !evalSignal(sg.data, records, logic, day, now).met) continue;
+    if (f.on.field) {
+      const raw = e.body.fields[f.on.field];
+      const sg = typeof raw === 'string' ? Signal.safeParse(safeJson(raw)) : null;
+      if (!sg?.success || !evalSignal(sg.data, records, logic, day, now).met) continue;
+    } else if (!f.if.length) continue;
     for (const a of f.do) {
       if (a.do === 'notify') out.notices.push(a.text.replace('{이름}', titleOfEntry(e.body, logic.types.find(t => t.id === e.body.type))));
       if (a.do === 'effect') out.effects.push({name: a.name, entry: a.target === 'item' ? e.id : null, type: e.body.type});
@@ -407,7 +428,7 @@ export function flowSentence(f: Flow, types: TypeDef[], goals: {id: string; titl
   const lg = {types} as unknown as Logic;
   const when = f.on.kind === 'time' ? `매일 ${f.on.at}에` : f.on.kind === 'dayStart' ? '하루를 시작하면' : f.on.kind === 'wake' ? '일어났어요를 누르면'
     : f.on.kind === 'signal' ? `${josa(f.on.signal ? signalText(f.on.signal, lg, goals) : '상황', '이가')} 되면`
-    : f.on.kind === 'item' ? `${t(f.on.type)?.name ?? 'DB'}의 항목마다, 그 항목의 ${josa(fname(f.on.type, f.on.field), '이가')} 되면`
+    : f.on.kind === 'item' ? (f.on.field ? `${t(f.on.type)?.name ?? 'DB'}의 항목마다, 그 항목의 ${josa(fname(f.on.type, f.on.field), '이가')} 되면` : `${t(f.on.type)?.name ?? 'DB'}의 항목마다, 조건에 맞게 되면`)
     : `${t(f.on.type)?.name ?? 'DB'}에 항목이 ${{created: '추가되면', changed: '수정되면', any: '추가·수정되면'}[f.on.event]}`;
   const ifs = [...f.if.map(c => cond(f.on.type, c)), ...f.when.map(sg => `${signalText(sg, lg, goals)}이면`),
     ...f.ifAgg.map(c => `${{today: '오늘', week: '이번 주', month: '이번 달'}[c.period]} ${t(c.type)?.name ?? 'DB'} ${josa(AGGS.find(a => a.id === c.agg)?.name ?? '', '이가')} ${c.value}${{lt: ' 미만', lte: ' 이하', gt: ' 초과', gte: ' 이상', eq: '', ne: ' 아님'}[c.op]}이면`)];

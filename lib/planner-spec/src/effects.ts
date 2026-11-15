@@ -2,7 +2,9 @@
 export const EFFECTS = [
   {id: 'sparkle', name: '반짝'}, {id: 'bounce', name: '통통'}, {id: 'shake', name: '흔들기'}, {id: 'float', name: '둥실'},
   {id: 'pulse', name: '두근'}, {id: 'spin', name: '빙글'}, {id: 'pop', name: '톡'}, {id: 'glow', name: '빛나기'}, {id: 'confetti', name: '빵빠레'},
+  // A whole-screen moment (trophy sticker, confetti, the item's name): for a goal reached, not for parts.
+  {id: 'celebrate', name: '축하 화면'},
 ] as const;
-export const EFFECT_IDS = EFFECTS.map(e => e.id) as unknown as readonly ['sparkle', 'bounce', 'shake', 'float', 'pulse', 'spin', 'pop', 'glow', 'confetti'];
+export const EFFECT_IDS = EFFECTS.map(e => e.id) as unknown as readonly ['sparkle', 'bounce', 'shake', 'float', 'pulse', 'spin', 'pop', 'glow', 'confetti', 'celebrate'];
 export type EffectId = (typeof EFFECTS)[number]['id'];
 export const EFFECT_NAME: Record<string, string> = Object.fromEntries(EFFECTS.map(e => [e.id, e.name]));

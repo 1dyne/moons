@@ -16,13 +16,17 @@ import {runDaily} from '../lib/server/v5/daily';
 import {transcribeChunks,command} from '../lib/server/v5/audio-chunks';
 import type {Store} from '../lib/server/v5/types';
 const memory=new PGlite(),oldJson=openai.json,oldEmbed=openaiEmbedder.embed;
+// AI usage rows are written fire-and-forget (ai/index.ts record()). PGlite.close() never settles while
+// queries are still queued, so the after hook drains every query the code under test left behind.
+const inFlight=new Set<Promise<unknown>>();
+function pending<T>(work:Promise<T>){inFlight.add(work);work.then(()=>inFlight.delete(work),()=>inFlight.delete(work));return work}
 before(async()=>{
  await memory.exec(SCHEMA);
- const driver:Driver={query:(s,p)=>memory.query(s,p) as any,transaction:fn=>memory.transaction(tx=>fn({query:(s,p)=>tx.query(s,p) as any}))};
+ const driver:Driver={query:(s,p)=>pending(memory.query(s,p)) as any,transaction:fn=>pending(memory.transaction(tx=>fn({query:(s,p)=>tx.query(s,p) as any})))};
  (globalThis as any).__moonsDb=Promise.resolve(driver);await initV5();
  openaiEmbedder.embed=async (texts:string[])=>texts.map(()=>[1,0]);
 });
-after(async()=>{openai.json=oldJson;openaiEmbedder.embed=oldEmbed;await memory.close()});
+after(async()=>{openai.json=oldJson;openaiEmbedder.embed=oldEmbed;while(inFlight.size)await Promise.allSettled([...inFlight]);await memory.close()});
 test('Product: language follows answer, not Chinese original; wrong-language output retries',async()=>{
  let calls=0;
  openai.json=(async(task:any)=>{

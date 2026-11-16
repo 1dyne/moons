@@ -1,0 +1,269 @@
+{
+ "id": "lit.routine",
+ "version": 1,
+ "name": "루틴 트래커",
+ "requires": [
+  "lit.daily"
+ ],
+ "desc": "요일을 정해 둔 루틴이 그날 아침 하루 일과에 저절로 들어오고, 체크하면 달력에 칠해져요. 루틴 전용 기능이 아니라 “하루가 시작되면 하나씩 만들기” 규칙이에요.",
+ "records": [
+  {
+   "kind": "property",
+   "ref": "$days",
+   "body": {
+    "name": "요일",
+    "kind": "multi",
+    "options": [
+     {
+      "id": "0",
+      "name": "일",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "1",
+      "name": "월",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "2",
+      "name": "화",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "3",
+      "name": "수",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "4",
+      "name": "목",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "5",
+      "name": "금",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "6",
+      "name": "토",
+      "color": "",
+      "meaning": null
+     }
+    ]
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$from",
+   "body": {
+    "name": "루틴",
+    "kind": "relation",
+    "relation": {
+     "db": "$routines",
+     "many": false
+    },
+    "desc": "어느 루틴에서 온 일과인지"
+   }
+  },
+  {
+   "kind": "database",
+   "ref": "$routines",
+   "body": {
+    "name": "루틴",
+    "icon": "🔁",
+    "properties": [
+     "@lit.daily:$title",
+     "$days",
+     "@lit.daily:$est"
+    ]
+   }
+  },
+  {
+   "kind": "item",
+   "ref": "$r1",
+   "body": {
+    "dbs": [
+     "$routines"
+    ],
+    "values": {
+     "@lit.daily:$title": "스트레칭",
+     "$days": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5"
+     ],
+     "@lit.daily:$est": 10
+    }
+   }
+  },
+  {
+   "kind": "rule",
+   "ref": "$repeat",
+   "body": {
+    "name": "오늘 요일의 루틴을 하루 일과로",
+    "on": {
+     "kind": "dayStart"
+    },
+    "source": {
+     "dbs": [
+      "$routines"
+     ],
+     "where": [
+      {
+       "prop": "$days",
+       "op": "contains",
+       "value": "@weekday"
+      }
+     ]
+    },
+    "do": [
+     {
+      "do": "createEach",
+      "dbs": [
+       "@lit.daily:$daily"
+      ],
+      "link": "$from",
+      "values": {
+       "@lit.daily:$title": {
+        "copy": "@lit.daily:$title"
+       },
+       "@lit.daily:$day": {
+        "today": true
+       },
+       "@lit.daily:$est": {
+        "copy": "@lit.daily:$est"
+       },
+       "@lit.daily:$state": {
+        "set": "todo"
+       }
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "pages": [
+  {
+   "id": "$routinePage",
+   "name": "루틴",
+   "widgets": [
+    {
+     "id": "w",
+     "title": "오늘 루틴",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "checklist",
+       "view": {
+        "dbs": [
+         "@lit.daily:$daily"
+        ],
+        "period": "day",
+        "where": [
+         {
+          "prop": "$from",
+          "op": "filled"
+         }
+        ],
+        "show": [
+         "$from",
+         "@lit.daily:$spent"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "이번 달 한 날",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "calendar",
+       "view": {
+        "dbs": [
+         "@lit.daily:$daily"
+        ],
+        "where": [
+         {
+          "prop": "$from",
+          "op": "filled"
+         },
+         {
+          "role": "done",
+          "op": "is",
+          "value": "@done"
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "루틴 목록",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "table",
+       "view": {
+        "dbs": [
+         "$routines"
+        ],
+        "show": [
+         "$days",
+         "@lit.daily:$est"
+        ],
+        "edit": [
+         "$days",
+         "@lit.daily:$est"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "최근 30일",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "chart",
+       "agg": "count",
+       "view": {
+        "dbs": [
+         "@lit.daily:$daily"
+        ],
+        "period": "last30",
+        "where": [
+         {
+          "prop": "$from",
+          "op": "filled"
+         },
+         {
+          "role": "done",
+          "op": "is",
+          "value": "@done"
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

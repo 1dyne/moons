@@ -1,0 +1,802 @@
+{
+ "id": "lit.daily",
+ "version": 1,
+ "name": "하루 일과 + 목표",
+ "desc": "하루 일과를 체크하면 연결한 목표의 진행률이 오르고, 목표를 이루거나 포기하면 축하·다독임과 함께 회고 기록지가 열려요. 예상 대비 소요 시간, 10분 칸, 희망사항 회색 표시가 들어 있어요.",
+ "records": [
+  {
+   "kind": "property",
+   "ref": "$title",
+   "body": {
+    "name": "이름",
+    "kind": "title",
+    "role": "title"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$day",
+   "body": {
+    "name": "날짜",
+    "kind": "date",
+    "role": "day",
+    "desc": "이 항목이 어느 날의 것인지. 바꾸면 그날로 옮겨져요"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$start",
+   "body": {
+    "name": "시작",
+    "kind": "datetime",
+    "role": "start"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$end",
+   "body": {
+    "name": "끝",
+    "kind": "datetime",
+    "role": "end"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$state",
+   "body": {
+    "name": "상태",
+    "kind": "select",
+    "role": "done",
+    "desc": "체크할 때마다 다음 단계로",
+    "options": [
+     {
+      "id": "todo",
+      "name": "할 일",
+      "color": "gray",
+      "meaning": "open"
+     },
+     {
+      "id": "did",
+      "name": "한 일",
+      "color": "green",
+      "meaning": "done"
+     },
+     {
+      "id": "part",
+      "name": "일부",
+      "color": "orange",
+      "meaning": "open"
+     },
+     {
+      "id": "miss",
+      "name": "못 함",
+      "color": "red",
+      "meaning": "open"
+     },
+     {
+      "id": "later",
+      "name": "미룸",
+      "color": "purple",
+      "meaning": "skip"
+     },
+     {
+      "id": "drop",
+      "name": "취소",
+      "color": "gray",
+      "meaning": "skip"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$fixed",
+   "body": {
+    "name": "고정 일정",
+    "kind": "checkbox",
+    "role": "fixed",
+    "desc": "수업·회의처럼 시간이 정해진 일정"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$est",
+   "body": {
+    "name": "예상",
+    "kind": "duration",
+    "unit": "분"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$cat",
+   "body": {
+    "name": "분류",
+    "kind": "select",
+    "options": [
+     {
+      "id": "must",
+      "name": "필수",
+      "color": "blue",
+      "meaning": null
+     },
+     {
+      "id": "want",
+      "name": "희망사항",
+      "color": "gray",
+      "meaning": null
+     },
+     {
+      "id": "rest",
+      "name": "여가",
+      "color": "teal",
+      "meaning": null
+     }
+    ]
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$reason",
+   "body": {
+    "name": "못 한 이유",
+    "kind": "text"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$goal",
+   "body": {
+    "name": "목표",
+    "kind": "relation",
+    "relation": {
+     "db": "$goals",
+     "many": true
+    },
+    "desc": "이 일이 어떤 목표를 위한 건지"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$spent",
+   "body": {
+    "name": "소요",
+    "kind": "formula",
+    "unit": "분",
+    "formula": {
+     "op": "diff",
+     "a": "$end",
+     "b": "$start"
+    }
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$gap",
+   "body": {
+    "name": "예상 대비",
+    "kind": "formula",
+    "unit": "분",
+    "formula": {
+     "op": "expr",
+     "expr": "{$spent} - {$est}"
+    }
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$horizon",
+   "body": {
+    "name": "기간",
+    "kind": "select",
+    "options": [
+     {
+      "id": "year",
+      "name": "연간",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "quarter",
+      "name": "분기",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "month",
+      "name": "월간",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "week",
+      "name": "주간",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "mile",
+      "name": "마일스톤",
+      "color": "",
+      "meaning": null
+     }
+    ]
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$gstate",
+   "body": {
+    "name": "목표 상태",
+    "kind": "select",
+    "role": "done",
+    "options": [
+     {
+      "id": "active",
+      "name": "진행 중",
+      "color": "blue",
+      "meaning": "open"
+     },
+     {
+      "id": "achieved",
+      "name": "이룸",
+      "color": "green",
+      "meaning": "done"
+     },
+     {
+      "id": "dropped",
+      "name": "포기",
+      "color": "gray",
+      "meaning": "skip"
+     },
+     {
+      "id": "rest",
+      "name": "쉼",
+      "color": "purple",
+      "meaning": "open"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$deadline",
+   "body": {
+    "name": "마감",
+    "kind": "date"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$parent",
+   "body": {
+    "name": "상위 목표",
+    "kind": "relation",
+    "relation": {
+     "db": "$goals",
+     "many": false
+    }
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$progress",
+   "body": {
+    "name": "진행률",
+    "kind": "formula",
+    "unit": "%",
+    "formula": {
+     "op": "rollup",
+     "via": "$goal",
+     "back": true,
+     "of": null,
+     "agg": "doneRatio"
+    },
+    "desc": "이어진 하루 일과 중 끝낸 비율"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$about",
+   "body": {
+    "name": "어느 목표",
+    "kind": "relation",
+    "relation": {
+     "db": "$goals",
+     "many": false
+    }
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$feel",
+   "body": {
+    "name": "소감",
+    "kind": "longtext"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$impact",
+   "body": {
+    "name": "임팩트",
+    "kind": "rating",
+    "max": 10
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$next",
+   "body": {
+    "name": "다음엔",
+    "kind": "text"
+   }
+  },
+  {
+   "kind": "database",
+   "ref": "$daily",
+   "body": {
+    "name": "하루 일과",
+    "icon": "✅",
+    "properties": [
+     "$title",
+     "$day",
+     "$start",
+     "$end",
+     "$state",
+     "$fixed",
+     "$est",
+     "$cat",
+     "$reason",
+     "$goal",
+     "$spent",
+     "$gap"
+    ],
+    "focus": true,
+    "desc": "하루에 할 일과 고정 일정"
+   }
+  },
+  {
+   "kind": "database",
+   "ref": "$goals",
+   "body": {
+    "name": "목표",
+    "icon": "🎯",
+    "properties": [
+     "$title",
+     "$horizon",
+     "$gstate",
+     "$deadline",
+     "$parent",
+     "$progress"
+    ],
+    "desc": "중장기 목표"
+   }
+  },
+  {
+   "kind": "database",
+   "ref": "$retro",
+   "body": {
+    "name": "회고",
+    "icon": "📝",
+    "properties": [
+     "$title",
+     "$day",
+     "$about",
+     "$feel",
+     "$impact",
+     "$next"
+    ],
+    "desc": "목표를 이루거나 포기했을 때 남기는 기록"
+   }
+  },
+  {
+   "kind": "lens",
+   "ref": "$todayOpen",
+   "body": {
+    "name": "오늘 남은 일",
+    "dbs": [
+     "$daily"
+    ],
+    "where": [
+     {
+      "role": "day",
+      "op": "is",
+      "value": "@today"
+     },
+     {
+      "role": "done",
+      "op": "is",
+      "value": "@open"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "rule",
+   "ref": "$achieved",
+   "body": {
+    "name": "목표를 이루면 축하하고 회고",
+    "on": {
+     "kind": "enter"
+    },
+    "source": {
+     "dbs": [
+      "$goals"
+     ],
+     "where": [
+      {
+       "prop": "$gstate",
+       "op": "is",
+       "value": "achieved"
+      }
+     ]
+    },
+    "do": [
+     {
+      "do": "effect",
+      "name": "celebrate"
+     },
+     {
+      "do": "notify",
+      "text": "{title} 이뤘어요!"
+     },
+     {
+      "do": "openForm",
+      "dbs": [
+       "$retro"
+      ],
+      "props": [
+       "$feel",
+       "$impact",
+       "$next"
+      ],
+      "link": "$about",
+      "title": "{title} 회고"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "rule",
+   "ref": "$dropped",
+   "body": {
+    "name": "목표를 포기하면 다독이고 기록",
+    "on": {
+     "kind": "enter"
+    },
+    "source": {
+     "dbs": [
+      "$goals"
+     ],
+     "where": [
+      {
+       "prop": "$gstate",
+       "op": "is",
+       "value": "dropped"
+      }
+     ]
+    },
+    "do": [
+     {
+      "do": "notify",
+      "text": "{title} — 여기까지 온 것도 기록이에요"
+     },
+     {
+      "do": "openForm",
+      "dbs": [
+       "$retro"
+      ],
+      "props": [
+       "$feel",
+       "$next"
+      ],
+      "link": "$about",
+      "title": "{title} 돌아보기"
+     }
+    ]
+   }
+  },
+  {
+   "kind": "rule",
+   "ref": "$full",
+   "body": {
+    "name": "진행률 100%면 이룸으로 (제안)",
+    "mode": "suggest",
+    "on": {
+     "kind": "change"
+    },
+    "source": {
+     "dbs": [
+      "$goals"
+     ],
+     "where": [
+      {
+       "prop": "$progress",
+       "op": "gte",
+       "value": 100
+      },
+      {
+       "prop": "$gstate",
+       "op": "is",
+       "value": "active"
+      }
+     ]
+    },
+    "do": [
+     {
+      "do": "set",
+      "values": {
+       "$gstate": {
+        "set": "achieved"
+       }
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "pages": [
+  {
+   "id": "$today",
+   "name": "오늘",
+   "widgets": [
+    {
+     "id": "w",
+     "title": "",
+     "w": 4,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "capture",
+       "write": {
+        "dbs": [
+         "$daily"
+        ]
+       },
+       "label": "오늘 할 일을 한 줄로 · #태그 칸: 값"
+      }
+     ],
+     "style": "plain"
+    },
+    {
+     "id": "w",
+     "title": "오늘 일정",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "checklist",
+       "view": {
+        "dbs": [
+         "$daily"
+        ],
+        "period": "day",
+        "show": [
+         "$start",
+         "$est",
+         "$spent",
+         "$goal"
+        ],
+        "edit": [
+         "$state",
+         "$day",
+         "$start",
+         "$end",
+         "$est",
+         "$cat",
+         "$goal",
+         "$fixed",
+         "$reason"
+        ],
+        "chips": [
+         "$cat",
+         "$fixed"
+        ],
+        "styles": [
+         {
+          "when": [
+           {
+            "prop": "$cat",
+            "op": "is",
+            "value": "want"
+           }
+          ],
+          "look": "gray"
+         },
+         {
+          "when": [
+           {
+            "prop": "$fixed",
+            "op": "is",
+            "value": true
+           }
+          ],
+          "look": "bold"
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "오늘",
+     "w": 1,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "metric",
+       "label": "끝낸 비율",
+       "agg": "doneRatio",
+       "show": "ring",
+       "target": 100,
+       "view": {
+        "dbs": [
+         "$daily"
+        ],
+        "period": "day",
+        "where": [
+         {
+          "prop": "$cat",
+          "op": "isNot",
+          "value": "want"
+         }
+        ]
+       }
+      },
+      {
+       "id": "p",
+       "kind": "metric",
+       "label": "쓴 시간(분)",
+       "agg": "sum",
+       "of": "$spent",
+       "view": {
+        "dbs": [
+         "$daily"
+        ],
+        "period": "day"
+       }
+      },
+      {
+       "id": "p",
+       "kind": "metric",
+       "label": "예상 합(분)",
+       "agg": "sum",
+       "of": "$est",
+       "view": {
+        "dbs": [
+         "$daily"
+        ],
+        "period": "day"
+       }
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "10분 칸",
+     "w": 1,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "timegrid",
+       "startHour": 6
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "$goalsPage",
+   "name": "목표",
+   "widgets": [
+    {
+     "id": "w",
+     "title": "목표",
+     "w": 3,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "table",
+       "view": {
+        "dbs": [
+         "$goals"
+        ],
+        "show": [
+         "$horizon",
+         "$progress",
+         "$gstate",
+         "$deadline"
+        ],
+        "edit": [
+         "$gstate",
+         "$horizon",
+         "$deadline"
+        ],
+        "chips": [
+         "$horizon"
+        ],
+        "styles": [
+         {
+          "when": [
+           {
+            "prop": "$gstate",
+            "op": "is",
+            "value": "achieved"
+           }
+          ],
+          "look": "strike"
+         },
+         {
+          "when": [
+           {
+            "prop": "$gstate",
+            "op": "is",
+            "value": "dropped"
+           }
+          ],
+          "look": "faded"
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "진행 중",
+     "w": 1,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "metric",
+       "label": "진행 중인 목표",
+       "agg": "count",
+       "view": {
+        "dbs": [
+         "$goals"
+        ],
+        "where": [
+         {
+          "prop": "$gstate",
+          "op": "is",
+          "value": "active"
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "회고",
+     "w": 4,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "list",
+       "view": {
+        "dbs": [
+         "$retro"
+        ],
+        "show": [
+         "$about",
+         "$impact",
+         "$day"
+        ],
+        "sort": [
+         {
+          "prop": "$day",
+          "dir": "desc"
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

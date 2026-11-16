@@ -240,7 +240,7 @@ const resolveWrite = (write: v2.Part['write'], ctx: Ctx, day: string) => Object.
 function Form({part, day}: PartProps) {
   const {ws, ctx, save, toast} = useLit(), [vals, setVals] = useState<Record<string, v2.CellValue>>({}), [text, setText] = useState('');
   const props = part.props.map(id => ws.properties.get(id)).filter(p => !!p);
-  const needsText = !props.some(p => p!.body.role === 'title');
+  const needsText = !props.length;
   return <form className="form" onSubmit={async e => {
     e.preventDefault();
     const body = newItemBody(ws, part.write.dbs, text, day, {...resolveWrite(part.write, ctx, day), ...Object.fromEntries(Object.entries(vals).filter(([, v]) => v !== null && v !== ''))});

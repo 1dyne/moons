@@ -192,3 +192,17 @@ test('a property kind that cannot hold a role is refused', () => {
   assert.throws(() => v2.PropertyBody.parse({name: 'x', kind: 'text', role: 'start'}));
   assert.throws(() => v2.PropertyBody.parse({name: 'x', kind: 'formula'}));
 });
+
+test('same-day rollup: one item sums what other items hold on its day', () => {
+  const p = planner();
+  const awake = prop('깨어 있을 시간', 'duration'), fixedSum = prop('고정 합', 'formula', {formula: {op: 'sameDay', dbs: [p.daily.id], where: [{role: 'fixed', op: 'is', value: true}], of: p.est.id, agg: 'sum'}});
+  const fixed = prop('고정', 'checkbox', {role: 'fixed'});
+  const left = prop('남는 시간', 'formula', {formula: {op: 'expr', expr: `{${awake.id}} - {${fixedSum.id}}`}});
+  const check = rec('item', {values: {[awake.id]: 900}}, '2026-11-17');
+  const a = rec('item', {dbs: [p.daily.id], values: {[fixed.id]: true, [p.est.id]: 120}}, '2026-11-17');
+  const b = rec('item', {dbs: [p.daily.id], values: {[fixed.id]: true, [p.est.id]: 60}}, '2026-11-18');
+  const c = rec('item', {dbs: [p.daily.id], values: {[p.est.id]: 30}}, '2026-11-17');
+  const ws = buildWorkspace([...Object.values(p), awake, fixedSum, fixed, left, check, a, b, c] as AnyRecord[]);
+  assert.equal(value(ws, check, fixedSum.id), 120);
+  assert.equal(value(ws, check, left.id), 780);
+});

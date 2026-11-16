@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import {addDays, v2} from '@workspace/life-contract';
+import {title} from '@workspace/lit-core';
 import {useLit, newLocalId} from './store.tsx';
 import {PartView} from './Parts.tsx';
 import {PartEditor} from './PartEditor.tsx';
@@ -40,7 +41,7 @@ export function PageView() {
       <input type="date" value={day} onChange={e => e.target.value && setDay(e.target.value)} aria-label="보이는 날" />
       <button className="ghost" onClick={() => setDay(addDays(day, 1))} aria-label="다음 날">›</button>
       {day !== today && <button className="small" onClick={() => setDay(null)}>오늘</button>}
-      {carried && ws.items.get(carried) && <span className="carried small">들고 온 항목 · {ws.items.get(carried) ? (ws.items.get(carried)!.body.text || '항목') : ''}</span>}
+      {carried && ws.items.get(carried) && <span className="carried small">들고 온 항목 · {title(ws, ws.items.get(carried)!)}</span>}
     </div>
     <div className="widgets">
       {pg.widgets.map(w => <section key={w.id} className={`widget w${w.w} st-${w.style} ${editing ? 'editing' : ''}`} style={w.accent ? {'--accent': w.accent} as React.CSSProperties : undefined}>

@@ -83,12 +83,12 @@ export function MergeButton({from, into, done}: {from: string; into: string; don
   const {pull, toast, ws} = useLit();
   return <button className="small" onClick={async () => { if (!confirm(`“${nameOf(ws, from)}”을 “${nameOf(ws, into)}”에 합칠까요? 값과 필터·규칙·계산이 함께 옮겨가요.`)) return; try { const r = await api.merge(from, into); toast(`${r.changed}개를 옮겼어요`); await pull(); done(); } catch (e) { toast((e as Error).message, 'error'); } }}>합치기</button>;
 }
-const OPS_F: [v2.Formula['op'], string, string][] = [['diff', '차이', 'A − B'], ['rollup', '모아 계산', 'Rollup'], ['latest', '지난번 값', 'Latest'], ['ifThen', '조건', 'If'], ['expr', '직접 식', 'Expression']];
+const OPS_F: [v2.Formula['op'], string, string][] = [['diff', '차이', 'A − B'], ['rollup', '모아 계산', 'Rollup'], ['sameDay', '같은 날 모아 계산', 'Day rollup'], ['latest', '지난번 값', 'Latest'], ['ifThen', '조건', 'If'], ['expr', '직접 식', 'Expression']];
 function FormulaEditor({f, onChange}: {f: v2.Formula; onChange: (f: v2.Formula) => void}) {
   const {ws} = useLit(), props = propList(ws), rel = propList(ws, p => p.body.kind === 'relation');
   const pick = (v: string | null, set: (id: string) => void, l = props) => <select value={v ?? ''} onChange={e => set(e.target.value)}><option value="">고르기</option>{l.map(([i, n]) => <option key={i} value={i}>{n}</option>)}</select>;
   return <fieldset className="formula"><legend>계산 <En>Formula</En></legend>
-    <div className="chips">{OPS_F.map(([op, n, en]) => <button key={op} className={`chip ${f.op === op ? 'on' : ''}`} onClick={() => onChange(op === 'diff' ? {op, a: '' as never, b: '' as never} : op === 'rollup' ? {op, via: '' as never, back: true, of: null, agg: 'doneRatio'} : op === 'latest' ? {op, of: '' as never, match: '' as never} : op === 'ifThen' ? {op, when: [], then: '', else: null} : {op: 'expr', expr: ''})}>{n} <En>{en}</En></button>)}</div>
+    <div className="chips">{OPS_F.map(([op, n, en]) => <button key={op} className={`chip ${f.op === op ? 'on' : ''}`} onClick={() => onChange(op === 'diff' ? {op, a: '' as never, b: '' as never} : op === 'rollup' ? {op, via: '' as never, back: true, of: null, agg: 'doneRatio'} : op === 'latest' ? {op, of: '' as never, match: '' as never} : op === 'sameDay' ? {op, dbs: [], where: [], of: null, agg: 'sum'} : op === 'ifThen' ? {op, when: [], then: '', else: null} : {op: 'expr', expr: ''})}>{n} <En>{en}</En></button>)}</div>
     {f.op === 'diff' && <div className="row">{pick(f.a, a => onChange({...f, a}))} − {pick(f.b, b => onChange({...f, b}))}<span className="muted small">시각끼리면 분, 날짜끼리면 일</span></div>}
     {f.op === 'rollup' && <div className="col">
       <label><span className="k">연결</span>{pick(f.via, via => onChange({...f, via}), rel)}</label>
@@ -96,6 +96,12 @@ function FormulaEditor({f, onChange}: {f: v2.Formula; onChange: (f: v2.Formula) 
       <label><span className="k">집계</span><select value={f.agg} onChange={e => onChange({...f, agg: e.target.value as v2.Aggregate})}>{v2.AGGREGATES.map(a => <option key={a} value={a}>{AGG_NAMES[a][1]} · {AGG_NAMES[a][0]}</option>)}</select></label>
       {!['count', 'doneRatio', 'days', 'streak'].includes(f.agg) && <label><span className="k">어느 칸</span>{pick(f.of, of => onChange({...f, of}))}</label>}
     </div>}
+    {f.op === 'sameDay' && <div className="col">
+      <IdPicker label="어느 DB의 항목을" ids={dbList(ws)} value={f.dbs} onChange={dbs => onChange({...f, dbs})} />
+      <span className="k">조건</span><CondEditor conds={f.where} onChange={where => onChange({...f, where})} />
+      <label><span className="k">집계</span><select value={f.agg} onChange={e => onChange({...f, agg: e.target.value as v2.Aggregate})}>{v2.AGGREGATES.map(a => <option key={a} value={a}>{AGG_NAMES[a][1]} · {AGG_NAMES[a][0]}</option>)}</select></label>
+      {!['count', 'doneRatio', 'days', 'streak'].includes(f.agg) && <label><span className="k">어느 칸</span>{pick(f.of, of => onChange({...f, of}))}</label>}
+      <p className="muted small">이 항목과 같은 날에 있는 항목들만 모아요.</p></div>}
     {f.op === 'latest' && <div className="col"><label><span className="k">값</span>{pick(f.of, of => onChange({...f, of}))}</label><label><span className="k">같은 것끼리</span>{pick(f.match, match => onChange({...f, match}))}</label></div>}
     {f.op === 'ifThen' && <div className="col"><CondEditor conds={f.when} onChange={when => onChange({...f, when})} /><label><span className="k">이면</span><input value={String(f.then ?? '')} onChange={e => onChange({...f, then: e.target.value})} /></label><label><span className="k">아니면</span><input value={String(f.else ?? '')} onChange={e => onChange({...f, else: e.target.value || null})} /></label></div>}
     {f.op === 'expr' && <div className="col"><textarea className="mono" value={f.expr} onChange={e => onChange({...f, expr: e.target.value})} rows={2} /><div className="chips">{props.map(([i, n]) => <button key={i} className="chip" onClick={() => onChange({...f, expr: `${f.expr} {${i}}`})}>+ {n}</button>)}</div><p className="muted small">숫자, + − * / ( ) 와 칸 {'{…}'} 만 써요.</p></div>}

@@ -1,0 +1,310 @@
+{
+ "id": "lit.energy",
+ "version": 1,
+ "name": "에너지 신호등 + 가용 시간",
+ "requires": [
+  "lit.daily"
+ ],
+ "desc": "시간마다 에너지를 찍으면 신호등이 바뀌고, 아침 점검의 깨어 있을 시간에서 그날 고정 일정을 빼고 에너지를 곱해 “오늘 쓸 수 있는 시간”을 계산해요. 에너지가 낮으면 알림.",
+ "records": [
+  {
+   "kind": "property",
+   "ref": "$score",
+   "body": {
+    "name": "에너지",
+    "kind": "rating",
+    "max": 10,
+    "desc": "1 바닥 ~ 10 최상"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$why",
+   "body": {
+    "name": "이유",
+    "kind": "text"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$awake",
+   "body": {
+    "name": "깨어 있을 시간",
+    "kind": "duration",
+    "unit": "분",
+    "desc": "예: 16시간 = 960"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$fixedMin",
+   "body": {
+    "name": "고정 일정 시간",
+    "kind": "formula",
+    "unit": "분",
+    "formula": {
+     "op": "sameDay",
+     "dbs": [
+      "@lit.daily:$daily"
+     ],
+     "where": [
+      {
+       "role": "fixed",
+       "op": "is",
+       "value": true
+      }
+     ],
+     "of": "@lit.daily:$est",
+     "agg": "sum"
+    }
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$avail",
+   "body": {
+    "name": "쓸 수 있는 시간",
+    "kind": "formula",
+    "unit": "분",
+    "formula": {
+     "op": "expr",
+     "expr": "({$awake} - {$fixedMin}) * {$score} / 10"
+    },
+    "desc": "(깨어 있을 시간 − 고정 일정) × 에너지/10"
+   }
+  },
+  {
+   "kind": "database",
+   "ref": "$check",
+   "body": {
+    "name": "아침 점검",
+    "icon": "🌅",
+    "properties": [
+     "@lit.daily:$day",
+     "$awake",
+     "$score",
+     "$fixedMin",
+     "$avail"
+    ]
+   }
+  },
+  {
+   "kind": "database",
+   "ref": "$energyLog",
+   "body": {
+    "name": "에너지 기록",
+    "icon": "🚦",
+    "properties": [
+     "@lit.daily:$start",
+     "$score",
+     "$why"
+    ]
+   }
+  },
+  {
+   "kind": "signal",
+   "ref": "$availSig",
+   "body": {
+    "name": "오늘 쓸 수 있는 시간",
+    "measure": {
+     "dbs": [
+      "$check"
+     ],
+     "of": "$avail",
+     "agg": "last",
+     "period": "today"
+    },
+    "op": "gt",
+    "compare": {
+     "n": 0
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "ref": "$plannedSig",
+   "body": {
+    "name": "오늘은 무리 (계획 > 쓸 수 있는 시간)",
+    "measure": {
+     "dbs": [
+      "@lit.daily:$daily"
+     ],
+     "where": [
+      {
+       "role": "fixed",
+       "op": "isNot",
+       "value": true
+      },
+      {
+       "role": "done",
+       "op": "isNot",
+       "value": "@skip"
+      }
+     ],
+     "of": "@lit.daily:$est",
+     "agg": "sum",
+     "period": "today"
+    },
+    "op": "gt",
+    "compare": {
+     "signal": "$availSig"
+    }
+   }
+  },
+  {
+   "kind": "signal",
+   "ref": "$low",
+   "body": {
+    "name": "에너지 4 이하",
+    "measure": {
+     "dbs": [
+      "$energyLog"
+     ],
+     "of": "$score",
+     "agg": "last",
+     "period": "today"
+    },
+    "op": "lte",
+    "compare": {
+     "n": 4
+    }
+   }
+  },
+  {
+   "kind": "rule",
+   "ref": "$warn",
+   "body": {
+    "name": "에너지가 낮으면 알림",
+    "on": {
+     "kind": "signal",
+     "signal": "$low"
+    },
+    "do": [
+     {
+      "do": "notify",
+      "text": "에너지가 낮아요. 오늘은 꼭 할 것만 남겨 볼까요?"
+     },
+     {
+      "do": "effect",
+      "name": "shake"
+     }
+    ]
+   }
+  }
+ ],
+ "pages": [
+  {
+   "id": "$energyPage",
+   "name": "컨디션",
+   "widgets": [
+    {
+     "id": "w",
+     "title": "아침 점검",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "form",
+       "props": [
+        "$awake",
+        "$score"
+       ],
+       "write": {
+        "dbs": [
+         "$check"
+        ]
+       },
+       "label": "오늘"
+      },
+      {
+       "id": "p",
+       "kind": "metric",
+       "label": "오늘 쓸 수 있는 시간(분)",
+       "signal": "$availSig"
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "지금 에너지",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "rating",
+       "write": {
+        "dbs": [
+         "$energyLog"
+        ],
+        "prop": "$score"
+       },
+       "max": 10
+      },
+      {
+       "id": "p",
+       "kind": "metric",
+       "label": "신호등",
+       "agg": "last",
+       "of": "$score",
+       "show": "light",
+       "green": 7,
+       "red": 3,
+       "view": {
+        "dbs": [
+         "$energyLog"
+        ],
+        "period": "day"
+       }
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "오늘 에너지",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "list",
+       "view": {
+        "dbs": [
+         "$energyLog"
+        ],
+        "period": "day",
+        "show": [
+         "@lit.daily:$start",
+         "$score",
+         "$why"
+        ],
+        "edit": [
+         "$why",
+         "$score"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "최근 7일 평균",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "chart",
+       "agg": "avg",
+       "of": "$score",
+       "target": 7,
+       "view": {
+        "dbs": [
+         "$energyLog"
+        ],
+        "period": "last7"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

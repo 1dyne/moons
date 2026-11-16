@@ -86,11 +86,16 @@ export function TemplatesScreen() {
 
 const FONTS: [string, string][] = [['pretendard', '고딕'], ['plex', 'IBM Plex'], ['serif', '명조'], ['hand', '손글씨']];
 export function SkinScreen() {
-  const {screen, saveScreen} = useLit(), s = screen.skin, set = (x: Partial<typeof s>) => void saveScreen({...screen, skin: {...s, ...x}});
+  const {screen, saveScreen, settings, toast} = useLit(), s = screen.skin, set = (x: Partial<typeof s>) => void saveScreen({...screen, skin: {...s, ...x}});
+  const [legacy, setLegacy] = useState<number | null>(null);
+  useEffect(() => { void fetch('/api/life/v2/legacy', {credentials: 'include'}).then(r => r.json()).then(r => setLegacy(r.count ?? 0)).catch(() => {}); }, []);
   return <div className="editor">
+    <p className="muted small">시간대 {settings.tz} · 하루는 {settings.dayBoundary}에 바뀌어요</p>
     {(['accent', 'background', 'surface', 'ink'] as const).map(k => <label key={k}><span className="k">{{accent: '강조색', background: '바탕', surface: '카드', ink: '글자'}[k]}</span><input type="color" value={s[k]} onChange={e => set({[k]: e.target.value})} /></label>)}
     <label><span className="k">글꼴</span><select value={s.font} onChange={e => set({font: e.target.value})}>{FONTS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></label>
     <label><span className="k">모서리</span><input type="range" min={0} max={24} value={s.radius} onChange={e => set({radius: Number(e.target.value)})} /></label>
+    {!!legacy && <fieldset><legend>예전 플래너 기록</legend><p className="small">예전 lit에서 쓰던 기록 {legacy}개가 남아 있어요. 새 lit에는 보이지 않아요.</p>
+      <button className="danger small" onClick={async () => { if (prompt('지우려면 “지우기”를 입력하세요. (이력은 서버에 남아요)') !== '지우기') return; const r = await fetch('/api/life/v2/legacy/clear', {method: 'POST', credentials: 'include', headers: {'content-type': 'application/json'}, body: JSON.stringify({confirm: 'clear'})}).then(x => x.json()); toast(`${r.cleared ?? 0}개를 지웠어요`); setLegacy(0); }}>예전 기록 지우기</button></fieldset>}
   </div>;
 }
 

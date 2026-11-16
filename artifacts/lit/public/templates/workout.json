@@ -1,0 +1,377 @@
+{
+ "id": "lit.workout",
+ "version": 1,
+ "name": "운동 기록",
+ "requires": [
+  "lit.daily"
+ ],
+ "desc": "하루 일과에서 “운동”이 들어간 줄을 열면 운동 페이지로 그 일과를 들고 가요. 세트를 적으면 지난번 무게가 옆에 보이고, 휴식 타이머가 있어요. 운동 일과를 체크하면 루틴·목표에도 그대로 반영돼요.",
+ "records": [
+  {
+   "kind": "property",
+   "ref": "$part",
+   "body": {
+    "name": "부위",
+    "kind": "select",
+    "options": [
+     {
+      "id": "leg",
+      "name": "하체",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "chest",
+      "name": "가슴",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "back",
+      "name": "등",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "shoulder",
+      "name": "어깨",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "arm",
+      "name": "팔",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "core",
+      "name": "코어",
+      "color": "",
+      "meaning": null
+     },
+     {
+      "id": "cardio",
+      "name": "유산소",
+      "color": "",
+      "meaning": null
+     }
+    ]
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$kind",
+   "body": {
+    "name": "종목",
+    "kind": "relation",
+    "relation": {
+     "db": "$exercises",
+     "many": false
+    }
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$weight",
+   "body": {
+    "name": "무게",
+    "kind": "number",
+    "unit": "kg"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$reps",
+   "body": {
+    "name": "횟수",
+    "kind": "number",
+    "unit": "회"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$rpe",
+   "body": {
+    "name": "힘든 정도",
+    "kind": "rating",
+    "max": 10
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$prev",
+   "body": {
+    "name": "지난번 무게",
+    "kind": "formula",
+    "unit": "kg",
+    "formula": {
+     "op": "latest",
+     "of": "$weight",
+     "match": "$kind"
+    }
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$best",
+   "body": {
+    "name": "최고 무게",
+    "kind": "formula",
+    "unit": "kg",
+    "formula": {
+     "op": "rollup",
+     "via": "$kind",
+     "back": true,
+     "of": "$weight",
+     "agg": "max"
+    }
+   }
+  },
+  {
+   "kind": "database",
+   "ref": "$exercises",
+   "body": {
+    "name": "운동 종목",
+    "icon": "🏋️",
+    "properties": [
+     "@lit.daily:$title",
+     "$part",
+     "$best"
+    ]
+   }
+  },
+  {
+   "kind": "database",
+   "ref": "$sets",
+   "body": {
+    "name": "세트",
+    "icon": "🔢",
+    "properties": [
+     "$kind",
+     "$weight",
+     "$reps",
+     "$rpe",
+     "$prev",
+     "@lit.daily:$start"
+    ]
+   }
+  },
+  {
+   "kind": "item",
+   "ref": "$e1",
+   "body": {
+    "dbs": [
+     "$exercises"
+    ],
+    "values": {
+     "@lit.daily:$title": "스쿼트",
+     "$part": "leg"
+    }
+   }
+  },
+  {
+   "kind": "item",
+   "ref": "$e2",
+   "body": {
+    "dbs": [
+     "$exercises"
+    ],
+    "values": {
+     "@lit.daily:$title": "벤치프레스",
+     "$part": "chest"
+    }
+   }
+  },
+  {
+   "kind": "item",
+   "ref": "$e3",
+   "body": {
+    "dbs": [
+     "$exercises"
+    ],
+    "values": {
+     "@lit.daily:$title": "데드리프트",
+     "$part": "back"
+    }
+   }
+  },
+  {
+   "kind": "rule",
+   "ref": "$go",
+   "body": {
+    "name": "운동 일과를 열면 운동 페이지로",
+    "on": {
+     "kind": "open"
+    },
+    "source": {
+     "dbs": [
+      "@lit.daily:$daily"
+     ],
+     "where": [
+      {
+       "on": "text",
+       "op": "contains",
+       "value": "운동"
+      }
+     ]
+    },
+    "do": [
+     {
+      "do": "goTo",
+      "page": "$workoutPage",
+      "carry": true
+     }
+    ]
+   }
+  }
+ ],
+ "pages": [
+  {
+   "id": "$workoutPage",
+   "name": "운동",
+   "widgets": [
+    {
+     "id": "w",
+     "title": "오늘 운동",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "checklist",
+       "view": {
+        "dbs": [
+         "@lit.daily:$daily"
+        ],
+        "period": "day",
+        "where": [
+         {
+          "on": "text",
+          "op": "contains",
+          "value": "운동"
+         }
+        ],
+        "show": [
+         "@lit.daily:$start",
+         "@lit.daily:$spent"
+        ]
+       }
+      },
+      {
+       "id": "p",
+       "kind": "timer",
+       "label": "휴식",
+       "steps": [
+        {
+         "name": "휴식",
+         "min": 2
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "세트 기록",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "form",
+       "props": [
+        "$kind",
+        "$weight",
+        "$reps",
+        "$rpe"
+       ],
+       "write": {
+        "dbs": [
+         "$sets"
+        ],
+        "values": {
+         "@lit.daily:$start": {
+          "now": true
+         }
+        }
+       },
+       "label": "세트"
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "오늘 세트",
+     "w": 4,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "table",
+       "view": {
+        "dbs": [
+         "$sets"
+        ],
+        "period": "day",
+        "show": [
+         "$kind",
+         "$weight",
+         "$prev",
+         "$reps",
+         "$rpe"
+        ],
+        "edit": [
+         "$weight",
+         "$reps",
+         "$rpe"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "종목",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "table",
+       "view": {
+        "dbs": [
+         "$exercises"
+        ],
+        "show": [
+         "$part",
+         "$best"
+        ],
+        "edit": [
+         "$part"
+        ],
+        "chips": [
+         "$part"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "w",
+     "title": "최근 30일 세트 수",
+     "w": 2,
+     "parts": [
+      {
+       "id": "p",
+       "kind": "chart",
+       "agg": "count",
+       "view": {
+        "dbs": [
+         "$sets"
+        ],
+        "period": "last30"
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

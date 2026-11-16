@@ -1,0 +1,78 @@
+{
+ "id": "lit.toomuch",
+ "version": 1,
+ "name": "무리한 날은 희망사항으로",
+ "requires": [
+  "lit.daily",
+  "lit.energy"
+ ],
+ "desc": "오늘 계획한 시간이 쓸 수 있는 시간을 넘는 순간, 필수가 아닌 일과를 희망사항으로 옮겨요. 희망사항은 하루 일과 템플릿의 조건부 모양(회색)으로 보여요. 규칙과 모양은 마음대로 바꿀 수 있어요.",
+ "records": [
+  {
+   "kind": "rule",
+   "ref": "$move",
+   "body": {
+    "name": "무리한 날은 필수가 아닌 일을 희망사항으로",
+    "on": {
+     "kind": "signal",
+     "signal": "@lit.energy:$plannedSig"
+    },
+    "source": {
+     "dbs": [
+      "@lit.daily:$daily"
+     ],
+     "where": [
+      {
+       "role": "day",
+       "op": "is",
+       "value": "@today"
+      },
+      {
+       "role": "done",
+       "op": "is",
+       "value": "@open"
+      },
+      {
+       "role": "fixed",
+       "op": "isNot",
+       "value": true
+      },
+      {
+       "prop": "@lit.daily:$cat",
+       "op": "isNot",
+       "value": "must"
+      }
+     ]
+    },
+    "do": [
+     {
+      "do": "set",
+      "values": {
+       "@lit.daily:$cat": {
+        "set": "want"
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "kind": "rule",
+   "ref": "$tell",
+   "body": {
+    "name": "무리한 날 알림",
+    "on": {
+     "kind": "signal",
+     "signal": "@lit.energy:$plannedSig"
+    },
+    "do": [
+     {
+      "do": "notify",
+      "text": "오늘 계획이 쓸 수 있는 시간을 넘었어요. 필수가 아닌 일은 희망사항으로 옮겼어요"
+     }
+    ]
+   }
+  }
+ ],
+ "pages": []
+}

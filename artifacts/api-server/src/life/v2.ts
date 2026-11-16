@@ -132,3 +132,20 @@ export async function installTemplate(owner: string, raw: unknown) {
   const saved = await putScreen(owner, next);
   return {screen: saved, created: out.records.length, reused: out.reused, pages: out.pages.map(p => p.id)};
 }
+
+// ── The old planner's records (v1 kinds). The user clears them from lit's settings when ready; tombstones keep history.
+const LEGACY = ['goal', 'project', 'task', 'routine', 'sleep', 'condition', 'review', 'session', 'persona', 'note', 'entry'] as const;
+export async function legacyCount(owner: string) {
+  let n = 0, cursor: string | undefined;
+  do { const page = await listRecords(owner, {kinds: [...LEGACY], limit: 1000, cursor}); n += page.items.length; cursor = page.nextCursor ?? undefined; } while (cursor);
+  return n;
+}
+export async function clearLegacy(owner: string) {
+  let n = 0;
+  for (;;) {
+    const page = await listRecords(owner, {kinds: [...LEGACY], limit: 500});
+    if (!page.items.length) break;
+    for (const r of page.items) { await deleteRecord(owner, r.id); n++; }
+  }
+  return {cleared: n};
+}

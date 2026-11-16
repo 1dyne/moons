@@ -107,6 +107,10 @@ function formula(ws: Workspace, item: Item, f: v2.Formula, depth: number): V {
       for (const x of prior) { const v = value(ws, x, f.of, depth); if (v !== null && v !== '') return v; }
       return null;
     }
+    case 'sameDay': {
+      const day = itemDay(ws, item);
+      return aggregate(ws, query(ws, {dbs: f.dbs, where: f.where}).filter(x => x.id !== item.id && itemDay(ws, x) === day), f.agg, f.of, depth);
+    }
     case 'ifThen': return matchesAll(ws, item, f.when, undefined, depth) ? f.then : f.else;
     case 'expr': return expr(f.expr, id => num(value(ws, item, id, depth)));
   }

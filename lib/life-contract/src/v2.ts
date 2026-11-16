@@ -53,6 +53,8 @@ export const Formula = z.discriminatedUnion('op', [
   z.object({op: z.literal('rollup'), via: recordId, back: z.boolean().default(false), of: recordId.nullable().default(null), agg: z.enum(AGGREGATES)}),
   // The value `of` had on the latest earlier item that shares this item's value of `match` (last time's weight).
   z.object({op: z.literal('latest'), of: recordId, match: recordId}),
+  // Gather the items of a source that land on the same day as this item (e.g. the fixed time of that day).
+  z.object({op: z.literal('sameDay'), dbs: z.array(recordId).max(10).default([]), where: z.array(Cond).max(8).default([]), of: recordId.nullable().default(null), agg: z.enum(AGGREGATES)}),
   z.object({op: z.literal('ifThen'), when: z.array(Cond).max(8), then: CellValue, else: CellValue.default(null)}),
   // For developers who want to write it: numbers, + − × ÷, parentheses and {property id}.
   z.object({op: z.literal('expr'), expr: z.string().max(500)}),

@@ -81,7 +81,7 @@ const taskOf = (logic: Logic) => logic.types.find(t => t.id === 'task')!;
 const SYS: Preset[] = [
   {id: 'today-tasks', group: 'new', name: '오늘 일정 (할 일 목록)', icon: 'check', desc: '할 일 DB의 체크 목록. 줄에 보일 속성과 ⋯에서 고칠 속성을 내가 골라요. 두 번 누르면 지워져요', make: logic => {
     const t = taskOf(logic), mine = t.fields.filter(f => !BUILTIN_FIELD_IDS.task!.includes(f.id)).map(f => f.id);
-    return {title: '오늘 일정', types: [], flows: [], options: opts('task', [B('checklist', {stateField: 'state', field: 'cat', fields: ['start', 'goal', ...mine.slice(0, 2)], detail: ['state', 'start', 'end', 'day', 'cat', 'goal', 'est', ...mine, 'reason'], conds: [{field: 'routine', op: 'empty', value: ''}], period: 'day', anim: '', tap: 'cycle', dbl: 'delete'})])};
+    return {title: '오늘 일정', types: [], flows: [], options: opts('task', [B('checklist', {stateField: 'state', field: 'cat', fields: ['start', 'goal', ...mine.slice(0, 2)], detail: ['state', 'start', 'end', 'day', 'cat', 'goal', 'est', ...mine, 'reason'], period: 'day', anim: '', tap: 'cycle', dbl: 'delete'})])};
   }},
   {id: 'wish-tasks', group: 'new', name: '희망사항 해금', icon: 'lock', desc: '오늘은 어려운 할 일을 희망사항으로 두고, 여는 조건(상황)이 되면 필수로 바뀌며 반짝여요. 규칙은 편집에서 바꿀 수 있어요', make: logic => {
     const t = taskOf(logic), has = t.fields.some(f => f.id === 'unlock');

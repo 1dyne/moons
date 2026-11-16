@@ -32,6 +32,7 @@ export const TASK_FIELDS: F[] = [
   f('reason', '못 한 이유', 'text'),
   f('hl', '형광펜', 'choice', {options: HL.map(([, n]) => n)}),
   f('fixed', '고정 일정', 'check'),
+  f('routine', '루틴에서 옴', 'check', {desc: '오늘의 루틴에서 고른 할 일 (읽기 전용)'}),
 ];
 export const GOAL_FIELDS: F[] = [
   f('title', '제목', 'text'),
@@ -77,12 +78,12 @@ const item = (r: Rec, type: string, fields: Record<string, unknown>, extra: Part
 
 /** A task record as an item of the 할 일 DB. */
 export function taskItem(r: AnyRecord): E {
-  const b = (r as Rec).body as {title: string; category: string | null; goalIds: string[]; highlight: string | null; props: Record<string, unknown>;
+  const b = (r as Rec).body as {routineId?: string | null; title: string; category: string | null; goalIds: string[]; highlight: string | null; props: Record<string, unknown>;
     plan: {start: {value: string; precision: string} | null; end: {value: string} | null; estimateMin: number | null; fixed: boolean}; outcome: {result: string; amount: number | null; reason: string | null; completedAt: string | null}};
   const timed = b.plan.start?.precision === 'minute';
   return item(r as Rec, 'task', {...b.props, title: b.title, day: r.logicalDay, state: name(STATE, b.outcome.result) || '할 일', cat: name(CAT, b.category), start: timed ? zonedClock(b.plan.start!.value) : '',
     end: timed && b.plan.end ? zonedClock(b.plan.end.value) : '', est: b.plan.estimateMin, amount: b.outcome.amount, goal: b.goalIds[0] ?? '', reason: b.outcome.reason,
-    hl: name(HL, b.highlight), fixed: b.plan.fixed || null},
+    hl: name(HL, b.highlight), fixed: b.plan.fixed || null, routine: b.routineId ? true : null},
   {verb: b.outcome.result === 'done' ? 'did' : 'planned', at: timed ? b.plan.start!.value : b.outcome.completedAt ?? r.createdAt, end: timed && b.plan.end ? b.plan.end.value : null,
     links: b.goalIds.map(to => ({rel: 'part_of' as const, to}))});
 }

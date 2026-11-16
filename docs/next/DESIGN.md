@@ -16,6 +16,16 @@
 
 탭 구성은 v9 그대로(기록 · 학습 · Space · 공유, 추가한 Satellite는 하단). 이후 장의 My Space 설계(3.5)는 이 표에 맞춰 다시 쓴다.
 
+
+### 정보는 쓰다 보면 저절로 쌓인다 (2026-11-16 확정)
+- moons는 사람이 쓰는 개인 DB이면서, **AI가 사용자를 이해하기 위해 읽는 지식 베이스**다. 같은 데이터를 둘 다 읽는다.
+- 사용자에게 한 번에 채우게 하지 않는다. 정보는 세 길로 들어온다.
+  1. **쓰는 동안 저절로**: 저장, 고침, 다시 보기, 테스트 결과, 걸린 시간, lit 생활 데이터, Satellite 기록
+  2. **사용자가 먼저 말할 때**: 일기·페이지·대화에 쓴 말("나 조건문 약한 것 같아", "다음 달 시험")을 moons가 목표·자기 믿음·조건으로 읽어 둔다. 외부 AI와 나눈 대화도 커넥터로 들어온다
+  3. **moons가 물을 때**: 꼭 필요한 순간에 한 가지만, 건너뛸 수 있게. 예: 같은 방식으로 세 번 틀렸을 때 "이번엔 어떻게 봤어?", 새 모행성이 생겼을 때 "목표가 있어?" 쓰기를 막지 않고, 같은 질문을 반복하지 않는다
+- 가장 좋은 건 1, 2다. 3은 1, 2로 알 수 없을 때만.
+- moons가 사용자에 대해 알게 된 것은 **사용자가 볼 수 있고 고치거나 반박할 수 있는 형태**로 둔다(열린 학습자 모델). AI 커넥터도 같은 내용을 읽는다.
+
 ## 0. 한 문장
 
 **moons는 한 사람이 아는 것·생각한 것을 쌓아 두는 개인 DB이고, 사람은 그 DB를 "요즘 내가 무슨 생각을 하고, 안다고 착각한 게 뭔지" 보는 화면으로, LLM은 같은 DB를 구조 그대로 읽는 자료로 쓴다.**
@@ -71,7 +81,13 @@
 └─────────────────────────┘
 ```
 - 면(Face)은 **글자** 또는 **손글씨**, 둘 다 섞어도 된다(5장).
-- 카드 종류: `basic`(앞/뒤) · `term`(단어: v8.1의 원형·품사·뜻·콜로케이션·주의점 칸) · `sentence`(한 줄, 뒷면 선택).
+- 카드 종류: `basic`(앞/뒤) · `term`(단어: v8.1의 원형·품사·뜻·콜로케이션·주의점 칸) · `sentence`(한 줄, 뒷면 선택) · `choice`(선택형 문제).
+- **선택형 카드** `choice` (2026-11-16 추가)
+  - 앞면: 문제 + 보기. 양자선택(O/X, 2지)부터 5지선다까지. 보기 순서 섞기는 선택.
+  - 뒷면: 정답 + 풀이. 보기마다 "왜 틀렸나" 한 줄을 달 수 있다(선택).
+  - 테스트에서 고른 보기를 그대로 기록한다. **어떤 오답 보기를 골랐는지**가 틀리는 방식의 흔적이 된다(예: 범위를 넓힌 보기를 반복해서 고름).
+  - 뒤집기 전 예측(알 것 같아 / 모르겠어)은 다른 카드와 같이 적용된다.
+  - 보기에도 형광펜·👁 규칙이 같이 적용된다.
 
 ### 2.2 형광펜
 - 기본 팔레트 6색(빨강·주황·노랑·초록·파랑·보라). 색의 의미는 사용자가 정한다. 원하면 설정에서 색마다 이름을 붙인다(예: 빨강 = 시제 단서). 이름은 선택이고, 비어 있으면 색만 보인다.
@@ -287,7 +303,8 @@ type ItemBase = { id: string; folderId: string | null;   // null = 아직 안 �
   source?: { itemId: string; start: number; end: number };  // 어디서 만들었나
   layer: Layer; createdAt: string; updatedAt: string; touchedAt: string };
 
-type Card = ItemBase & { type: 'card'; cardKind: 'basic' | 'term' | 'sentence';
+type Card = ItemBase & { type: 'card'; cardKind: 'basic' | 'term' | 'sentence' | 'choice';
+  choice?: { options: Face[]; answer: number[]; why?: (string | null)[]; shuffle?: boolean };   // 2~5개, 정답 여러 개 가능
   front: Face; back: Face; term?: { headword: string; pos?: string; meaningKo?: string; forms?: string[]; collocations?: string[]; pitfall?: string };
   srs: { box: 1 | 2 | 3 | 4 | 5; dueAt: string; illusion: number } };   // illusion = 연속 착각 해소 전까지 남은 횟수
 
@@ -307,7 +324,7 @@ type Link = { id: string; from: string; to: string; kind: 'dotted' | 'source' | 
 type Event = { seq: number; at: string; device: string;
   type: 'created' | 'updated' | 'moved' | 'archived' | 'deleted' | 'viewed' | 'reviewed' | 'locked' | 'update_added';
   itemId: string; before?: unknown; after?: unknown;           // updated: 바뀐 필드만 전/후
-  review?: { mode: 'test' | 'browse'; predicted?: 'know' | 'unsure'; result?: 'right' | 'wrong'; ms?: number } };
+  review?: { mode: 'test' | 'browse'; predicted?: 'know' | 'unsure'; result?: 'right' | 'wrong'; picked?: number[]; ms?: number } };
 
 type Settings = { eyeAll: boolean; markNames: Partial<Record<Color, string>>; tapeLegend: Partial<Record<Color, string>>;
   order: 'canvas' | 'created' | 'random'; testOrder: 'canvas' | 'created' | 'random' | 'due';

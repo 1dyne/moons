@@ -5,19 +5,20 @@ import {addDays, isoWeek, weekday, type AnyRecord, type LifeRecord, type v2} fro
 // computed value. It knows no template: every meaning comes from property roles and the user's own records.
 
 export type Prop = LifeRecord<'property'>; export type Db = LifeRecord<'database'>; export type Item = LifeRecord<'item'>;
-export type Lens = LifeRecord<'lens'>; export type Sig = LifeRecord<'signal'>; export type Rule = LifeRecord<'rule'>;
+export type Lens = LifeRecord<'lens'>; export type Sig = LifeRecord<'signal'>; export type Rule = LifeRecord<'rule'>; export type Screen = LifeRecord<'screen'>;
 export type Workspace = {
   properties: Map<string, Prop>; databases: Map<string, Db>; items: Map<string, Item>;
   lenses: Map<string, Lens>; signals: Map<string, Sig>; rules: Map<string, Rule>;
   /** role → the ids of properties that hold it (several databases may each have their own). */
   byRole: Map<v2.Role, string[]>;
+  screen: Screen | null;
 };
 /** The planner day and the moment the engine works in (the server passes the account's day boundary). */
-export type Ctx = {today: string; now: Date};
+export type Ctx = {today: string; now: Date; day?: string; carried?: string | null};
 
 const live = <T extends AnyRecord>(r: T) => !r.deletedAt;
 export function buildWorkspace(records: AnyRecord[]): Workspace {
-  const ws: Workspace = {properties: new Map(), databases: new Map(), items: new Map(), lenses: new Map(), signals: new Map(), rules: new Map(), byRole: new Map()};
+  const ws: Workspace = {properties: new Map(), databases: new Map(), items: new Map(), lenses: new Map(), signals: new Map(), rules: new Map(), byRole: new Map(), screen: null};
   for (const r of records) {
     if (!live(r)) continue;
     if (r.kind === 'property') ws.properties.set(r.id, r as Prop);
@@ -26,6 +27,7 @@ export function buildWorkspace(records: AnyRecord[]): Workspace {
     else if (r.kind === 'lens') ws.lenses.set(r.id, r as Lens);
     else if (r.kind === 'signal') ws.signals.set(r.id, r as Sig);
     else if (r.kind === 'rule') ws.rules.set(r.id, r as Rule);
+    else if (r.kind === 'screen' && (!ws.screen || r.updatedAt > ws.screen.updatedAt)) ws.screen = r as Screen;
   }
   for (const p of ws.properties.values()) if (p.body.role) ws.byRole.set(p.body.role, [...(ws.byRole.get(p.body.role) ?? []), p.id]);
   return ws;
@@ -183,6 +185,8 @@ export function resolveToken(v: V, ctx?: Ctx): V {
   if (v === '@tomorrow') return addDays(ctx.today, 1);
   if (v === '@weekday') return String(weekday(ctx.today));
   if (v === '@now') return ctx.now.toISOString();
+  if (v === '@day') return ctx.day ?? ctx.today;
+  if (v === '@carried') return ctx.carried ?? '';
   return v;
 }
 const lower = (v: V) => typeof v === 'string' ? v.toLowerCase() : v;

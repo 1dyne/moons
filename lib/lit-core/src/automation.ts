@@ -92,6 +92,10 @@ export function onMoment(ws: Workspace, moment: {kind: 'dayStart'} | {kind: 'tim
   return [...ws.rules.values()].filter(r => r.body.enabled && r.body.on.kind === moment.kind && (moment.kind !== 'time' || r.body.on.at === moment.at))
     .flatMap(r => runOver(ws, r.id, ctx)).filter(nonEmpty);
 }
+/** The user opened an item on the screen: open rules that cover it give their screen actions (go to a page…). */
+export function onOpen(ws: Workspace, item: Item, ctx: Ctx): Effect[] {
+  return [...ws.rules.values()].filter(r => r.body.enabled && r.body.on.kind === 'open' && ruleHolds(ws, r, item, ctx)).flatMap(r => planRule(ws, r.id, item, ctx).effects);
+}
 /** What a rule would do right now to the items it covers — shown before turning it on, and as suggestions. */
 export function preview(ws: Workspace, ruleId: string, ctx: Ctx): Plan[] {
   const r = ws.rules.get(ruleId);

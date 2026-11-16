@@ -5,7 +5,7 @@ import {guest} from '../moons/lib/server/v5/workspace-store.ts';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 import {limited} from '../moons/lib/server/http.ts';
 import {getSettings, recordHistory} from './store.ts';
-import {acceptSuggestion, ctxOf, deleteV2, listSuggestions, loadWorkspace, mergeProperties, previewRule, runMoment, saveV2, suggestDatabase, understand} from './v2.ts';
+import {acceptSuggestion, getScreen, installTemplate, putScreen, ctxOf, deleteV2, listSuggestions, loadWorkspace, mergeProperties, previewRule, runMoment, saveV2, suggestDatabase, understand} from './v2.ts';
 
 // /api/life/v2 — lit v2 (docs/lit/V2_DESIGN.md §2). Same session and store as v1; v1 keeps serving the old planner.
 export function lifeV2Router(checkOrigin: (req: Request) => void) {
@@ -59,6 +59,9 @@ export function lifeV2Router(checkOrigin: (req: Request) => void) {
   router.post('/suggestions/accept', route(async (req, _res, owner) => acceptSuggestion(owner, String(req.body?.rule ?? ''), String(req.body?.item ?? ''))));
   router.get('/signals/:id', route(async (req, _res, owner) => evalSignal(await loadWorkspace(owner), String(req.params.id), await ctxOf(owner))));
 
+  router.get('/screen', route(async (_req, _res, owner) => ({screen: await getScreen(owner)})));
+  router.put('/screen', route(async (req, _res, owner) => ({screen: await putScreen(owner, req.body?.body, typeof req.body?.baseRevision === 'number' ? req.body.baseRevision : undefined)})));
+  router.post('/templates/install', route(async (req, res, owner) => { res.status(201); return installTemplate(owner, req.body?.template); }));
   router.get('/tidy', route(async (_req, _res, owner) => tidyReport(await loadWorkspace(owner))));
   router.post('/properties/merge', route(async (req, _res, owner) => mergeProperties(owner, String(req.body?.from ?? ''), String(req.body?.into ?? ''))));
   router.post('/infer', route(async (req, _res, owner) => suggestDatabase(owner, Array.isArray(req.body?.items) ? req.body.items.map(String).slice(0, 500) : [])));

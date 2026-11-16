@@ -1,0 +1,11 @@
+{
+  "name": "lit",
+  "short_name": "lit",
+  "description": "문법으로 직접 짓는 자동화 플래너",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#e6e6e1",
+  "theme_color": "#e6e6e1",
+  "icons": [{"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]
+}

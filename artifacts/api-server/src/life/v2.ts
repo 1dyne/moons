@@ -1,5 +1,5 @@
-import {logicalDay, v2, type AnyRecord} from '@workspace/life-contract';
-import {applyValues, buildWorkspace, inferDatabase, mergeProperty, onItemWrite, onMoment, parseCapture, preview, roleValue, suggestions, withItem, type Ctx, type Effect, type Item, type Plan, type Workspace, type Write} from '@workspace/lit-core';
+import {logicalDay, ulid, v2, type AnyRecord} from '@workspace/life-contract';
+import {applyValues, buildWorkspace, instantiate, missingRequirements, inferDatabase, mergeProperty, onItemWrite, onMoment, parseCapture, preview, roleValue, suggestions, withItem, type Ctx, type Effect, type Item, type Plan, type Workspace, type Write} from '@workspace/lit-core';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 import {deleteRecord, getSettings, listRecords, writeRecordOnly} from './store.ts';
 
@@ -105,3 +105,30 @@ export async function mergeProperties(owner: string, from: string, into: string)
 }
 export async function suggestDatabase(owner: string, items: string[]) { return inferDatabase(await loadWorkspace(owner), items); }
 export async function understand(owner: string, line: string) { return parseCapture(await loadWorkspace(owner), line); }
+
+// ── Screen: one record; each save is a revision (the versions). ───────────────────────────────────
+export const localId = () => Math.random().toString(36).slice(2, 10);
+const EMPTY = () => v2.ScreenBody.parse({pages: [{id: localId(), name: '홈', widgets: []}]});
+export async function getScreen(owner: string) {
+  const ws = await loadWorkspace(owner);
+  return ws.screen ?? (await saveV2(owner, null, {kind: 'screen', body: EMPTY()}, {ws})).record;
+}
+export async function putScreen(owner: string, body: unknown, baseRevision?: number) {
+  const cur = await getScreen(owner);
+  return (await saveV2(owner, cur.id, {kind: 'screen', body, baseRevision})).record;
+}
+/** Install a template: its records (validated before anything is written) and its pages, appended to the screen. */
+export async function installTemplate(owner: string, raw: unknown) {
+  const screen = await getScreen(owner), ws = await loadWorkspace(owner);
+  const t = v2.Template.safeParse(raw);
+  if (!t.success) throw new WorkspaceError(400, 'Invalid template.');
+  const missing = missingRequirements(ws, t.data);
+  if (missing.length) throw new WorkspaceError(409, `먼저 설치할 템플릿: ${missing.join(', ')}`);
+  let out;
+  try { out = instantiate(ws, t.data, () => ulid(), localId); } catch (e) { throw new WorkspaceError(400, (e as Error).message); }
+  for (const r of out.records) await writeRecordOnly(owner, null, {kind: r.kind, id: r.id, logicalDay: r.kind === 'item' ? (await ctxOf(owner)).today : null, body: r.body, source: {type: 'kit', ref: `template:${t.data.id}`, confirmed: true}});
+  const body = screen.body as v2.ScreenBody;
+  const next = {...body, pages: [...body.pages, ...out.pages], installed: {...body.installed, [t.data.id]: Object.fromEntries(Object.entries(out.refs).filter(([k]) => t.data.records.some(r => r.ref === k)))}};
+  const saved = await putScreen(owner, next);
+  return {screen: saved, created: out.records.length, reused: out.reused, pages: out.pages.map(p => p.id)};
+}

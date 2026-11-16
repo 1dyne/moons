@@ -30,7 +30,8 @@ export type CellValue = z.infer<typeof CellValue>;
 export const OPS = ['is', 'isNot', 'lt', 'lte', 'gt', 'gte', 'contains', 'empty', 'filled'] as const;
 export type Op = (typeof OPS)[number];
 /** A condition on one property, or on whatever property holds a role (then it matches across every database).
- * Values may be tokens: @today @yesterday @tomorrow @thisWeek @weekday · @done @open @skip · @none (no database). */
+ * Values may be tokens: @today @yesterday @tomorrow @thisWeek @weekday @day (the day shown) · @done @open @skip ·
+ * @none (no database) · @carried (the item brought along by a go-to). */
 export const Cond = z.object({
   prop: recordId.optional(),
   role: z.enum(ROLES).optional(),
@@ -80,7 +81,8 @@ export const DatabaseBody = z.object({
   properties: z.array(recordId).max(60).default([]),
   // Time between start and end counts as focus.
   focus: z.boolean().default(false),
-  from: z.object({template: z.string().max(80), version: z.number().int().min(1)}).nullable().default(null),
+  // Installed from a template: which one, and which of its databases (so other templates can find it).
+  from: z.object({template: z.string().max(80), ref: z.string().max(40).default(''), version: z.number().int().min(1).default(1)}).nullable().default(null),
 });
 export type DatabaseBody = z.infer<typeof DatabaseBody>;
 
@@ -136,15 +138,87 @@ export const RuleBody = z.object({
   enabled: z.boolean().default(true),
   mode: z.enum(['auto', 'suggest']).default('auto'),
   // enter: an item comes to match the source · change: an item in the source is added or changed ·
-  // signal: a signal becomes true · dayStart: a new planner day opens · time: a clock time.
-  on: z.object({kind: z.enum(['enter', 'change', 'signal', 'dayStart', 'time']), signal: recordId.nullable().default(null), at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('22:00')}),
+  // signal: a signal becomes true · dayStart: a new planner day opens · time: a clock time ·
+  // open: the user opens an item on the screen (only screen actions run: goTo, openForm, notify, effect).
+  on: z.object({kind: z.enum(['enter', 'change', 'signal', 'dayStart', 'time', 'open']), signal: recordId.nullable().default(null), at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('22:00')}),
   source: Source.default({}),
   if: z.array(Cond).max(8).default([]),
   do: z.array(Action).min(1).max(8),
 });
 export type RuleBody = z.infer<typeof RuleBody>;
 
-export const V2_BODIES = {property: PropertyBody, database: DatabaseBody, item: ItemBody, lens: LensBody, signal: SignalBody, rule: RuleBody} as const;
+// ── Screen (one record per user, its revisions are the versions) ───────────────────────────────────
+export const PART_KINDS = ['capture', 'checklist', 'list', 'table', 'gallery', 'calendar', 'timegrid', 'metric', 'chart', 'breakdown', 'form', 'timestamp', 'timer', 'rating', 'counter', 'cards', 'heading'] as const;
+export type PartKind = (typeof PART_KINDS)[number];
+/** How a matching item looks (conditional style). */
+export const LOOKS = ['gray', 'faded', 'strike', 'hidden', 'color', 'bold', 'bottom'] as const;
+const localId = z.string().regex(/^[a-z0-9]{1,16}$/);
+export const View = Source.extend({
+  chips: z.array(recordId).max(6).default([]),        // filter chips the viewer toggles on the screen
+  sort: z.array(z.object({prop: recordId, dir: z.enum(['asc', 'desc'])})).max(3).default([]),
+  group: recordId.nullable().default(null),
+  show: z.array(recordId).max(12).default([]),         // shown on each line
+  edit: z.array(recordId).max(20).default([]),         // editable from the line's menu
+  styles: z.array(z.object({when: z.array(Cond).max(6), look: z.enum(LOOKS), color: z.string().max(20).default('')})).max(8).default([]),
+  period: z.enum(['', 'day', ...PERIODS]).default(''), // '' = every day · 'day' = the day shown on the page (today unless moved)
+  limit: z.number().int().min(1).max(500).default(100),
+});
+export type View = z.infer<typeof View>;
+export const Part = z.object({
+  id: localId,
+  kind: z.enum(PART_KINDS),
+  label: z.string().max(80).default(''),
+  view: View.default({}),
+  // Where an input part writes: databases, and which property gets the time (start/end) or the number.
+  write: z.object({dbs: z.array(recordId).max(10).default([]), prop: recordId.nullable().default(null), values: z.record(recordId, ValueExpr).default({})}).default({}),
+  props: z.array(recordId).max(20).default([]),       // form fields
+  agg: z.enum(AGGREGATES).default('count'),
+  of: recordId.nullable().default(null),
+  signal: recordId.nullable().default(null),          // metric: show a signal; cards: the property holding each item's signal
+  show: z.enum(['number', 'bar', 'ring', 'light']).default('number'),
+  target: z.number().finite().nullable().default(null),
+  green: z.number().finite().nullable().default(null), red: z.number().finite().nullable().default(null),
+  steps: z.array(z.object({name: z.string().max(30), min: z.number().int().min(1).max(600)})).max(6).default([]),
+  loop: z.number().int().min(1).max(20).default(1),
+  max: z.number().int().min(2).max(10).default(10),
+  startHour: z.number().int().min(0).max(23).default(6),
+  text: z.string().max(400).default(''),
+});
+export type Part = z.infer<typeof Part>;
+export const Widget = z.object({
+  id: localId,
+  title: z.string().max(60).default(''),
+  w: z.number().int().min(1).max(4).default(2),          // columns out of 4
+  parts: z.array(Part).max(12).default([]),
+  style: z.enum(['card', 'line', 'plain', 'filled']).default('card'),
+  accent: z.string().max(20).default(''),
+  folded: z.boolean().default(false),
+});
+export type Widget = z.infer<typeof Widget>;
+export const Page = z.object({id: localId, name: z.string().trim().min(1).max(30), widgets: z.array(Widget).max(40).default([])});
+export type Page = z.infer<typeof Page>;
+export const Skin = z.object({
+  accent: z.string().max(20).default('#3a66b8'), background: z.string().max(20).default('#f4f3ef'), surface: z.string().max(20).default('#ffffff'),
+  ink: z.string().max(20).default('#25272a'), font: z.string().max(40).default('pretendard'), radius: z.number().int().min(0).max(24).default(10),
+});
+export const ScreenBody = z.object({pages: z.array(Page).max(20).default([]), skin: Skin.default({}),
+  // Which records each installed template made (template id → its ref → record id), so later templates can use them.
+  installed: z.record(z.string(), z.record(z.string(), z.string())).default({})});
+export type ScreenBody = z.infer<typeof ScreenBody>;
+
+// ── Template: records + pages as data. Refs ("$name") become new ids when installed; "@template:$name" finds a
+// database another installed template made. Nothing in lit's code knows any template.
+export const TemplateRecord = z.object({kind: z.enum(['property', 'database', 'item', 'lens', 'signal', 'rule']), ref: z.string().regex(/^\$[a-zA-Z0-9_]{1,30}$/), body: z.unknown()});
+export const Template = z.object({
+  id: z.string().regex(/^[a-z0-9.-]{1,60}$/), version: z.number().int().min(1).default(1),
+  name: z.string().max(60), desc: z.string().max(600).default(''),
+  requires: z.array(z.string().max(60)).max(10).default([]),
+  records: z.array(TemplateRecord).max(300).default([]),
+  pages: z.array(z.unknown()).max(10).default([]),
+});
+export type Template = z.infer<typeof Template>;
+
+export const V2_BODIES = {property: PropertyBody, database: DatabaseBody, item: ItemBody, lens: LensBody, signal: SignalBody, rule: RuleBody, screen: ScreenBody} as const;
 export type V2Kind = keyof typeof V2_BODIES;
 export const V2_KINDS = Object.keys(V2_BODIES) as V2Kind[];
 export const isV2Kind = (k: string): k is V2Kind => (V2_KINDS as string[]).includes(k);

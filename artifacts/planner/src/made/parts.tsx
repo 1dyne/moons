@@ -33,6 +33,8 @@ export const signalOf = (v: unknown) => { if (typeof v !== 'string') return null
 export function useDoubleTap(on: (id: string) => void) {
   const last = useRef<{id: string; t: number} | null>(null);
   return (id: string) => (e: React.PointerEvent) => {
+    // Taps on an item belong to the item: the widget's own "두 번 누르면 설정" must not count them too.
+    e.stopPropagation();
     if ((e.target as HTMLElement).closest('button,input,select,textarea,a,label')) return;
     const now = Date.now();
     if (last.current?.id === id && now - last.current.t < 380) { last.current = null; on(id); } else last.current = {id, t: now};

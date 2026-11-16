@@ -237,7 +237,7 @@ function WidgetBody({w, ctx, spec, settings, today, endHour}: {w: Widget; ctx: C
     case 'hourly': return <HourlyDay ctx={ctx} startHour={start} endHour={endHour} />;
     case 'bullet': return <BulletDay ctx={ctx} />;
     case 'page': return <OnePageDay key={day} ctx={ctx} startHour={start} endHour={endHour} />;
-    case 'checkin': return <CheckIn m={asModule(w, 'checkin')} p={p} day={day} now={ctx.now} />;
+    case 'checkin': return <CheckIn m={asModule(w, 'checkin')} p={p} day={day} now={ctx.now} today={today} boundary={Number(settings.dayBoundary.slice(0, 2)) || 4} />;
     case 'carry': return (day === today ? <CarryOver ctx={ctx} /> : null) ?? <Tip id="carry-empty" block>어제 못 끝낸 일이 없어요.</Tip>;
     case 'routine': return <Routines m={asModule(w, 'routine')} ctx={ctx} />;
     case 'habits': return ofKind(p.records, 'routine').some(r => r.body.active) ? <HabitGrid p={p} month={day.slice(0, 7)} today={today} /> : <Tip id="habits-empty" block>루틴을 추가하면 한 달 칸이 그려져요.</Tip>;

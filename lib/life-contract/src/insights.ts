@@ -53,20 +53,33 @@ export function dayCondition(records: AnyRecord[], day: string) {
   return {wake: pick('wake'), focus, evening: pick('evening'), score: parts.length ? round(parts.reduce((a, b) => a + b, 0) / parts.length) : null, samples: parts.length};
 }
 
-/** A realistic day: hours awake minus fixed appointments, scaled by the waking energy (1–10). */
-export function capacity(records: AnyRecord[], day: string, opts: {wake: string; sleep: string; energy: number | null}) {
+/** A realistic day: hours awake minus fixed appointments, scaled by the waking energy (1–10).
+ *  With `window` (the day's waking and bedtime instants, and now) it counts from now: only the time still ahead,
+ *  the appointments still ahead, and the work still left on open tasks (estimate minus focus already done). */
+export function capacity(records: AnyRecord[], day: string, opts: {wake: string; sleep: string; energy: number | null; window?: {wakeAt: number; sleepAt: number; now: number}}) {
   const [wh, wm] = opts.wake.split(':').map(Number), [sh, sm] = opts.sleep.split(':').map(Number);
   let awake = (sh! * 60 + sm!) - (wh! * 60 + wm!); if (awake <= 0) awake += 1440;
   const tasks = of(records, 'task').filter(t => t.logicalDay === day && t.body.plan.state !== 'dropped' && !['cancelled', 'postponed'].includes(t.body.outcome.result));
   const fixed = tasks.filter(t => t.body.plan.fixed);
-  const fixedMin = fixed.reduce((sum, t) => sum + (t.body.plan.start?.precision === 'minute' && t.body.plan.end?.precision === 'minute' ? mins(t.body.plan.start.value, t.body.plan.end.value) : t.body.plan.estimateMin ?? 0), 0);
-  const free = Math.max(0, awake - fixedMin);
+  const timedFixed = (t: LifeRecord<'task'>) => t.body.plan.start?.precision === 'minute' && t.body.plan.end?.precision === 'minute';
+  const w = opts.window, from = w ? Math.min(Math.max(w.now, w.wakeAt), w.sleepAt) : 0;
+  const ahead = w ? Math.max(0, Math.round((w.sleepAt - from) / 60000)) : awake;
+  // Appointments: the part of each still ahead (a finished or untimed one counts by its estimate until it is done).
+  const fixedMin = fixed.reduce((sum, t) => {
+    if (timedFixed(t)) { const a = Date.parse(t.body.plan.start!.value), b = Date.parse(t.body.plan.end!.value);
+      return sum + (w ? Math.max(0, Math.min(b, w.sleepAt) - Math.max(a, from)) / 60000 : mins(t.body.plan.start!.value, t.body.plan.end!.value)); }
+    return sum + (w && t.body.outcome.result === 'done' ? 0 : t.body.plan.estimateMin ?? 0);
+  }, 0);
+  const free = Math.max(0, ahead - fixedMin);
   // Even at full energy a day holds about 70% focused work; at 1/10 about a quarter.
   const factor = opts.energy === null ? .5 : .2 + opts.energy * .05;
   const realistic = Math.round(free * factor);
   const open = tasks.filter(t => !t.body.plan.fixed && t.body.outcome.result !== 'done');
-  const planned = open.reduce((sum, t) => sum + (t.body.plan.estimateMin ?? 0), 0);
-  return {awake, fixedMin: Math.round(fixedMin), free: Math.round(free), factor, realistic, planned, unestimated: open.filter(t => !t.body.plan.estimateMin).length, over: Math.max(0, planned - realistic)};
+  const at = w ? new Date(w.now) : new Date();
+  const left = (t: LifeRecord<'task'>) => Math.max(0, (t.body.plan.estimateMin ?? 0) - (w ? actualMin(records, t.id, at) : 0));
+  const planned = Math.round(open.reduce((sum, t) => sum + left(t), 0));
+  return {awake, ahead, passed: w ? Math.max(0, Math.round((from - w.wakeAt) / 60000)) : 0, fixedMin: Math.round(fixedMin), free: Math.round(free), factor, realistic, planned,
+    unestimated: open.filter(t => !t.body.plan.estimateMin).length, over: Math.max(0, planned - realistic), ended: !!w && w.now >= w.sleepAt};
 }
 
 /** Minutes actually focused on a task (closed sessions, plus a running one up to `at`). */

@@ -34,6 +34,9 @@
     },
     {
       "path": "../../lib/planner-spec"
+    },
+    {
+      "path": "../../lib/lit-core"
     }
   ]
 }

@@ -12,6 +12,7 @@ import {clerkEnabled,clerkProxyEnabled} from "./moons/lib/server/product-config"
 import {serveWeb} from "./web";
 import {mcpRouter} from "./moons/mcp-router";
 import {lifeRouter} from "./life/router";
+import {lifeV2Router} from "./life/v2router";
 import {checkOrigin} from "./moons/workspace-router";
 
 const app: Express = express();
@@ -48,6 +49,7 @@ app.get("/api/version",(_req,res)=>res.set("Cache-Control","no-store").json({com
 app.use(mcpRouter());
 // Life data hub: the planner Satellite's store and the read API for 모의 우주·에너지긴축모드.
 app.use("/api/life/v1", lifeRouter(checkOrigin));
+app.use("/api/life/v2", lifeV2Router(checkOrigin));
 app.use("/api", workspaceRouter);
 app.use("/api", productRouter);
 app.use(express.json());

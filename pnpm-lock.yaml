@@ -187,6 +187,9 @@ importers:
       '@workspace/life-contract':
         specifier: workspace:*
         version: link:../../lib/life-contract
+      '@workspace/lit-core':
+        specifier: workspace:*
+        version: link:../../lib/lit-core
       '@workspace/moons-sync':
         specifier: workspace:*
         version: link:../../lib/moons-sync
@@ -569,6 +572,19 @@ importers:
 
   lib/life-contract:
     dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.6
+
+  lib/lit-core:
+    dependencies:
+      '@workspace/life-contract':
+        specifier: workspace:*
+        version: link:../life-contract
       zod:
         specifier: 'catalog:'
         version: 3.25.76

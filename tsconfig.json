@@ -23,6 +23,9 @@
     },
     {
       "path": "./lib/lit-widget-sdk"
+    },
+    {
+      "path": "./lib/lit-core"
     }
   ]
 }

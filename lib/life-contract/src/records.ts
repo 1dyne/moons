@@ -1,3 +1,4 @@
+import {V2_BODIES} from './v2.ts';
 import {z} from 'zod';
 
 // Life data contract v0 (docs/LIFE_DATA_CONTRACT_v0.md). The hub stores these; consumers read them.
@@ -196,7 +197,7 @@ export const EntryBody = z.object({
 }).refine(e => !e.end || e.end >= e.at, {message: 'An entry must end after it starts.'});
 export type Entry = z.infer<typeof EntryBody>;
 
-export const BODIES = {goal: GoalBody, project: ProjectBody, task: TaskBody, routine: RoutineBody, sleep: SleepBody, condition: ConditionBody, review: ReviewBody, session: SessionBody, persona: PersonaBody, note: NoteBody, entry: EntryBody} as const;
+export const BODIES = {...V2_BODIES, goal: GoalBody, project: ProjectBody, task: TaskBody, routine: RoutineBody, sleep: SleepBody, condition: ConditionBody, review: ReviewBody, session: SessionBody, persona: PersonaBody, note: NoteBody, entry: EntryBody} as const;
 export type Kind = keyof typeof BODIES;
 export const KINDS = Object.keys(BODIES) as Kind[];
 export type Bodies = {[K in Kind]: z.infer<(typeof BODIES)[K]>};
@@ -247,8 +248,10 @@ export const ALL_SCOPES: Scope[] = ['life.read.plan', 'life.read.outcome', 'life
 /** Drops what a grant does not cover: kinds out of scope, outcome without outcome scope, private fields always. */
 export function shareable(record: AnyRecord, scopes: Scope[]): AnyRecord | null {
   const has = (s: Scope) => scopes.includes(s);
-  const need: Record<Kind, Scope> = {goal: 'life.read.plan', project: 'life.read.plan', task: 'life.read.plan', routine: 'life.read.plan', sleep: 'life.read.condition', condition: 'life.read.condition', review: 'life.read.review', entry: 'life.read.outcome', session: 'life.read.outcome', persona: 'life.read.plan', note: 'life.read.review'};
-  if (!has(need[record.kind])) return null;
+  // v2 records are not shared with other products yet (V2_DESIGN §8: connections are rebuilt after lit).
+  const need: Partial<Record<Kind, Scope>> = {goal: 'life.read.plan', project: 'life.read.plan', task: 'life.read.plan', routine: 'life.read.plan', sleep: 'life.read.condition', condition: 'life.read.condition', review: 'life.read.review', entry: 'life.read.outcome', session: 'life.read.outcome', persona: 'life.read.plan', note: 'life.read.review'};
+  const scope = need[record.kind];
+  if (!scope || !has(scope)) return null;
   const copy = structuredClone(record) as AnyRecord;
   delete copy.ext;
   const body = copy.body as Record<string, unknown>;

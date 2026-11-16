@@ -2,7 +2,7 @@ import {z} from 'zod';
 import './autolog.ts';
 import './flows.ts';
 import {LINK_RELS, VERBS, ALL_SCOPES, Availability, addDays, availableOn, buildNow, dayCondition, estimateAccuracy, goalPercent, goalSchedule, logicalDay, periodSummary, personaShare, weeklyFocus, type AnyRecord, type LifeRecord} from '@workspace/life-contract';
-import {Mode, AGGS, Action, EFFECTS, Launch, SIGNALS, BUILTIN_FIELD_IDS, SYSTEM_TYPE_IDS, isSystemType, propOfField, systemTypes, MadePack, installPack, packCode, packOf, BLOCK_KINDS, Design, FIELD_KINDS, Flow, LOGIC_BLOCKS, Logic, LogicBlock, MadeOptions, PERIODS, TypeDef, VERB_NAMES, durationMin, entriesOf, flowSentence, newLogicId, type Widget, BLOCKS, PERMISSIONS, isCode, BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
+import {GRAMMAR, RULE_TRIGGERS, RULE_ACTIONS, Mode, AGGS, Action, EFFECTS, Launch, SIGNALS, BUILTIN_FIELD_IDS, SYSTEM_TYPE_IDS, isSystemType, propOfField, systemTypes, MadePack, installPack, packCode, packOf, BLOCK_KINDS, Design, FIELD_KINDS, Flow, LOGIC_BLOCKS, Logic, LogicBlock, MadeOptions, PERIODS, TypeDef, VERB_NAMES, durationMin, entriesOf, flowSentence, newLogicId, type Widget, BLOCKS, PERMISSIONS, isCode, BUILTIN_TABS, FONTS, GAUGES, PALETTE, PROP_TYPES, SKIN_PRESETS, WIDGETS, WIDGET_LABELS, buildSpec, newPropId, normalizeWidgets, tabsOf, toFree, uses, type PlannerSpec, type PropDef} from '@workspace/planner-spec';
 import {WorkspaceError} from '../moons/lib/server/v5/types.ts';
 import {listLibrary, saveLibrary} from './library.ts';
 import {allRecords, deleteRecord, getSettings, getSpec, lastActivity, putAvailability, putSettings, saveSpec, writeRecord} from './store.ts';
@@ -382,7 +382,7 @@ export function registerPlannerTools(tool: Tool) {
     const logic = logicOf((await getSpec(owner))?.spec as PlannerSpec | undefined);
     const spec = (await getSpec(owner))?.spec as PlannerSpec | undefined, all = [...systemTypes(spec?.props?.task ?? []), ...logic.types];
     return {types: all, systemTypes: SYSTEM_TYPE_IDS, flows: logic.flows.map(f => ({id: f.id, enabled: f.enabled, sentence: flowSentence(f, all), flow: f})),
-      verbs: VERB_NAMES, fieldKinds: FIELD_KINDS, blocks: LOGIC_BLOCKS.map(b => ({kind: b.kind, group: b.group, name: b.name, desc: b.desc})), aggregates: AGGS, periods: PERIODS,
+      verbs: VERB_NAMES, fieldKinds: FIELD_KINDS, grammar: GRAMMAR, blocks: LOGIC_BLOCKS.map(b => ({kind: b.kind, en: b.en, group: b.group, name: b.name, desc: b.desc})), ruleTriggers: RULE_TRIGGERS, ruleActions: RULE_ACTIONS, aggregates: AGGS, periods: PERIODS,
       signals: SIGNALS, effects: EFFECTS};
   });
 

@@ -4,16 +4,16 @@ import {AGGS, type Agg} from './agg.ts';
 // 상황 (docs/lit/BLOCKS.md §4): things about the user's day that lit computes from every record — focus time, tasks,
 // goals, the mission, energy, any DB. A wish opens when its 상황 is met; an automation can start or check on one.
 export const SIGNALS = [
-  {kind: 'focus', name: '오늘 순집중', unit: '시간', needs: 'n'},
-  {kind: 'tasksAll', name: '오늘 할 일 다 끝내기', unit: '', needs: ''},
-  {kind: 'tasksBy', name: '오늘 할 일을 정한 시각 전에 다 끝내기', unit: '', needs: 'at'},
-  {kind: 'tasksDone', name: '오늘 끝낸 할 일', unit: '개', needs: 'n'},
-  {kind: 'mission', name: '오늘의 미션 달성 (순집중 목표 또는 할 일 전부)', unit: '시간', needs: 'n'},
-  {kind: 'goal', name: '목표 진행률', unit: '%', needs: 'goal n'},
-  {kind: 'goalDone', name: '목표 이루기', unit: '', needs: 'goal'},
-  {kind: 'energyHigh', name: '에너지가 이만큼 이상', unit: '점', needs: 'n'},
-  {kind: 'energyLow', name: '에너지가 이만큼 이하', unit: '점', needs: 'n'},
-  {kind: 'db', name: 'DB 합계', unit: '', needs: 'db'},
+  {kind: 'focus', en: 'Focus time', name: '오늘 순집중', unit: '시간', needs: 'n'},
+  {kind: 'tasksAll', en: 'All tasks done', name: '오늘 할 일 다 끝내기', unit: '', needs: ''},
+  {kind: 'tasksBy', en: 'All tasks done by', name: '오늘 할 일을 정한 시각 전에 다 끝내기', unit: '', needs: 'at'},
+  {kind: 'tasksDone', en: 'Tasks done', name: '오늘 끝낸 할 일', unit: '개', needs: 'n'},
+  {kind: 'mission', en: 'Daily mission', name: '오늘의 미션 달성 (순집중 목표 또는 할 일 전부)', unit: '시간', needs: 'n'},
+  {kind: 'goal', en: 'Goal progress', name: '목표 진행률', unit: '%', needs: 'goal n'},
+  {kind: 'goalDone', en: 'Goal achieved', name: '목표 이루기', unit: '', needs: 'goal'},
+  {kind: 'energyHigh', en: 'Energy at or above', name: '에너지가 이만큼 이상', unit: '점', needs: 'n'},
+  {kind: 'energyLow', en: 'Energy at or below', name: '에너지가 이만큼 이하', unit: '점', needs: 'n'},
+  {kind: 'db', en: 'DB total', name: 'DB 합계', unit: '', needs: 'db'},
 ] as const;
 export type SignalKind = (typeof SIGNALS)[number]['kind'];
 export const Signal = z.object({

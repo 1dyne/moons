@@ -180,7 +180,7 @@ function BlocksPanel({blocks, type, setType, onChange}: {blocks: LogicBlock[]; t
       {open === b.id && <BlockConfig b={b} type={type} setType={setType} set={p => set(b.id, p)} />}
     </li>)}</ol>
     {palette ? <div className="palette">{(Object.keys(BLOCK_GROUPS) as (keyof typeof BLOCK_GROUPS)[]).map(g => <div key={g}><h4 className="sp-h">{BLOCK_GROUPS[g]}</h4>
-      <div className="palette-row">{LOGIC_BLOCKS.filter(x => x.group === g).map(x => <button key={x.kind} className="palette-item" onClick={() => add(x.kind)}><b>{x.name}</b><span>{x.desc}</span></button>)}</div></div>)}
+      <div className="palette-row">{LOGIC_BLOCKS.filter(x => x.group === g).map(x => <button key={x.kind} className="palette-item" onClick={() => add(x.kind)}><b>{x.name} <span className="muted small" lang="en">{x.en}</span></b><span>{x.desc}</span></button>)}</div></div>)}
       {blocks.length > 0 && <button className="ghost small" onClick={() => setPalette(false)}>닫기</button>}</div>
       : <button className="small" onClick={() => setPalette(true)}>+ 부품</button>}
   </div>;

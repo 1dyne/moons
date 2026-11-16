@@ -7,11 +7,11 @@ import {VERBS, type AnyRecord, type Entry, type LifeRecord, type Verb} from '@wo
 
 // ── Types: the user's own collections (수면, 집중, 기분…) ────────────────────────────────────────────
 export const FIELD_KINDS = [
-  {id: 'number', name: '숫자'}, {id: 'score', name: '점수'}, {id: 'text', name: '짧은 글'}, {id: 'longtext', name: '긴 글'},
-  {id: 'choice', name: '선택'}, {id: 'multi', name: '여러 개 선택'}, {id: 'check', name: '체크'}, {id: 'date', name: '날짜'},
-  {id: 'time', name: '시각'}, {id: 'duration', name: '걸린 시간(분)'}, {id: 'link', name: '연결'},
+  {id: 'number', en: 'Number', name: '숫자'}, {id: 'score', en: 'Rating', name: '점수'}, {id: 'text', en: 'Text', name: '짧은 글'}, {id: 'longtext', en: 'Long text', name: '긴 글'},
+  {id: 'choice', en: 'Select', name: '선택'}, {id: 'multi', en: 'Multi-select', name: '여러 개 선택'}, {id: 'check', en: 'Checkbox', name: '체크'}, {id: 'date', en: 'Date', name: '날짜'},
+  {id: 'time', en: 'Time', name: '시각'}, {id: 'duration', en: 'Duration', name: '걸린 시간(분)'}, {id: 'link', en: 'Relation', name: '연결'},
   // 상황: a condition the user picks from lit's list (오늘 순집중 8시간…), kept on the item (a wish's unlock condition).
-  {id: 'signal', name: '상황'},
+  {id: 'signal', en: 'Signal', name: '상황'},
 ] as const;
 export type FieldKind = (typeof FIELD_KINDS)[number]['id'];
 const id24 = z.string().regex(/^[a-z0-9]{1,24}$/);
@@ -46,44 +46,45 @@ export const VERB_NAMES: Record<Verb, string> = {planned: '계획함', started: 
 export const newLogicId = () => Math.random().toString(36).slice(2, 10);
 
 // ── Filters (a view's conditions; also the 조건 of automations) ───────────────────────────────────
-export const OPS = [{id: 'eq', name: '='}, {id: 'ne', name: '≠'}, {id: 'lt', name: '<'}, {id: 'lte', name: '≤'}, {id: 'gt', name: '>'}, {id: 'gte', name: '≥'},
-  {id: 'has', name: '포함'}, {id: 'empty', name: '비어 있음'}, {id: 'filled', name: '값 있음'}] as const;
+export const OPS = [{id: 'eq', en: 'is', name: '='}, {id: 'ne', en: 'is not', name: '≠'}, {id: 'lt', en: 'less than', name: '<'}, {id: 'lte', en: 'at most', name: '≤'}, {id: 'gt', en: 'greater than', name: '>'}, {id: 'gte', en: 'at least', name: '≥'},
+  {id: 'has', en: 'contains', name: '포함'}, {id: 'empty', en: 'is empty', name: '비어 있음'}, {id: 'filled', en: 'is not empty', name: '값 있음'}] as const;
 export type Op = (typeof OPS)[number]['id'];
 // field: a field id, or 'verb' | 'value' | 'duration' (minutes) | 'hour' (local start hour) | 'link'.
 export const Cond = z.object({field: z.string().max(24), op: z.enum(OPS.map(o => o.id) as [Op, ...Op[]]), value: z.union([z.string().max(200), z.number(), z.boolean()]).default('')});
 export type Cond = z.infer<typeof Cond>;
-export const PERIODS = [{id: 'day', name: '보이는 날'}, {id: 'today', name: '오늘'}, {id: 'week', name: '이번 주'}, {id: 'last7', name: '최근 7일'}, {id: 'month', name: '이번 달'}, {id: 'last30', name: '최근 30일'}, {id: 'all', name: '전체'}] as const;
+export const PERIODS = [{id: 'day', en: 'Selected day', name: '보이는 날'}, {id: 'today', en: 'Today', name: '오늘'}, {id: 'week', en: 'This week', name: '이번 주'}, {id: 'last7', en: 'Last 7 days', name: '최근 7일'}, {id: 'month', en: 'This month', name: '이번 달'}, {id: 'last30', en: 'Last 30 days', name: '최근 30일'}, {id: 'all', en: 'All time', name: '전체'}] as const;
 export type Period = (typeof PERIODS)[number]['id'];
 export const SavedFilter = z.object({id: z.string().max(12), name: z.string().trim().min(1).max(20), conds: z.array(Cond).max(8).default([])});
 export type SavedFilter = z.infer<typeof SavedFilter>;
 
 // ── Blocks: the pieces a widget is made of ───────────────────────────────────────────────────────
 export const BLOCK_GROUPS = {input: '입력', time: '시간', compute: '계산', view: '보기', deco: '꾸미기'} as const;
+export const BLOCK_GROUPS_EN: Record<keyof typeof BLOCK_GROUPS, string> = {input: 'Input', time: 'Time', compute: 'Compute', view: 'View', deco: 'Decor'};
 export type BlockGroup = keyof typeof BLOCK_GROUPS;
 export const BLOCK_KINDS = ['button', 'toggle', 'counter', 'check', 'score', 'form', 'stopwatch', 'timer', 'stat', 'list', 'timeline', 'calendar', 'chart', 'gallery', 'table', 'grid10', 'breakdown', 'cards', 'checklist', 'heading', 'note'] as const;
 export type BlockKind = (typeof BLOCK_KINDS)[number];
-export const LOGIC_BLOCKS: {kind: BlockKind; group: BlockGroup; name: string; desc: string}[] = [
-  {kind: 'button', group: 'input', name: '버튼', desc: '누르면 그 시각이 한 줄 기록돼요 (기상, 약 먹음, 출근…)'},
-  {kind: 'toggle', group: 'input', name: '시작·끝 버튼', desc: '한 번 누르면 시작, 다시 누르면 끝. 걸린 시간이 남아요 (취침→기상, 공부, 운동)'},
-  {kind: 'counter', group: 'input', name: '카운터', desc: '+1 할 때마다 한 줄 (물 한 잔, 커피, 푼 문제)'},
-  {kind: 'check', group: 'input', name: '오늘 체크', desc: '그날 했는지 안 했는지 하나 (습관)'},
-  {kind: 'score', group: 'input', name: '점수', desc: '1~N 중 하나를 누르면 기록 (기분, 컨디션, 집중도)'},
-  {kind: 'form', group: 'input', name: '입력 칸 묶음', desc: '고른 속성들을 채우고 저장하면 한 줄 (독서 기록, 지출, 일기)'},
-  {kind: 'stopwatch', group: 'time', name: '스톱워치', desc: '흐르는 시간을 보여 주는 시작·끝 버튼'},
-  {kind: 'timer', group: 'time', name: '타이머', desc: '정한 시간이 끝나면 기록하고 알려요. 단계를 이어 반복할 수 있어요 (뽀모도로 25→5)'},
-  {kind: 'stat', group: 'compute', name: '숫자·게이지', desc: '개수·합계·평균·최대·최소·연속 일수·목표 대비 %'},
-  {kind: 'list', group: 'view', name: '목록', desc: '기록을 줄로, 필터와 정렬을 골라서'},
-  {kind: 'timeline', group: 'view', name: '시간축', desc: '하루를 시간 순서로 (몇 시부터 몇 시까지)'},
-  {kind: 'calendar', group: 'view', name: '달력', desc: '한 달에 기록이 있는 날, 양만큼 진하게'},
-  {kind: 'chart', group: 'view', name: '막대 차트', desc: '날마다 합계·개수·평균'},
-  {kind: 'gallery', group: 'view', name: '카드', desc: '기록을 카드로'},
-  {kind: 'table', group: 'view', name: '표', desc: '속성을 열로'},
-  {kind: 'grid10', group: 'view', name: '10분 타임테이블', desc: '하루를 10분 칸으로. 잰 시간이 저절로 칠해지고, 빈 칸을 눌러 직접 칠해요'},
-  {kind: 'breakdown', group: 'compute', name: '나눠 보기', desc: '선택 속성별 합계 (과목별 시간, 분류별 지출) — 목록 또는 원형'},
-  {kind: 'checklist', group: 'input', name: '체크 목록', desc: '항목마다 체크 칸. 줄에 보일 속성과 ⋯에서 고칠 속성을 골라요 (할 일, 숙제, 장보기)'},
-  {kind: 'cards', group: 'view', name: '열림 카드', desc: '항목마다 상황(조건)과 진행 막대. 조건이 되면 열리고, 열린 것은 사용하기 (소원, 보상)'},
-  {kind: 'heading', group: 'deco', name: '제목·문구', desc: '블록 사이의 글'},
-  {kind: 'note', group: 'deco', name: '안내 없는 빈 줄', desc: '간격'},
+export const LOGIC_BLOCKS: {kind: BlockKind; en: string; group: BlockGroup; name: string; desc: string}[] = [
+  {kind: 'button', en: 'Timestamp', group: 'input', name: '버튼', desc: '누르면 그 시각이 한 줄 기록돼요 (기상, 약 먹음, 출근…)'},
+  {kind: 'toggle', en: 'Start/Stop', group: 'input', name: '시작·끝 버튼', desc: '한 번 누르면 시작, 다시 누르면 끝. 걸린 시간이 남아요 (취침→기상, 공부, 운동)'},
+  {kind: 'counter', en: 'Counter', group: 'input', name: '카운터', desc: '+1 할 때마다 한 줄 (물 한 잔, 커피, 푼 문제)'},
+  {kind: 'check', en: 'Daily check', group: 'input', name: '오늘 체크', desc: '그날 했는지 안 했는지 하나 (습관)'},
+  {kind: 'score', en: 'Rating', group: 'input', name: '점수', desc: '1~N 중 하나를 누르면 기록 (기분, 컨디션, 집중도)'},
+  {kind: 'form', en: 'Form', group: 'input', name: '입력 칸 묶음', desc: '고른 속성들을 채우고 저장하면 한 줄 (독서 기록, 지출, 일기)'},
+  {kind: 'stopwatch', en: 'Stopwatch', group: 'time', name: '스톱워치', desc: '흐르는 시간을 보여 주는 시작·끝 버튼'},
+  {kind: 'timer', en: 'Timer', group: 'time', name: '타이머', desc: '정한 시간이 끝나면 기록하고 알려요. 단계를 이어 반복할 수 있어요 (뽀모도로 25→5)'},
+  {kind: 'stat', en: 'Metric', group: 'compute', name: '지표', desc: '개수·합계·평균·최대·최소·연속 일수·목표 대비 %'},
+  {kind: 'list', en: 'List', group: 'view', name: '목록', desc: '기록을 줄로, 필터와 정렬을 골라서'},
+  {kind: 'timeline', en: 'Timeline', group: 'view', name: '시간축', desc: '하루를 시간 순서로 (몇 시부터 몇 시까지)'},
+  {kind: 'calendar', en: 'Calendar', group: 'view', name: '달력', desc: '한 달에 기록이 있는 날, 양만큼 진하게'},
+  {kind: 'chart', en: 'Bar chart', group: 'view', name: '막대 차트', desc: '날마다 합계·개수·평균'},
+  {kind: 'gallery', en: 'Gallery', group: 'view', name: '카드', desc: '기록을 카드로'},
+  {kind: 'table', en: 'Table', group: 'view', name: '표', desc: '속성을 열로'},
+  {kind: 'grid10', en: 'Time grid', group: 'view', name: '10분 타임테이블', desc: '하루를 10분 칸으로. 잰 시간이 저절로 칠해지고, 빈 칸을 눌러 직접 칠해요'},
+  {kind: 'breakdown', en: 'Breakdown', group: 'compute', name: '나눠 보기', desc: '선택 속성별 합계 (과목별 시간, 분류별 지출) — 목록 또는 원형'},
+  {kind: 'checklist', en: 'Checklist', group: 'input', name: '체크 목록', desc: '항목마다 체크 칸. 줄에 보일 속성과 ⋯에서 고칠 속성을 골라요 (할 일, 숙제, 장보기)'},
+  {kind: 'cards', en: 'Unlock cards', group: 'view', name: '열림 카드', desc: '항목마다 상황(조건)과 진행 막대. 조건이 되면 열리고, 열린 것은 사용하기 (소원, 보상)'},
+  {kind: 'heading', en: 'Heading', group: 'deco', name: '제목·문구', desc: '블록 사이의 글'},
+  {kind: 'note', en: 'Spacer', group: 'deco', name: '여백', desc: '부품 사이 간격'},
 ];
 export const blockInfo = (k: BlockKind) => LOGIC_BLOCKS.find(b => b.kind === k)!;
 import {AGGS, type Agg} from './agg.ts';
@@ -212,6 +213,16 @@ export const Action = z.discriminatedUnion('do', [
   z.object({do: z.literal('effect'), name: z.enum(EFFECT_IDS), target: z.enum(['item', 'widget']).default('item')}),
 ]);
 export const OPEN_WHAT = {'receipt-today': '오늘 영수증', 'receipt-yesterday': '어제 영수증', checkin: '아침 상태 묻기'} as const;
+// Grammar names for a rule: English is the canonical name (docs, AI, market), Korean is the screen translation.
+export const RULE_TRIGGERS = [
+  {id: 'record', en: 'When an item is added or changed', name: '항목이 생기거나 바뀌면'}, {id: 'item', en: 'For each item, when its signal is met', name: '항목마다 그 항목의 상황이 되면'},
+  {id: 'signal', en: 'When a signal is met', name: '상황이 되면'}, {id: 'time', en: 'At a time', name: '정한 시각에'},
+  {id: 'dayStart', en: 'When the day starts', name: '하루가 시작되면'}, {id: 'wake', en: 'On wake', name: '일어나면'},
+] as const;
+export const RULE_ACTIONS = [
+  {id: 'create', en: 'Create item', name: '항목 만들기'}, {id: 'update', en: 'Update item', name: '항목 고치기'}, {id: 'updateWhere', en: 'Update matching items', name: '조건에 맞는 항목 고치기'},
+  {id: 'notify', en: 'Notify', name: '알림'}, {id: 'open', en: 'Open', name: '열기'}, {id: 'effect', en: 'Effect', name: '움직임'},
+] as const;
 // What starts a flow: a record written (any device, any widget; run on the server), or a moment on the screen —
 // a time of day, the first opening of a new day, or 일어났어요 (run by the planner that is open).
 export const TRIGGERS = {record: 'DB에 항목이 추가·수정되면', item: '항목마다, 그 항목의 상황(또는 조건)이 되면', signal: '상황이 되면', time: '매일 정한 시각에', dayStart: '하루를 시작하면 (그날 처음 열 때)', wake: '일어났어요를 누르면'} as const;

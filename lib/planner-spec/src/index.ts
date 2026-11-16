@@ -11,3 +11,4 @@ export * from './modes.ts';
 export * from './signals.ts';
 export * from './pack.ts';
 export * from './systemdb.ts';
+export * from './grammar.ts';

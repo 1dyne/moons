@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {ulid, v2, type AnyRecord, type LifeRecord} from '@workspace/life-contract';
-import {aggregate, applyValues, buildWorkspace, evalSignal, expr, inferDatabase, itemView, mergeProperty, onItemWrite, onMoment, parseCapture, preview, query, suggestions, tidyReport, value, withItem, type Ctx, type Item} from './index.ts';
+import {aggregate, applyValues, nest, title, buildWorkspace, evalSignal, expr, inferDatabase, itemView, mergeProperty, onItemWrite, onMoment, parseCapture, preview, query, suggestions, tidyReport, value, withItem, type Ctx, type Item} from './index.ts';
 
 // The tests build their own databases. Words like 하루 일과 or 목표 appear only here, never in the engine.
 let n = 0;
@@ -205,4 +205,30 @@ test('same-day rollup: one item sums what other items hold on its day', () => {
   const ws = buildWorkspace([...Object.values(p), awake, fixedSum, fixed, left, check, a, b, c] as AnyRecord[]);
   assert.equal(value(ws, check, fixedSum.id), 120);
   assert.equal(value(ws, check, left.id), 780);
+});
+
+test('sub-items: progress rolls up; parent and children move on their own; a user rule can act on the parent', () => {
+  const p = planner();
+  const up = prop('상위 항목', 'relation', {relation: {db: p.daily.id, many: false}});
+  const sub = prop('하위 진행률', 'formula', {formula: {op: 'rollup', via: up.id, back: true, agg: 'doneRatio'}});
+  const top = rec('item', {dbs: [p.daily.id], values: {[p.title.id]: '텝스', [p.state.id]: 'todo', [p.day.id]: '2026-11-17'}});
+  const mid = rec('item', {dbs: [p.daily.id], values: {[p.title.id]: '청해', [p.state.id]: 'todo', [up.id]: [top.id], [p.day.id]: '2026-11-17'}});
+  const t1 = rec('item', {dbs: [p.daily.id], values: {[p.title.id]: 'test 1', [p.state.id]: 'todo', [up.id]: [mid.id], [p.day.id]: '2026-11-17'}});
+  const t2 = rec('item', {dbs: [p.daily.id], values: {[p.title.id]: 'test 2', [p.state.id]: 'todo', [up.id]: [mid.id], [p.day.id]: '2026-11-17'}});
+  let ws = buildWorkspace([...Object.values(p), up, sub, top, mid, t1, t2] as AnyRecord[]);
+  assert.deepEqual(nest(ws, query(ws, {dbs: [p.daily.id]}, ctx), up.id).map(x => [title(ws, x.item), x.depth]), [['텝스', 0], ['청해', 1], ['test 1', 2], ['test 2', 2]]);
+  // No rule: checking every child moves nothing else.
+  const a = set(t1, {[p.state.id]: 'did'}), b = set(t2, {[p.state.id]: 'did'});
+  let before = withItem(ws, a); const after = withItem(before, b);
+  assert.equal(value(after, mid, sub.id), 100);
+  assert.deepEqual(onItemWrite(before, after, t2, b, ctx), []);
+  // The parent can be done while a child moves to tomorrow.
+  const moved = set(t2, {[p.day.id]: '2026-11-18'}), doneTop = set(top, {[p.state.id]: 'did'});
+  ws = withItem(withItem(ws, moved), doneTop);
+  assert.deepEqual(nest(ws, query(ws, {dbs: [p.daily.id], where: [{role: 'day', op: 'is', value: '2026-11-17'}]}, ctx), up.id).map(x => title(ws, x.item)), ['텝스', '청해', 'test 1']);
+  // With a rule the user made ("all sub-items done → done"), the parent is checked when its last child is.
+  const rule = rec('rule', {on: {kind: 'enter'}, source: {dbs: [p.daily.id], where: [{prop: sub.id, op: 'gte', value: 100}, {role: 'done', op: 'is', value: '@open'}]}, do: [{do: 'set', values: {[p.state.id]: {set: 'did'}}}]});
+  before = withItem(buildWorkspace([...Object.values(p), up, sub, top, mid, t1, t2, rule] as AnyRecord[]), a);
+  const plans = onItemWrite(before, withItem(before, b), t2, b, ctx);
+  assert.deepEqual(plans.map(x => x.item), [mid.id]);
 });

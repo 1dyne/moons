@@ -239,3 +239,7 @@ table.grid td input, table.grid td select { width: 100%; }
 .connect-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; max-width: 420px; }
 .actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .moon-say { display: flex; align-items: center; gap: 10px; }
+
+.line .fold { border: 0; background: none; padding: 0 2px; color: var(--muted); width: 16px; }
+.line.sub { font-size: 14px; }
+.line.sub .check { font-size: 16px; }

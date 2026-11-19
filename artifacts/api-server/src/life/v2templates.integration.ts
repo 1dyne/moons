@@ -95,3 +95,19 @@ test('workout: opening a line with 운동 goes to the workout page carrying it; 
   assert.equal(value(ws2, ws2.items.get(s2.id)!, w.$prev!), 60);
   assert.equal(value(ws2, ws2.items.get(squat.id)!, w.$best!), 65);
 });
+
+test('sub-items: independent by default; with a user rule the chain closes test → 청해 → 텝스', async () => {
+  const r = await refs('lit.daily'), ctx = await ctxOf(owner);
+  const mk = (t: string, up?: string) => item({dbs: [r.$daily], values: {[r.$title!]: t, [r.$state!]: 'todo', [r.$day!]: ctx.today, ...(up ? {[r.$upper!]: [up]} : {})}});
+  const top = await mk('텝스'), mid = await mk('청해', top.id), t1 = await mk('part1 test 1', mid.id), t2 = await mk('part1 test 2', mid.id);
+  await update(t1, {[r.$state!]: 'did'}); await update(t2, {[r.$state!]: 'did'});
+  let ws = await loadWorkspace(owner);
+  assert.equal(value(ws, ws.items.get(mid.id)!, r.$subProgress!), 100);
+  assert.equal(ws.items.get(mid.id)!.body.values[r.$state!], 'todo', 'no rule: the parent stays as it was');
+  await saveV2(owner, null, {kind: 'rule', body: {name: '하위를 다 하면 상위도', on: {kind: 'enter'}, source: {dbs: [r.$daily], where: [{prop: r.$subProgress, op: 'gte', value: 100}, {role: 'done', op: 'is', value: '@open'}]}, do: [{do: 'set', values: {[r.$state!]: {set: 'did'}}}]}});
+  const a = await mk('청취 A'), b = await mk('a-1', a.id), c = await mk('a-1-x', b.id);
+  await update(c, {[r.$state!]: 'did'});
+  ws = await loadWorkspace(owner);
+  assert.equal(ws.items.get(b.id)!.body.values[r.$state!], 'did');
+  assert.equal(ws.items.get(a.id)!.body.values[r.$state!], 'did');
+});

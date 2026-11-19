@@ -1,8 +1,8 @@
 {
  "id": "lit.daily",
- "version": 1,
+ "version": 2,
  "name": "하루 일과 + 목표",
- "desc": "하루 일과를 체크하면 연결한 목표의 진행률이 오르고, 목표를 이루거나 포기하면 축하·다독임과 함께 회고 기록지가 열려요. 예상 대비 소요 시간, 10분 칸, 희망사항 회색 표시가 들어 있어요.",
+ "desc": "하루 일과를 체크하면 연결한 목표의 진행률이 오르고, 목표를 이루거나 포기하면 축하·다독임과 함께 회고 기록지가 열려요. 예상 대비 소요 시간, 10분 칸, 희망사항 회색 표시가 들어 있어요. 일과 아래에 하위 항목(⋯ → + 하위)을 달 수 있고, 상위와 하위는 따로 체크·미뤄요.",
  "records": [
   {
    "kind": "property",
@@ -298,6 +298,36 @@
   },
   {
    "kind": "property",
+   "ref": "$upper",
+   "body": {
+    "name": "상위 항목",
+    "kind": "relation",
+    "relation": {
+     "db": "$daily",
+     "many": false
+    },
+    "desc": "이 일이 어느 큰 일의 세부인지. 상위와 하위는 따로 체크하고 따로 미뤄요"
+   }
+  },
+  {
+   "kind": "property",
+   "ref": "$subProgress",
+   "body": {
+    "name": "하위 진행률",
+    "kind": "formula",
+    "unit": "%",
+    "formula": {
+     "op": "rollup",
+     "via": "$upper",
+     "back": true,
+     "of": null,
+     "agg": "doneRatio"
+    },
+    "desc": "이 일의 하위 항목 중 끝낸 비율"
+   }
+  },
+  {
+   "kind": "property",
    "ref": "$about",
    "body": {
     "name": "어느 목표",
@@ -351,7 +381,9 @@
      "$reason",
      "$goal",
      "$spent",
-     "$gap"
+     "$gap",
+     "$upper",
+     "$subProgress"
     ],
     "focus": true,
     "desc": "하루에 할 일과 고정 일정"
@@ -577,6 +609,7 @@
          "$start",
          "$est",
          "$spent",
+         "$subProgress",
          "$goal"
         ],
         "edit": [
@@ -588,7 +621,8 @@
          "$cat",
          "$goal",
          "$fixed",
-         "$reason"
+         "$reason",
+         "$upper"
         ],
         "chips": [
          "$cat",
@@ -615,7 +649,8 @@
           ],
           "look": "bold"
          }
-        ]
+        ],
+        "nest": "$upper"
        }
       }
      ]

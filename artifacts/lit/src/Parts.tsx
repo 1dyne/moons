@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useState, type DragEvent} from 'react';
 import {addDays, v2} from '@workspace/life-contract';
-import {aggregate, evalSignal, itemDay, matchesAll, parseCapture, periodRange, query, title, value, type Ctx, type Item, type Workspace} from '@workspace/lit-core';
+import {aggregate, evalSignal, itemDay, matchesAll, nest, parseCapture, periodRange, query, title, value, type Ctx, type Item, type Workspace} from '@workspace/lit-core';
 import {useLit} from './store.tsx';
 import {checkGlyph, newItemBody, nextDone, propsForItem, roleProp} from './model.ts';
 import {ItemSheet} from './Item.tsx';
@@ -70,7 +70,7 @@ function Chips({view, chips, setChips}: {view: v2.View; chips: Record<string, st
 function Lines({part, day, check}: PartProps & {check: boolean}) {
   const {ws, ctx, save, setValues, flash, open, runEffects} = useLit();
   const [chips, setChips] = useState<Record<string, string | null>>({}), [opened, setOpened] = useState<string | null>(null), [menu, setMenu] = useState<string | null>(null);
-  const [text, setText] = useState(''), [drag, setDrag] = useState<string | null>(null);
+  const [text, setText] = useState(''), [drag, setDrag] = useState<string | null>(null), [folded, setFolded] = useState<Set<string>>(new Set());
   const v = part.view, c = ctxFor(ctx, day);
   const items = viewItems(ws, v, ctx, day, chips);
   const group = v.group ? ws.properties.get(v.group) : undefined;
@@ -95,31 +95,40 @@ function Lines({part, day, check}: PartProps & {check: boolean}) {
     <Chips view={v} chips={chips} setChips={setChips} />
     {sections.map(([name, list]) => <div key={name} className="section">
       {name && <h4 className="section-h">{name}</h4>}
-      <ul>{ordered(list).map(it => {
+      <ul>{(() => { const rows = v.nest ? nest(ws, ordered(list), v.nest) : ordered(list).map(item => ({item, depth: 0})); let hideBelow = Infinity;
+        return rows.map(({item: it, depth}, i) => {
+        if (depth > hideBelow) return null;
+        hideBelow = folded.has(it.id) ? depth : Infinity;
+        const hasKids = (rows[i + 1]?.depth ?? -1) > depth;
         const lk = looks(ws, v, it, c); if (lk.cls.includes('look-hidden')) return null;
         const s = start(it), en = end(it), running = s && it.body.values[s.id] && en && !it.body.values[en.id];
         const moves = open(it);
-        return <li key={it.id} className={`line ${lk.cls} ${flash[it.id] ? `fx-${flash[it.id]}` : ''}`} style={lk.color ? {'--look': `var(--c-${lk.color})`} as React.CSSProperties : undefined}
+        return <li key={it.id} className={`line ${depth ? 'sub' : ''} ${lk.cls} ${flash[it.id] ? `fx-${flash[it.id]}` : ''}`} style={{...(lk.color ? {'--look': `var(--c-${lk.color})`} : {}), paddingLeft: depth * 20} as React.CSSProperties}
           draggable onDragStart={() => setDrag(it.id)} onDragOver={e => e.preventDefault()} onDrop={e => drop(e, it, list)}>
+          {v.nest && <button className="fold" aria-label={folded.has(it.id) ? '하위 펼치기' : '하위 접기'} style={{visibility: hasKids ? 'visible' : 'hidden'}} onClick={() => setFolded(f => { const n = new Set(f); if (n.has(it.id)) n.delete(it.id); else n.add(it.id); return n; })}>{folded.has(it.id) ? '▸' : '▾'}</button>}
           {check && <button className="check" aria-label="달성 단계 바꾸기" onClick={() => { const n = nextDone(ws, it); if (n) void setValues(it, n); }}>{checkGlyph(ws, it) || '○'}</button>}
           <button className="line-title" onClick={() => setOpened(it.id)}>{title(ws, it) || <span className="muted">(이름 없음)</span>}</button>
           <span className="line-props">{v.show.map(pid => { const p = ws.properties.get(pid), val = value(ws, it, pid), t = fmt(ws, p, val); return t ? <span key={pid} className={`pv c-${optionColor(p, val)}`}>{t}</span> : null; })}</span>
           {s && en && <button className={`stamp ${running ? 'on' : ''}`} aria-label={running ? '끝' : '시작'} onClick={() => void setValues(it, running ? {[en.id]: new Date().toISOString()} : {[s.id]: new Date().toISOString(), [en.id]: null})}>{running ? '■' : '▶'}</button>}
           {moves.length > 0 && <button className="go" aria-label="이어서 열기" onClick={() => runEffects(moves)}>→</button>}
           <button className="more" aria-label="더 보기" onClick={() => setMenu(menu === it.id ? null : it.id)}>⋯</button>
-          {menu === it.id && <LineMenu item={it} edit={v.edit} day={day} close={() => setMenu(null)} />}
+          {menu === it.id && <LineMenu item={it} edit={v.edit} day={day} nestProp={v.nest} close={() => setMenu(null)} />}
         </li>;
-      })}</ul>
+      }); })()}</ul>
     </div>)}
     {!items.length && <p className="muted small empty">비어 있어요</p>}
     <form className="add-line" onSubmit={e => { e.preventDefault(); void add(); }}><input value={text} onChange={e => setText(e.target.value)} placeholder="+ 추가" aria-label="새 항목" /></form>
     {opened && <ItemSheet id={opened} onClose={() => setOpened(null)} />}
   </div>;
 }
-function LineMenu({item, edit, day, close}: {item: Item; edit: string[]; day: string; close: () => void}) {
-  const {ws, setValues, save, remove} = useLit();
+function LineMenu({item, edit, day, nestProp, close}: {item: Item; edit: string[]; day: string; nestProp?: string | null; close: () => void}) {
+  const {ws, setValues, save, remove} = useLit(), [child, setChild] = useState('');
   const d = roleProp(ws, 'day', item.body.dbs);
   return <div className="line-menu">
+    {nestProp && <form className="row" onSubmit={async e => { e.preventDefault(); const t = child.trim(); if (!t) return; setChild('');
+      // A sub-item starts on its parent's day; after that each moves and is checked on its own.
+      await save('item', newItemBody(ws, item.body.dbs, t, itemDay(ws, item) || day, {[nestProp]: [item.id]})); }}>
+      <input value={child} onChange={e => setChild(e.target.value)} placeholder="+ 하위 항목" aria-label="하위 항목 추가" autoFocus /><button className="small" type="submit">추가</button></form>}
     {edit.map(pid => ws.properties.get(pid)).filter(p => p && p.body.kind !== 'formula').map(p => <label key={p!.id}><span className="k">{p!.body.name}</span><ValueInput p={p!} item={item} value={item.body.values[p!.id] ?? null} onChange={val => setValues(item, {[p!.id]: val})} /></label>)}
     <div className="row wrap">
       {d && <button className="small" onClick={() => { void setValues(item, {[d.id]: addDays(itemDay(ws, item) || day, 1)}); close(); }}>내일로</button>}

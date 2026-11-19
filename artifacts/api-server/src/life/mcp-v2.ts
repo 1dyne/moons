@@ -27,7 +27,8 @@ const guide = () => `lit v2 · 사용자가 lit 문법으로 직접 짓는 자�
 - Lens(모아보기): 저장한 필터(dbs + where). Cond: {prop|role, on:"value"|"db"|"text", op ${v2.OPS.join('|')}, value}. 특수 값 @today @yesterday @thisWeek @weekday @day @done @open @skip @none @carried.
 - Signal(상황): measure(source+of+agg+period) op compare({n} 또는 {signal}).
 - Rule(규칙): on enter|change|signal|dayStart|time|open → source/if → do set|create|createEach(하루 한 번 반복)|archive|notify|effect|openForm|goTo. mode auto|suggest.
-- Screen: pages → widgets(w 1~4칸) → parts(${v2.PART_KINDS.join('·')}), part.view = source + period('' 모든 날|day 보이는 날|today…) + show/edit/chips/group/sort/styles(조건부 모양 ${v2.LOOKS.join('|')}).
+- 하위 항목: 같은 DB를 가리키는 relation 칸(예: "상위 항목", many:false)에 상위 항목 id를 넣는다. 상위의 진행률은 rollup(via 그 칸, back:true, agg doneRatio). 상위와 하위는 각자 날짜·달성 단계를 가진다(따로 체크하고 따로 미룬다). 상위를 하위에 맞춰 저절로 바꾸고 싶을 때만 사용자가 규칙을 만든다(on enter, where 하위 진행률 gte 100 → set 달성). 엔진은 항목을 쓰면 연결된 항목(양방향, 3단계)의 enter 규칙도 다시 본다. 하위 찾기: query_items({source:{where:[{prop:"<상위 칸 id>", op:"contains", value:"<상위 id>"}]}}).
+- Screen: pages → widgets(w 1~4칸) → parts(${v2.PART_KINDS.join('·')}), part.view = source + period('' 모든 날|day 보이는 날|today…) + show/edit/chips/group/nest(하위로 묶을 relation 칸)/sort/styles(조건부 모양 ${v2.LOOKS.join('|')}).
 - Template: 예시로 조립해 둔 데이터. install_template 으로 설치하면 사용자 것으로 복사된다.
 지킬 것 (개인 공간):
 1. 먼저 get_workspace 로 지금 구조를 본다. 이미 있는 속성·DB를 다시 만들지 않는다(비슷한 이름은 tidy 결과를 본다).

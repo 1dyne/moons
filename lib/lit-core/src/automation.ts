@@ -80,7 +80,46 @@ export function onItemWrite(before: Workspace, after: Workspace, prior: Item | n
       plans.push(...runOver(after, r.id, ctx));
     }
   }
+  // Items joined to this one by a relation (either way, a few steps out) were not written, but what they compute
+  // (a rollup of their linked items) may have changed: enter rules check them too. Nothing moves on its own —
+  // only a rule the user made can act on a linked item.
+  for (const n of linkedItems(after, [next, ...(prior ? [prior] : [])], 3)) {
+    const was = before.items.get(n.id);
+    for (const r of after.rules.values()) {
+      if (!r.body.enabled || r.body.on.kind !== 'enter') continue;
+      if (!ruleHolds(after, r, n, ctx) || (was && ruleHolds(before, r, was, ctx))) continue;
+      plans.push(planRule(after, r.id, n, ctx));
+    }
+  }
   return plans.filter(nonEmpty);
+}
+/** Items reachable through relation properties from these items (both directions), up to `depth` steps. */
+export function linkedItems(ws: Workspace, from: Item[], depth: number): Item[] {
+  const rel = [...ws.properties.values()].filter(p => p.body.kind === 'relation').map(p => p.id);
+  const seen = new Set(from.map(x => x.id)), out: Item[] = [];
+  let frontier = from;
+  for (let d = 0; d < depth && frontier.length; d++) {
+    const ids = new Set<string>();
+    for (const it of frontier) for (const pid of rel) { const v = it.body.values[pid]; for (const id of Array.isArray(v) ? v : typeof v === 'string' ? [v] : []) ids.add(id); }
+    const ref = new Set(frontier.map(x => x.id));
+    for (const x of ws.items.values()) if (rel.some(pid => { const v = x.body.values[pid]; return Array.isArray(v) ? v.some(id => ref.has(id)) : typeof v === 'string' && ref.has(v); })) ids.add(x.id);
+    frontier = [...ids].filter(id => !seen.has(id)).map(id => ws.items.get(id)).filter((x): x is Item => !!x);
+    for (const x of frontier) { seen.add(x.id); out.push(x); }
+  }
+  return out;
+}
+/** Nest items under the item their `via` relation points to (when that item is in the list too). Each keeps its own
+ * day and done step: a parent can be done while a child moved to another day, and the other way round. */
+export function nest(ws: Workspace, items: Item[], via: string): {item: Item; depth: number}[] {
+  const inList = new Set(items.map(x => x.id));
+  const parentOf = (x: Item) => { const v = x.body.values[via]; const id = Array.isArray(v) ? v[0] : typeof v === 'string' ? v : undefined; return id && inList.has(id) && id !== x.id ? id : null; };
+  const kids = new Map<string, Item[]>();
+  for (const x of items) { const p = parentOf(x); if (p) kids.set(p, [...(kids.get(p) ?? []), x]); }
+  const out: {item: Item; depth: number}[] = [], placed = new Set<string>();
+  const walk = (x: Item, depth: number) => { if (placed.has(x.id) || depth > 8) return; placed.add(x.id); out.push({item: x, depth}); for (const k of kids.get(x.id) ?? []) walk(k, depth + 1); };
+  for (const x of items) if (!parentOf(x)) walk(x, 0);
+  for (const x of items) if (!placed.has(x.id)) walk(x, 0); // a loop of links: show the rest flat
+  return out;
 }
 /** A rule that runs for a moment (day start, a time, a signal): once, or once per item of its source. */
 function runOver(ws: Workspace, ruleId: string, ctx: Ctx): Plan[] {

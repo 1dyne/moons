@@ -159,6 +159,8 @@ export const View = Source.extend({
   chips: z.array(recordId).max(6).default([]),        // filter chips the viewer toggles on the screen
   sort: z.array(z.object({prop: recordId, dir: z.enum(['asc', 'desc'])})).max(3).default([]),
   group: recordId.nullable().default(null),
+  // Nest lines under the item this relation points to (sub-items). Each line still moves on its own.
+  nest: recordId.nullable().default(null),
   show: z.array(recordId).max(12).default([]),         // shown on each line
   edit: z.array(recordId).max(20).default([]),         // editable from the line's menu
   styles: z.array(z.object({when: z.array(Cond).max(6), look: z.enum(LOOKS), color: z.string().max(20).default('')})).max(8).default([]),

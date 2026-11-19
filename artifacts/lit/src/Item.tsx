@@ -1,8 +1,8 @@
 import {useEffect, useState} from 'react';
 import {v2, type AnyRecord} from '@workspace/life-contract';
-import {itemDay, similarProperties, value, type Item} from '@workspace/lit-core';
+import {itemDay, similarProperties, title as itemTitle, value, type Item} from '@workspace/lit-core';
 import {api, useLit} from './store.tsx';
-import {propsForItem, roleProp} from './model.ts';
+import {checkGlyph, propsForItem, roleProp} from './model.ts';
 import {En, IdPicker, KIND_NAMES, Sheet, ValueInput, dbList, fmt, nameOf} from './ui.tsx';
 
 /** One item: every property, its databases, a new property right here, archive, history. */
@@ -25,6 +25,7 @@ export function ItemSheet({id, onClose}: {id: string; onClose: () => void}) {
         </div>)}
       </div>
       <AddProperty onAdd={pid => setExtra(x => [...x, pid])} />
+      <Backlinks item={item} />
       <p className="muted small">하루: {itemDay(ws, item)}{item.body.archived ? ' · 보관됨' : ''}</p>
       <div className="row wrap">
         {moves.length > 0 && <button className="primary" onClick={() => { runEffects(moves); onClose(); }}>→ 이어서 열기</button>}
@@ -64,3 +65,13 @@ export function AddProperty({onAdd}: {onAdd: (id: string) => void}) {
   </div>;
 }
 export type {Item};
+
+/** Items whose relation points at this one (sub-items, sets of an exercise…), grouped by that relation. */
+function Backlinks({item}: {item: Item}) {
+  const {ws} = useLit();
+  const rels = [...ws.properties.values()].filter(p => p.body.kind === 'relation');
+  const groups = rels.map(p => [p, [...ws.items.values()].filter(x => !x.body.archived && x.id !== item.id && (Array.isArray(x.body.values[p.id]) ? (x.body.values[p.id] as string[]).includes(item.id) : x.body.values[p.id] === item.id))] as const).filter(([, l]) => l.length);
+  if (!groups.length) return null;
+  return <div className="backlinks">{groups.map(([p, l]) => <div key={p.id}><span className="k">이 항목을 “{p.body.name}”(으)로 가리키는 항목 {l.length}개</span>
+    <ul>{l.slice(0, 30).map(x => <li key={x.id} className="small">{checkGlyph(ws, x)} {itemTitle(ws, x) || '(이름 없음)'} <span className="muted">{itemDay(ws, x)}</span></li>)}</ul></div>)}</div>;
+}
